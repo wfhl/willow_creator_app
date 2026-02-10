@@ -1,0 +1,637 @@
+import React, { type ChangeEvent } from 'react';
+import { Layers, Edit2, ImagePlus, ChevronDown, Video as VideoIcon, Sparkles, Copy, Loader2, Dices, Image as ImageIcon, Wand2, Download } from 'lucide-react';
+import LoadingIndicator from '../loading-indicator';
+import type { DBAsset as Asset } from '../../lib/dbService';
+import { AssetUploader } from '../asset-uploader';
+
+import { type Theme, type CaptionStyle } from './SettingsTab';
+
+interface CreateTabProps {
+    themes: Theme[];
+    captionStyles: CaptionStyle[];
+    selectedThemeId: string;
+    setSelectedThemeId: (id: string) => void;
+    customTheme: string;
+    setCustomTheme: (val: string) => void;
+    specificVisuals: string;
+    setSpecificVisuals: (val: string) => void;
+    specificOutfit: string;
+    setSpecificOutfit: (val: string) => void;
+    assets: Asset[];
+    onAssetsAdd: (files: FileList) => void;
+    onAssetRemove: (id: string) => void;
+    onAssetToggle: (id: string) => void;
+    handleInputImageUpload: (e: ChangeEvent<HTMLInputElement>, target: 'visuals' | 'outfit') => void;
+    generatedPrompt: string;
+    setGeneratedPrompt: (val: string) => void;
+    selectedModel: string;
+    setSelectedModel: (val: string) => void;
+    mediaType: 'image' | 'video';
+    setMediaType: (val: 'image' | 'video') => void;
+    aspectRatio: string;
+    setAspectRatio: (val: string) => void;
+    createImageSize: string;
+    setCreateImageSize: (val: string) => void;
+    createNumImages: number;
+    setCreateNumImages: (val: number) => void;
+    videoResolution: string;
+    setVideoResolution: (val: string) => void;
+    videoDuration: string;
+    setVideoDuration: (val: string) => void;
+    topic: string;
+    setTopic: (val: string) => void;
+    captionType: string;
+    setCaptionType: (val: string) => void;
+    generatedCaption: string;
+    setGeneratedCaption: (val: string) => void;
+    isDreaming: boolean;
+    handleDreamConcept: () => void;
+    handleGenerateContent: () => void;
+    isGeneratingMedia: boolean;
+    isGeneratingCaption: boolean;
+    handleGenerateRandomPost: () => void;
+    generatedMediaUrls: string[];
+    handleRefineEntry: (url: string, index: number) => void;
+    handleI2VEntry: (url: string, index: number) => void;
+    handleCopy: (text: string) => void;
+    handleSavePost: () => void;
+    isSaving: boolean;
+    showSaveForm: boolean;
+    setShowSaveForm: (val: boolean) => void;
+    presetsDropdown: React.ReactNode;
+    onGenerateCaptionOnly: () => void;
+}
+
+export function CreateTab(props: CreateTabProps) {
+    const {
+        themes, captionStyles,
+        selectedThemeId, setSelectedThemeId,
+        customTheme, setCustomTheme,
+        specificVisuals, setSpecificVisuals,
+        specificOutfit, setSpecificOutfit,
+        assets, onAssetsAdd, onAssetRemove, onAssetToggle,
+        handleInputImageUpload,
+        generatedPrompt, setGeneratedPrompt,
+        selectedModel, setSelectedModel,
+        mediaType, setMediaType,
+        aspectRatio, setAspectRatio,
+        createImageSize, setCreateImageSize,
+        createNumImages, setCreateNumImages,
+        videoResolution, setVideoResolution,
+        videoDuration, setVideoDuration,
+        topic, setTopic,
+        captionType, setCaptionType,
+        generatedCaption, setGeneratedCaption,
+        isDreaming, handleDreamConcept,
+        handleGenerateContent,
+        isGeneratingMedia, isGeneratingCaption,
+        handleGenerateRandomPost,
+        generatedMediaUrls,
+        handleRefineEntry, handleI2VEntry,
+        handleCopy,
+        handleSavePost, isSaving,
+        showSaveForm, setShowSaveForm,
+        presetsDropdown,
+        onGenerateCaptionOnly
+    } = props;
+
+    const currentTheme = selectedThemeId === 'CUSTOM'
+        ? { name: 'Custom', defaultOutfit: 'custom', defaultVisuals: 'custom' }
+        : themes.find(t => t.id === selectedThemeId) || themes[0];
+
+    return (
+        <div className="max-w-[1600px] mx-auto w-full p-8 pb-32">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 h-full">
+
+                {/* === LEFT COLUMN: VISUAL DESIGN (MEDIA) === */}
+                <div className="space-y-6 flex flex-col h-full">
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-6 flex-1 flex flex-col gap-6">
+                        <div className="flex items-center justify-between pb-4 border-b border-white/5">
+                            <div className="flex items-center gap-2">
+                                <Layers className="w-5 h-5 text-emerald-500" />
+                                <h2 className="text-sm font-bold text-white uppercase tracking-widest">Visual Design</h2>
+                            </div>
+                            <button
+                                onClick={handleDreamConcept}
+                                disabled={isDreaming}
+                                className="text-[10px] flex items-center gap-1 text-emerald-400 hover:text-emerald-300 disabled:opacity-50 transition-colors"
+                            >
+                                {isDreaming ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                                {isDreaming ? 'Dreaming...' : 'Dream Concept'}
+                            </button>
+                        </div>
+
+                        {/* Theme Selection */}
+                        <div className="space-y-2">
+                            <label className="text-xs text-white/50 uppercase tracking-wider font-bold">Theme</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {themes.map(theme => (
+                                    <button
+                                        key={theme.id}
+                                        onClick={() => setSelectedThemeId(theme.id)}
+                                        className={`text-left p-3 rounded-lg border transition-all duration-200 relative overflow-hidden ${selectedThemeId === theme.id
+                                            ? 'bg-white/10 border-white/40 shadow-lg shadow-emerald-900/10'
+                                            : 'bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/20'
+                                            }`}
+                                    >
+                                        <div className="flex justify-between items-center z-10 relative">
+                                            <span className={`text-sm font-medium ${selectedThemeId === theme.id ? 'text-white' : 'text-white/70'}`}>
+                                                {theme.name}
+                                            </span>
+                                            {selectedThemeId === theme.id && <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                                        </div>
+                                    </button>
+                                ))}
+                                {/* Manual / Custom Theme Button */}
+                                <button
+                                    onClick={() => {
+                                        setSelectedThemeId('CUSTOM');
+                                        setSpecificVisuals(""); // Clear previous
+                                    }}
+                                    className={`text-left p-3 rounded-lg border transition-all duration-200 relative overflow-hidden ${selectedThemeId === 'CUSTOM'
+                                        ? 'bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border-blue-400/50 shadow-lg'
+                                        : 'bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/20'
+                                        }`}
+                                >
+                                    <div className="flex justify-between items-center z-10 relative">
+                                        <span className={`text-sm font-medium ${selectedThemeId === 'CUSTOM' ? 'text-blue-200' : 'text-white/70'}`}>
+                                            Custom / Manual
+                                        </span>
+                                        {selectedThemeId === 'CUSTOM' && <Edit2 className="w-3 h-3 text-blue-400" />}
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Custom Theme Input - Only shown when CUSTOM is selected */}
+                        {selectedThemeId === 'CUSTOM' && (
+                            <div className="bg-blue-900/10 border border-blue-500/30 rounded-lg p-4">
+                                <label className="text-xs text-blue-200 block mb-2 font-medium">Custom Theme or Quote</label>
+                                <textarea
+                                    value={customTheme}
+                                    onChange={(e) => setCustomTheme(e.target.value)}
+                                    placeholder="Enter a theme, quote, or concept to base the entire post on... (e.g., 'Embrace the journey, not just the destination' or 'Ethereal forest goddess')"
+                                    className="w-full bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-blue-400/70 placeholder:text-blue-200/30 transition-colors min-h-[100px]"
+                                />
+                                <p className="text-xs text-blue-300/60 mt-2">This will be used as the foundation for generating the concept, visuals, and caption.</p>
+                            </div>
+                        )}
+
+                        {/* Visual Details Inputs */}
+                        <div className="space-y-4">
+                            <div>
+                                <div className="flex justify-between items-center mb-1">
+                                    <label className="text-xs text-white/50 block">Specific Action / Setting</label>
+                                    <label className="cursor-pointer text-xs flex items-center gap-1 text-emerald-500 hover:text-emerald-400">
+                                        <ImagePlus className="w-3 h-3" />
+                                        <span className="sr-only">Upload Reference</span>
+                                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleInputImageUpload(e, 'visuals')} />
+                                    </label>
+                                </div>
+                                {selectedThemeId === 'CUSTOM' ? (
+                                    <textarea
+                                        value={specificVisuals}
+                                        onChange={(e) => setSpecificVisuals(e.target.value)}
+                                        placeholder="Enter a quote to base the image on, or a custom visual description..."
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-500/50 placeholder:text-white/20 transition-colors min-h-[80px]"
+                                    />
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={specificVisuals}
+                                        onChange={(e) => setSpecificVisuals(e.target.value)}
+                                        placeholder={(currentTheme as any).defaultSetting || (currentTheme as any).defaultAction || (currentTheme as any).defaultVisuals}
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-500/50 placeholder:text-white/20 transition-colors"
+                                    />
+                                )}
+                            </div>
+                            <div>
+                                <div className="flex justify-between items-center mb-1">
+                                    <label className="text-xs text-white/50 block">Outfit Details {selectedThemeId === 'CUSTOM' && "(Optional)"}</label>
+                                    <label className="cursor-pointer text-xs flex items-center gap-1 text-emerald-500 hover:text-emerald-400">
+                                        <ImagePlus className="w-3 h-3" />
+                                        <span className="sr-only">Upload Reference</span>
+                                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleInputImageUpload(e, 'outfit')} />
+                                    </label>
+                                </div>
+                                <input
+                                    type="text"
+                                    value={specificOutfit}
+                                    onChange={(e) => setSpecificOutfit(e.target.value)}
+                                    placeholder={currentTheme.defaultOutfit}
+                                    className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-500/50 placeholder:text-white/20 transition-colors"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Assets */}
+                        <div className="border-t border-white/5 pt-4">
+                            <AssetUploader
+                                assets={assets}
+                                onAdd={onAssetsAdd}
+                                onRemove={onAssetRemove}
+                                onToggleSelection={onAssetToggle}
+                                label="Face References (Select Multiple)"
+                            />
+                        </div>
+
+                        {/* Generated Prompt Preview */}
+                        <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+                            <div className="flex justify-between items-center">
+                                <label className="text-xs text-white/50 font-bold uppercase tracking-widest">
+                                    Final Prompt
+                                </label>
+                                <div className="flex gap-2 items-center">
+                                    {presetsDropdown}
+
+                                    <button
+                                        onClick={() => handleCopy(generatedPrompt)}
+                                        className="text-[10px] flex items-center gap-1 text-white/40 hover:text-white transition-colors"
+                                    >
+                                        <Copy className="w-3 h-3" /> Copy
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea
+                                value={generatedPrompt}
+                                onChange={(e) => setGeneratedPrompt(e.target.value)}
+                                className="w-full p-3 bg-black/60 border border-white/10 rounded-lg text-[10px] text-white/60 font-mono leading-relaxed focus:outline-none focus:border-emerald-500/50 transition-colors min-h-[100px]"
+                            />
+
+                            {/* Settings Bar */}
+                            <div className="flex gap-2 bg-black/40 p-2 rounded-lg border border-white/10">
+                                <div className="flex-1 min-w-0">
+                                    <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Model</label>
+                                    <div className="relative">
+                                        <select
+                                            value={selectedModel}
+                                            onChange={(e) => setSelectedModel(e.target.value)}
+                                            className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                        >
+                                            {mediaType === 'image' ? (
+                                                <>
+                                                    <option value="nano-banana-pro-preview">Nano Banana Pro (Image)</option>
+                                                    <option value="gemini-3-pro-image-preview">Gemini 3 Pro (Multimodal Image)</option>
+                                                    <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
+                                                    <option value="fal-ai/bytedance/seedream/v4.5/text-to-image">Seedream v4.5 (High Fidelity)</option>
+                                                    <option value="fal-ai/bytedance/seedream/v4/text-to-image">Seedream v4.0 (Standard)</option>
+                                                    <option value="xai/grok-imagine-image/text-to-image">Grok 2 (xAI)</option>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <option value="veo-3.1-generate-preview">Veo 3.1 (Video)</option>
+                                                    <option value="veo-2.0-generate-001">Veo 2.0 (Video Legacy)</option>
+                                                </>
+                                            )}
+                                        </select>
+                                        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
+                                    </div>
+                                </div>
+                                <div className="w-24">
+                                    <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Ratio</label>
+                                    <div className="relative">
+                                        <select
+                                            value={selectedModel.includes('v4.5') ? createImageSize : aspectRatio}
+                                            onChange={(e) => {
+                                                if (selectedModel.includes('v4.5') || selectedModel.includes('seedream/v4')) {
+                                                    setCreateImageSize(e.target.value);
+                                                    // Also sync aspect ratio to keep other logic happy if needed
+                                                    if (e.target.value.includes('portrait')) setAspectRatio('3:4');
+                                                    if (e.target.value.includes('landscape')) setAspectRatio('4:3');
+                                                    if (e.target.value.includes('square')) setAspectRatio('1:1');
+                                                } else {
+                                                    setAspectRatio(e.target.value);
+                                                }
+                                            }}
+                                            className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                        >
+                                            {selectedModel.includes('v4.5') ? (
+                                                <>
+                                                    <option value="auto_4K">Auto 4K</option>
+                                                    <option value="square_hd">Square 2K</option>
+                                                    <option value="portrait_4_3">Portrait 4:3</option>
+                                                    <option value="landscape_16_9">Landscape 16:9</option>
+                                                </>
+                                            ) : selectedModel.includes('seedream/v4') ? (
+                                                <>
+                                                    <option value="square_hd">Square 2K</option>
+                                                    <option value="square">Square 1K</option>
+                                                    <option value="portrait_hd">Portrait 2K</option>
+                                                    <option value="landscape_hd">Landscape 2K</option>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <option value="1:1">1:1</option>
+                                                    <option value="3:4">3:4</option>
+                                                    <option value="4:3">4:3</option>
+                                                    <option value="9:16">9:16</option>
+                                                    <option value="16:9">16:9</option>
+                                                </>
+                                            )}
+                                        </select>
+                                        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
+                                    </div>
+                                </div>
+                                {/* Video Duration - Only for Video */}
+                                {mediaType === 'video' && (
+                                    <div className="w-24">
+                                        <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Duration</label>
+                                        <div className="relative">
+                                            <select
+                                                value={videoDuration}
+                                                onChange={(e) => setVideoDuration(e.target.value)}
+                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                            >
+                                                {selectedModel.includes('veo-3') ? (
+                                                    videoResolution === '1080p' ? (
+                                                        <option value="8s">8s</option>
+                                                    ) : (
+                                                        <>
+                                                            <option value="4s">4s</option>
+                                                            <option value="6s">6s</option>
+                                                            <option value="8s">8s</option>
+                                                        </>
+                                                    )
+                                                ) : (
+                                                    <>
+                                                        <option value="5s">5s</option>
+                                                        <option value="8s">8s</option>
+                                                    </>
+                                                )}
+                                            </select>
+                                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Video Resolution - Only for Video */}
+                                {mediaType === 'video' && (
+                                    <div className="w-24">
+                                        <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Quality</label>
+                                        <div className="relative">
+                                            <select
+                                                value={videoResolution}
+                                                onChange={(e) => setVideoResolution(e.target.value)}
+                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                            >
+                                                {selectedModel.includes('veo-3') ? (
+                                                    <>
+                                                        <option value="1080p">1080p</option>
+                                                        <option value="720p">720p</option>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <option value="1080p">1080p</option>
+                                                        <option value="720p">720p</option>
+                                                    </>
+                                                )}
+                                            </select>
+                                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Count Selector - Only for Image */}
+                                {mediaType === 'image' && (
+                                    <div className="w-16">
+                                        <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Count</label>
+                                        <div className="relative">
+                                            <select
+                                                value={createNumImages}
+                                                onChange={(e) => setCreateNumImages(Number(e.target.value))}
+                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                            >
+                                                <option value={1}>1</option>
+                                                <option value={2}>2</option>
+                                                <option value={3}>3</option>
+                                                <option value={4}>4</option>
+                                            </select>
+                                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* === RIGHT COLUMN: CONTENT & PREVIEW === */}
+                <div className="flex flex-col h-full space-y-6">
+                    {/* Media Preview Area */}
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-6 relative min-h-[400px] flex flex-col items-center justify-center overflow-hidden">
+                        {mediaType === 'image' && isGeneratingMedia ? (
+                            <div className="flex flex-col items-center gap-4 animate-in fade-in duration-700">
+                                <LoadingIndicator
+                                    title="Generating Media"
+                                    modelName={selectedModel}
+                                    type={mediaType}
+                                />
+                                <div className="grid grid-cols-2 gap-2 w-48 opacity-50">
+                                    <div className="aspect-[3/4] bg-white/5 rounded animate-pulse delay-75"></div>
+                                    <div className="aspect-[3/4] bg-white/5 rounded animate-pulse delay-150"></div>
+                                    <div className="aspect-[3/4] bg-white/5 rounded animate-pulse delay-300"></div>
+                                    <div className="aspect-[3/4] bg-white/5 rounded animate-pulse delay-500"></div>
+                                </div>
+                            </div>
+                        ) : generatedMediaUrls.length > 0 ? (
+                            <div className="w-full h-full grid grid-cols-2 gap-4">
+                                {generatedMediaUrls.map((url, idx) => {
+                                    const isVideo = url.startsWith('data:video') || !!url.match(/\.(mp4|webm|mov)$/i);
+                                    return (
+                                        <div key={idx} className="relative group aspect-[3/4]">
+                                            {isVideo ? (
+                                                <video src={url} controls className="w-full h-full object-cover rounded-lg shadow-2xl" />
+                                            ) : (
+                                                <img src={url} alt={`Generated ${idx}`} className="w-full h-full object-cover rounded-lg shadow-2xl" />
+                                            )}
+                                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1">
+                                                <button
+                                                    onClick={() => handleRefineEntry(url, idx)}
+                                                    className="p-1 hover:bg-white/20 rounded"
+                                                    title="Refine this image"
+                                                >
+                                                    <Edit2 className="w-4 h-4 text-white" />
+                                                </button>
+                                                {!isVideo && (
+                                                    <button
+                                                        onClick={() => handleI2VEntry(url, idx)}
+                                                        className="p-1 hover:bg-white/20 rounded"
+                                                        title="Animate this image"
+                                                    >
+                                                        <VideoIcon className="w-4 h-4 text-white" />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => {
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = `willow_generated_${Date.now()}_${idx}.${isVideo ? 'mp4' : 'png'}`;
+                                                        document.body.appendChild(a);
+                                                        a.click();
+                                                        document.body.removeChild(a);
+                                                    }}
+                                                    className="p-1 hover:bg-white/20 rounded"
+                                                    title="Download"
+                                                >
+                                                    <Download className="w-4 h-4 text-white" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="text-center space-y-4 opacity-40">
+                                <ImageIcon className="w-16 h-16 mx-auto stroke-1" />
+                                <p className="text-sm font-medium tracking-widest uppercase">Preview Canvas</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Text Content Area */}
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-6 flex-1 flex flex-col">
+                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-white/5">
+                            <h2 className="text-sm font-bold text-white uppercase tracking-widest">Caption Strategy</h2>
+                            <button
+                                onClick={onGenerateCaptionOnly}
+                                disabled={isGeneratingCaption}
+                                className="text-[10px] flex items-center gap-1 text-emerald-400 hover:text-emerald-300 disabled:opacity-50 transition-colors"
+                            >
+                                {isGeneratingCaption ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                                {isGeneratingCaption ? 'Writing...' : 'Generate Caption'}
+                            </button>
+                        </div>
+
+                        <div className="space-y-4 flex-1">
+                            <div className="flex gap-4">
+                                <div className="flex-1 space-y-1">
+                                    <label className="text-xs text-white/50 uppercase tracking-wider font-bold">Concept / Topic</label>
+                                    <input
+                                        type="text"
+                                        value={topic}
+                                        onChange={(e) => setTopic(e.target.value)}
+                                        placeholder="e.g. Morning thoughts, The future of AI..."
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+                                    />
+                                </div>
+                                <div className="w-1/3 space-y-1">
+                                    <label className="text-xs text-white/50 uppercase tracking-wider font-bold">Style</label>
+                                    <div className="relative">
+                                        <select
+                                            value={captionType}
+                                            onChange={(e) => setCaptionType(e.target.value)}
+                                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white appearance-none focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                                        >
+                                            {captionStyles.map(t => (
+                                                <option key={t.id} value={t.id}>{t.label}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                            <ChevronDown className="w-4 h-4 text-white/40" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="relative flex-1">
+                                <textarea
+                                    value={generatedCaption}
+                                    onChange={(e) => setGeneratedCaption(e.target.value)}
+                                    placeholder="Generated caption will appear here..."
+                                    className="w-full h-full min-h-[150px] bg-black/40 border border-white/10 rounded-lg p-4 text-white/90 font-serif leading-relaxed resize-none focus:outline-none focus:border-emerald-500/50 transition-colors"
+                                />
+                                {isGeneratingCaption && (
+                                    <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center">
+                                        <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold uppercase tracking-widest">
+                                            <Loader2 className="w-4 h-4 animate-spin" /> Writing...
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* === ACTION BAR === */}
+            <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/95 to-transparent z-50 pointer-events-none flex justify-center">
+                <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl p-2 flex items-center gap-4 pointer-events-auto backdrop-blur-xl ring-1 ring-white/5">
+
+                    {/* Left: Mode Toggle */}
+                    <div className="flex bg-white/5 rounded-xl p-1 border border-white/5">
+                        <button
+                            onClick={() => setMediaType('image')}
+                            className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${mediaType === 'image'
+                                ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                                : 'text-white/40 hover:text-white hover:bg-white/5'
+                                }`}
+                        >
+                            Image
+                        </button>
+                        <button
+                            onClick={() => setMediaType('video')}
+                            className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${mediaType === 'video'
+                                ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                                : 'text-white/40 hover:text-white hover:bg-white/5'
+                                }`}
+                        >
+                            Video
+                        </button>
+                    </div>
+
+                    <div className="h-8 w-px bg-white/10 mx-2"></div>
+
+                    {/* Middle: Save/Library Actions */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleGenerateRandomPost}
+                            className="p-3 bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 border border-white/10 hover:border-emerald-500/30 rounded-xl transition-all group"
+                            title="Surprise Me (Random Concept)"
+                        >
+                            <Dices className="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                        </button>
+
+                        <div className="relative">
+                            {!showSaveForm ? (
+                                <button
+                                    onClick={() => setShowSaveForm(true)}
+                                    // disabled={!generatedMediaUrls.length}
+                                    className="p-3 bg-white/5 hover:bg-white/10 disabled:opacity-30 border border-white/10 rounded-xl transition-all"
+                                    title="Save to Library"
+                                >
+                                    <Layers className="w-5 h-5 opacity-60" />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleSavePost}
+                                    disabled={isSaving}
+                                    className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs uppercase tracking-widest rounded-xl transition-all flex items-center gap-2"
+                                >
+                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                    Confirm Save
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Right: Generate Button */}
+                    <button
+                        onClick={handleGenerateContent}
+                        disabled={isGeneratingMedia || isGeneratingCaption}
+                        className={`
+                                h-12 px-8 rounded-xl font-bold uppercase tracking-widest text-sm
+                                bg-gradient-to-r from-emerald-600 to-emerald-500 
+                                hover:from-emerald-500 hover:to-emerald-400 
+                                text-black shadow-lg shadow-emerald-500/20 
+                                hover:shadow-emerald-500/40 hover:-translate-y-0.5
+                                disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0
+                                transition-all flex items-center gap-2
+                            `}
+                    >
+                        {(isGeneratingMedia || isGeneratingCaption) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-purple-300" />}
+                        {(isGeneratingMedia || isGeneratingCaption) ? "Generating..." : "Generate Content"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}

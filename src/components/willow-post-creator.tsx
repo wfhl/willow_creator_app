@@ -1,0 +1,885 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { geminiService } from '../../lib/geminiService';
+import type { GenerationRequest } from '../../lib/geminiService';
+import { dbService } from '../lib/dbService';
+import type { DBAsset as Asset, DBSavedPost as SavedPost, DBPromptPreset } from '../lib/dbService';
+import { WILLOW_PROFILE, WILLOW_THEMES, CAPTION_TEMPLATES } from './willow-presets';
+
+// Component Imports
+import { CreatorHeader } from './tabs/CreatorHeader';
+import { CreateTab } from './tabs/CreateTab';
+import { SavedTab } from './tabs/SavedTab';
+import { EditTab } from './tabs/EditTab';
+import { AnimateTab } from './tabs/AnimateTab';
+import { ScriptsTab } from './tabs/ScriptsTab';
+import { SettingsTab, type Theme, type CaptionStyle } from './tabs/SettingsTab';
+import { PresetsDropdown } from './tabs/PresetsDropdown';
+
+export default function WillowPostCreator() {
+    // --- Shared State ---
+    const [assets, setAssets] = useState<Asset[]>([]);
+    const [activeTab, setActiveTab] = useState<'create' | 'saved' | 'edit' | 'animate' | 'scripts' | 'settings'>('create');
+
+    // --- Configuration State ---
+    const [themes, setThemes] = useState<Theme[]>(WILLOW_THEMES as Theme[]);
+    const [captionStyles, setCaptionStyles] = useState<CaptionStyle[]>(CAPTION_TEMPLATES as CaptionStyle[]);
+
+    // --- Saved Posts State ---
+    const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
+    const [totalSavedCount, setTotalSavedCount] = useState(0);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchResults, setSearchResults] = useState<SavedPost[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [sortOrder, setSortOrder] = useState<'prev' | 'next'>('prev');
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const ignoreNextPromptUpdate = useRef(false);
+
+    // --- Preset State ---
+    const [presets, setPresets] = useState<DBPromptPreset[]>([]);
+    const [isPresetsOpen, setIsPresetsOpen] = useState(false);
+    const [showSaveForm, setShowSaveForm] = useState(false);
+
+    // --- Post Generation State ---
+    const [topic, setTopic] = useState("");
+    const [captionType, setCaptionType] = useState("reflective");
+    const [generatedCaption, setGeneratedCaption] = useState("");
+    const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
+
+    // --- Media Generation State ---
+    const [selectedThemeId, setSelectedThemeId] = useState("A");
+    const [customTheme, setCustomTheme] = useState("");
+    const [specificVisuals, setSpecificVisuals] = useState("");
+    const [specificOutfit, setSpecificOutfit] = useState("");
+    const [generatedPrompt, setGeneratedPrompt] = useState("");
+    const [isDreaming, setIsDreaming] = useState(false);
+
+    // Media Output State
+    const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
+    const [generatedMediaUrls, setGeneratedMediaUrls] = useState<string[]>([]);
+    const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+
+    // Refinement / I2V States
+    const [refineTarget, setRefineTarget] = useState<{ url: string, index: number } | null>(null);
+    const [refinePrompt, setRefinePrompt] = useState("");
+    const [isRefining, setIsRefining] = useState(false);
+    const [refineResultUrl, setRefineResultUrl] = useState<string | null>(null);
+    const [refineAdditionalImages, setRefineAdditionalImages] = useState<Asset[]>([]);
+
+    // Mutable Parameters State
+    const [refineImageSize, setRefineImageSize] = useState<string>("square_hd");
+    const [refineNumImages, setRefineNumImages] = useState<number>(1);
+
+    const [i2vTarget, setI2VTarget] = useState<{ url: string, index: number } | null>(null);
+    const [i2vPrompt, setI2VPrompt] = useState("");
+    const [isGeneratingI2V, setIsGeneratingI2V] = useState(false);
+    const [i2vResultUrl, setI2VResultUrl] = useState<string | null>(null);
+
+    // Control State
+    const [selectedModel, setSelectedModel] = useState<string>('nano-banana-pro-preview');
+    const [aspectRatio, setAspectRatio] = useState<string>('3:4');
+    const [createImageSize, setCreateImageSize] = useState<string>("auto_4K");
+    const [createNumImages, setCreateNumImages] = useState<number>(4);
+
+    // Video Configuration
+    const [videoResolution, setVideoResolution] = useState<string>('1080p');
+    const [videoDuration, setVideoDuration] = useState<string>('6s');
+    const [i2vAspectRatio, setI2vAspectRatio] = useState<string>('9:16');
+
+    // --- INITIALIZATION EFFECTS ---
+
+    // Load presets
+    useEffect(() => {
+        dbService.getAllPresets().then(setPresets).catch(console.error);
+    }, []);
+
+    // Load Assets & Posts (Persistence)
+    useEffect(() => {
+        const loadInitialData = async () => {
+            try {
+                // Configs
+                const savedThemes = await dbService.getConfig<Theme[]>('themes');
+                if (savedThemes) setThemes(savedThemes);
+                else await dbService.saveConfig('themes', WILLOW_THEMES);
+
+                const savedStyles = await dbService.getConfig<CaptionStyle[]>('caption_styles');
+                if (savedStyles) setCaptionStyles(savedStyles);
+                else await dbService.saveConfig('caption_styles', CAPTION_TEMPLATES);
+
+                // Assets
+                const dbAssets = await dbService.getAllAssets();
+                const unselected = dbAssets.filter(a => !a.selected);
+                for (const u of unselected) await dbService.deleteAsset(u.id);
+                setAssets(dbAssets.filter(a => a.selected));
+
+                // Posts
+                const count = await dbService.getPostsCount();
+                setTotalSavedCount(count);
+                if (count > 0) {
+                    const batch = await dbService.getRecentPostsBatch(24, 0, sortOrder);
+                    setSavedPosts(batch);
+                }
+            } catch (e) { console.error(e); }
+        };
+        loadInitialData();
+    }, []);
+
+    // Persist Configs
+    const persistThemes = (newThemes: Theme[]) => {
+        setThemes(newThemes);
+        dbService.saveConfig('themes', newThemes).catch(console.error);
+    };
+
+    const persistCaptionStyles = (newStyles: CaptionStyle[]) => {
+        setCaptionStyles(newStyles);
+        dbService.saveConfig('caption_styles', newStyles).catch(console.error);
+    };
+
+    // Reload posts on sort/search
+    useEffect(() => {
+        const reloadSortedPosts = async () => {
+            if (activeTab === 'saved' && !searchQuery) {
+                const count = await dbService.getPostsCount();
+                setTotalSavedCount(count);
+                const batch = await dbService.getRecentPostsBatch(24, 0, sortOrder);
+                setSavedPosts(batch);
+            }
+        };
+        reloadSortedPosts();
+    }, [sortOrder, activeTab, searchQuery]);
+
+    // Deep search
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            setSearchResults([]);
+            setIsSearching(false);
+            return;
+        }
+        const timer = setTimeout(async () => {
+            setIsSearching(true);
+            try {
+                const results = await dbService.searchPosts(searchQuery, 48, sortOrder);
+                setSearchResults(results);
+            } catch (err) { console.error(err); } finally { setIsSearching(false); }
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [searchQuery, sortOrder]);
+
+    // Update model when type changes
+    useEffect(() => {
+        if (mediaType === 'image') {
+            const isValidImageModel = selectedModel.includes('gemini') ||
+                selectedModel.includes('banana') ||
+                selectedModel.includes('seedream') ||
+                selectedModel.includes('grok-imagine-image');
+            if (!isValidImageModel) setSelectedModel('nano-banana-pro-preview');
+        } else {
+            const isValidVideoModel = selectedModel.includes('veo') ||
+                selectedModel.includes('grok-imagine-video');
+            if (!isValidVideoModel) setSelectedModel('veo-3.1-generate-preview');
+        }
+    }, [mediaType]);
+
+    const currentTheme = themes.find((t: Theme) => t.id === selectedThemeId) || themes[0];
+
+
+    // --- LOGIC HANDLERS ---
+
+    const constructPrompt = () => {
+        let prompt = `SUBJECT: ${WILLOW_PROFILE.subject} `;
+
+        if (selectedThemeId === 'CUSTOM') {
+            prompt += ` ${specificVisuals || "A creative, artistic portrait."}`;
+            if (specificOutfit) prompt += ` Wearing ${specificOutfit}.`;
+        } else {
+            let base = currentTheme.basePrompt;
+            base = base.replace("[Subject Definition], ", "").replace("[Subject Definition]", "");
+            base = base.replace("[Outfit]", specificOutfit || currentTheme.defaultOutfit || "");
+
+            const theme = currentTheme as any;
+            if (currentTheme.id === 'B') {
+                base = base.replace("[Visuals]", specificVisuals || theme.defaultVisuals || "");
+            } else if (['C', 'D', 'E'].includes(currentTheme.id)) {
+                base = base.replace("[Action]", specificVisuals || theme.defaultAction || "");
+            } else {
+                base = base.replace("[Setting]", specificVisuals || theme.defaultSetting || "");
+            }
+            prompt += base;
+        }
+
+        prompt += ` ${WILLOW_PROFILE.defaultParams} ${WILLOW_PROFILE.negativePrompt}`;
+        setGeneratedPrompt(prompt);
+    };
+
+    useEffect(() => {
+        if (ignoreNextPromptUpdate.current) {
+            ignoreNextPromptUpdate.current = false;
+            return;
+        }
+        constructPrompt();
+    }, [selectedThemeId, specificVisuals, specificOutfit]);
+
+
+    const handleInputImageUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'visuals' | 'outfit') => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            const simulatedText = target === 'visuals'
+                ? `Scene inspired by uploaded image: ${file.name}`
+                : `Outfit context from: ${file.name}`;
+            if (target === 'visuals') setSpecificVisuals(simulatedText);
+            if (target === 'outfit') setSpecificOutfit(simulatedText);
+        }
+    };
+
+    const handleDreamConcept = async () => {
+        setIsDreaming(true);
+        try {
+            const themeToUse = selectedThemeId === 'CUSTOM' ? (customTheme || 'creative concept') : currentTheme.name;
+            const concept = await (geminiService as any).generateConcept(themeToUse, 'post');
+            setTopic(concept.topic);
+            setSpecificVisuals(concept.setting);
+            setSpecificOutfit(concept.outfit);
+        } catch (e) { console.error(e); } finally { setIsDreaming(false); }
+    };
+
+    const handleAssetsAdd = (files: FileList) => {
+        Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const base64 = e.target?.result as string;
+                const newAsset: Asset = {
+                    id: Date.now().toString() + Math.random().toString().slice(2, 6),
+                    type: file.type.startsWith('video') ? 'video' : 'image',
+                    base64,
+                    selected: true
+                };
+                setAssets(prev => [...prev, newAsset]);
+                await dbService.saveAsset(newAsset);
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const handleAssetRemove = async (id: string) => {
+        setAssets(prev => prev.filter(a => a.id !== id));
+        await dbService.deleteAsset(id);
+    };
+
+    const handleAssetToggle = async (id: string) => {
+        setAssets(prev => {
+            const next = prev.map(a => {
+                if (a.id === id) {
+                    const updated = { ...a, selected: !a.selected };
+                    dbService.saveAsset(updated);
+                    return updated;
+                }
+                return a;
+            });
+            return next;
+        });
+    };
+
+    const handleGenerateMedia = async (promptOverride?: string) => {
+        const finalPromptToUse = promptOverride || generatedPrompt;
+        if (!finalPromptToUse) return;
+        setIsGeneratingMedia(true);
+        setGeneratedMediaUrls([]);
+
+        try {
+            const selectedImages = assets.filter(a => a.selected && a.type === 'image');
+            let finalPrompt = finalPromptToUse;
+            const contentParts: any[] = [];
+
+            if (selectedImages.length > 0) {
+                const faceInstruction = `Generate a portrait consistent with the character identity in the attached reference images. Focus on her specific red hair, blue-green eyes, and freckles. Maintain the subject's unique facial features while implementing the following scene:`;
+                finalPrompt = `${faceInstruction} ${finalPromptToUse}`;
+                selectedImages.forEach(img => {
+                    contentParts.push({
+                        inlineData: { mimeType: "image/jpeg", data: img.base64.split(',')[1] }
+                    });
+                });
+            }
+
+            const request: GenerationRequest = {
+                type: mediaType,
+                prompt: finalPrompt,
+                model: selectedModel,
+                aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
+                contentParts: contentParts,
+                videoConfig: mediaType === 'video' ? {
+                    resolution: videoResolution,
+                    durationSeconds: videoDuration.replace('s', ''),
+                    withAudio: false
+                } : undefined,
+                editConfig: { // Pass both for flexibility, backend handles routing
+                    imageSize: createImageSize,
+                    numImages: createNumImages
+                }
+            };
+
+            if (mediaType === 'image') {
+                const taskIndexes = Array.from({ length: createNumImages }, (_, i) => i);
+                const imagePromises = taskIndexes.map(async (i) => {
+                    try {
+                        if (i > 0) await new Promise(r => setTimeout(r, i * 2000));
+                        const url = await geminiService.generateMedia(request);
+                        if (url) {
+                            setGeneratedMediaUrls(prev => [...prev, url]);
+                            return url;
+                        }
+                    } catch (e) { console.error(e); }
+                    return null;
+                });
+                await Promise.all(imagePromises);
+            } else {
+                const result = await geminiService.generateMedia(request);
+                if (result) setGeneratedMediaUrls([result]);
+            }
+
+        } catch (error) {
+            console.error(error);
+            alert("Media generation failed.");
+        } finally {
+            setIsGeneratingMedia(false);
+        }
+    };
+
+    const handleGenerateCaption = async (overrides?: any) => {
+        const t = overrides?.topic || topic;
+        if (!t) return;
+        setIsGeneratingCaption(true);
+        try {
+            const template = captionStyles.find(c => c.id === (overrides?.captionType || captionType));
+            const systemInstruction = `
+            You are Willow Wisdom.
+            CORE PERSONA: ${WILLOW_PROFILE.subject}
+            CONTEXT: Theme: ${(overrides?.theme || currentTheme).name}, Visuals: ${overrides?.visuals || specificVisuals}, Outfit: ${overrides?.outfit || specificOutfit}
+            TASK: Write a caption for Topic: "${t}". Style: ${template?.prompt}
+            `;
+            const result = await geminiService.generateText(`TOPIC: "${t}"`, systemInstruction);
+            setGeneratedCaption(result);
+        } catch (e) {
+            console.error(e);
+            setGeneratedCaption("Error generating caption.");
+        } finally {
+            setIsGeneratingCaption(false);
+        }
+    };
+
+    const handleGenerateContent = () => {
+        handleGenerateMedia();
+        handleGenerateCaption();
+    };
+
+    const handleGenerateRandomPost = async () => {
+        setIsDreaming(true);
+        try {
+            const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+            const randomCaption = captionStyles[Math.floor(Math.random() * captionStyles.length)];
+            setSelectedThemeId(randomTheme.id);
+            setCaptionType(randomCaption.id);
+
+            const concept = await (geminiService as any).generateConcept(randomTheme.name, 'post');
+            setTopic(concept.topic);
+            setSpecificVisuals(concept.setting);
+            setSpecificOutfit(concept.outfit);
+
+            let prompt = randomTheme.basePrompt.replace("[Subject Definition]", WILLOW_PROFILE.subject)
+                .replace("[Outfit]", concept.outfit || randomTheme.defaultOutfit);
+
+            if (randomTheme.id === 'B') prompt = prompt.replace("[Visuals]", concept.setting || randomTheme.defaultVisuals || "");
+            else if (['C', 'D', 'E'].includes(randomTheme.id)) prompt = prompt.replace("[Action]", concept.setting || randomTheme.defaultAction || "");
+            else prompt = prompt.replace("[Setting]", concept.setting || randomTheme.defaultSetting || "");
+
+            prompt += ` ${WILLOW_PROFILE.defaultParams}`;
+            setGeneratedPrompt(prompt);
+
+            handleGenerateMedia(prompt);
+            handleGenerateCaption({
+                topic: concept.topic,
+                theme: randomTheme,
+                visuals: concept.setting,
+                outfit: concept.outfit,
+                captionType: randomCaption.id
+            });
+
+        } catch (e) { console.error(e); } finally { setIsDreaming(false); }
+    };
+
+    // --- SAVE / PRESET HANDLERS ---
+
+    const handleSavePost = async () => {
+        const newPost: SavedPost = {
+            id: Date.now().toString(),
+            timestamp: Date.now(),
+            topic,
+            caption: generatedCaption,
+            captionType,
+            mediaUrls: generatedMediaUrls,
+            mediaType: generatedMediaUrls.some(url => url.startsWith('data:video') || url.match(/\.(mp4|webm|mov)$/i)) ? 'video' : 'image',
+            themeId: selectedThemeId,
+            visuals: specificVisuals,
+            outfit: specificOutfit,
+            prompt: generatedPrompt,
+            tags: []
+        };
+        try {
+            await dbService.savePost(newPost);
+            setSavedPosts(prev => [newPost, ...prev]);
+            setTotalSavedCount(prev => prev + 1);
+            alert("Post Saved!");
+        } catch (e) {
+            console.error(e);
+            alert("Save failed.");
+        }
+    };
+
+    const handleSavePreset = async (_data: any, nameOverride?: string) => {
+        // Determine prompts based on active tab
+        let promptToSave = generatedPrompt;
+        let description = topic || "No description";
+
+        if (activeTab === 'edit') {
+            promptToSave = refinePrompt;
+            description = `Refinement: ${refinePrompt.slice(0, 30)}...`;
+        } else if (activeTab === 'animate') {
+            promptToSave = i2vPrompt;
+            description = `Animation: ${i2vPrompt.slice(0, 30)}...`;
+        }
+
+        let name = nameOverride;
+        if (!name) {
+            // Only prompt if no name provided from input
+            name = prompt("Enter a name for this preset:") || `Preset ${new Date().toLocaleTimeString()}`;
+        }
+
+        // If user cancelled prompt (and name became null from prompt cancel), handle it?
+        // prompt() returns null if cancelled. '' if empty ok.
+        // If nameOverride was undefined, we ran prompt. If that returns null, we probably shouldn't save?
+        // But the previous code defaulted to 'Preset Time' if prompt returns falsy.
+        // Let's keep existing fallback behavior for safety if prompt returns empty/null.
+        if (!name) name = `Preset ${new Date().toLocaleTimeString()}`;
+
+        const preset: DBPromptPreset = {
+            id: crypto.randomUUID(),
+            name: name,
+            description: description,
+            basePrompt: promptToSave,
+            themeId: selectedThemeId,
+            visuals: specificVisuals,
+            outfit: specificOutfit,
+            action: "",
+            model: selectedModel,
+            aspectRatio: aspectRatio,
+            negativePrompt: WILLOW_PROFILE.negativePrompt,
+            videoDuration,
+            videoResolution,
+            timestamp: Date.now()
+        };
+        await dbService.savePreset(preset);
+        setPresets(prev => [preset, ...prev]);
+        return preset.id;
+    };
+
+    const handleLoadPreset = (preset: DBPromptPreset) => {
+        if (preset.themeId) setSelectedThemeId(preset.themeId);
+        if (preset.visuals) setSpecificVisuals(preset.visuals);
+        if (preset.outfit) setSpecificOutfit(preset.outfit);
+        if (preset.model) setSelectedModel(preset.model);
+        if (preset.videoDuration) setVideoDuration(preset.videoDuration);
+        if (preset.videoResolution) setVideoResolution(preset.videoResolution);
+
+        if (activeTab === 'create') {
+            if (preset.aspectRatio) setAspectRatio(preset.aspectRatio);
+            if (preset.basePrompt) {
+                ignoreNextPromptUpdate.current = true;
+                setGeneratedPrompt(preset.basePrompt);
+            }
+        } else if (activeTab === 'edit') {
+            if (preset.basePrompt) setRefinePrompt(preset.basePrompt);
+        } else if (activeTab === 'animate') {
+            if (preset.basePrompt) setI2VPrompt(preset.basePrompt);
+            if (preset.aspectRatio && preset.aspectRatio !== 'auto') {
+                // Approximate mapping or direct set if compatible
+                setI2vAspectRatio(preset.aspectRatio);
+            }
+        }
+        setIsPresetsOpen(false);
+    };
+
+    const handleDeletePreset = async (id: string) => {
+        await dbService.deletePreset(id);
+        setPresets(prev => prev.filter(p => p.id !== id));
+    };
+
+    const handleImportReferences = async () => {
+        if (!confirm("Import 'GenReference' images into library?")) return;
+        try {
+            const res = await fetch('/references.json');
+            if (!res.ok) throw new Error("References file not found. Please ask admin to run 'process-references' script.");
+            const refs: SavedPost[] = await res.json();
+            if (refs.length === 0) return alert("No references found in catalog.");
+            if (!confirm(`Found ${refs.length} reference images. Import them now?`)) return;
+            let count = 0;
+            for (const item of refs) {
+                await dbService.savePost(item);
+                count++;
+            }
+            const newCount = await dbService.getPostsCount();
+            setTotalSavedCount(newCount);
+            const batch = await dbService.getRecentPostsBatch(24, 0);
+            setSavedPosts(batch);
+            alert(`Successfully imported ${count} references!`);
+        } catch (e: any) { console.error(e); alert("Import failed: " + e.message); }
+    };
+
+    const handleImportIGArchive = async () => {
+        if (!confirm("Import Instagram Archive?")) return;
+        try {
+            const manifestRes = await fetch('/ig_archive_manifest.json');
+            if (!manifestRes.ok) throw new Error("Manifest not found.");
+            const manifest = await manifestRes.json();
+            const { totalChunks, totalPosts } = manifest;
+            if (totalPosts === 0) return alert("Archive is empty.");
+            if (!confirm(`Found ${totalPosts} posts. Import?`)) return;
+
+            let count = 0;
+            for (let i = 0; i < totalChunks; i++) {
+                try {
+                    const res = await fetch(`/ig_archive_${i}.json`);
+                    if (!res.ok) continue;
+                    const chunk: SavedPost[] = await res.json();
+                    for (const post of chunk) {
+                        await dbService.savePost(post);
+                        count++;
+                    }
+                } catch (err) { console.error(err); }
+            }
+            const newCount = await dbService.getPostsCount();
+            setTotalSavedCount(newCount);
+            const batch = await dbService.getRecentPostsBatch(24, 0);
+            setSavedPosts(batch);
+            alert(`Successfully imported ${count} posts!`);
+        } catch (e: any) { console.error(e); alert("Import failed: " + e.message); }
+    };
+
+    const handleRefineEntry = (url: string, index: number) => {
+        setRefineTarget({ url, index });
+        setMediaType('image');
+        setRefinePrompt("");
+        setRefineResultUrl(null);
+        setActiveTab('edit');
+    };
+
+    const handleI2VEntry = (url: string, index: number) => {
+        setI2VTarget({ url, index });
+        setI2VPrompt("");
+        setI2VResultUrl(null);
+        setMediaType('video');
+        setActiveTab('animate');
+    };
+
+    const handleApproveRefinement = (action: 'replace' | 'add') => {
+        if (!refineResultUrl) return;
+        if (action === 'replace' && refineTarget) {
+            setGeneratedMediaUrls(prev => {
+                const next = [...prev];
+                next[refineTarget.index] = refineResultUrl;
+                return next;
+            });
+        } else {
+            setGeneratedMediaUrls(prev => [...prev, refineResultUrl]);
+        }
+        setRefineTarget(null);
+        setRefineResultUrl(null);
+        setActiveTab('create');
+    };
+
+
+    // --- RENDER ---
+    return (
+        <div className="h-screen w-full bg-[#050505] text-white font-sans selection:bg-emerald-500/30 selection:text-emerald-100 flex flex-col overflow-hidden">
+            <CreatorHeader
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                savedCount={totalSavedCount}
+            />
+
+            <div className="flex-1 overflow-y-auto pt-20 pb-20 scroll-smooth">
+                {activeTab === 'create' && (
+                    <CreateTab
+                        themes={themes}
+                        captionStyles={captionStyles}
+                        selectedThemeId={selectedThemeId}
+                        setSelectedThemeId={setSelectedThemeId}
+                        customTheme={customTheme}
+                        setCustomTheme={setCustomTheme}
+                        specificVisuals={specificVisuals}
+                        setSpecificVisuals={setSpecificVisuals}
+                        specificOutfit={specificOutfit}
+                        setSpecificOutfit={setSpecificOutfit}
+                        assets={assets}
+                        onAssetsAdd={handleAssetsAdd}
+                        onAssetRemove={handleAssetRemove}
+                        onAssetToggle={handleAssetToggle}
+                        handleInputImageUpload={handleInputImageUpload}
+                        generatedPrompt={generatedPrompt}
+                        setGeneratedPrompt={setGeneratedPrompt}
+                        selectedModel={selectedModel}
+                        setSelectedModel={setSelectedModel}
+                        mediaType={mediaType}
+                        onGenerateCaptionOnly={handleGenerateCaption}
+                        setMediaType={setMediaType}
+                        aspectRatio={aspectRatio}
+                        setAspectRatio={setAspectRatio}
+                        createImageSize={createImageSize}
+                        setCreateImageSize={setCreateImageSize}
+                        createNumImages={createNumImages}
+                        setCreateNumImages={setCreateNumImages}
+                        videoResolution={videoResolution}
+                        setVideoResolution={setVideoResolution}
+                        videoDuration={videoDuration}
+                        setVideoDuration={setVideoDuration}
+                        topic={topic}
+                        setTopic={setTopic}
+                        captionType={captionType}
+                        setCaptionType={setCaptionType}
+                        generatedCaption={generatedCaption}
+                        setGeneratedCaption={setGeneratedCaption}
+                        isDreaming={isDreaming}
+                        handleDreamConcept={handleDreamConcept}
+                        handleGenerateContent={handleGenerateContent}
+                        isGeneratingMedia={isGeneratingMedia}
+                        isGeneratingCaption={isGeneratingCaption}
+                        handleGenerateRandomPost={handleGenerateRandomPost}
+                        generatedMediaUrls={generatedMediaUrls}
+                        handleRefineEntry={handleRefineEntry}
+                        handleI2VEntry={handleI2VEntry}
+                        handleCopy={(t) => navigator.clipboard.writeText(t)}
+                        handleSavePost={handleSavePost}
+                        isSaving={false} // Can add loading state for saving later if needed
+                        showSaveForm={showSaveForm}
+                        setShowSaveForm={setShowSaveForm}
+                        presetsDropdown={
+                            <PresetsDropdown
+                                isOpen={isPresetsOpen}
+                                setIsOpen={setIsPresetsOpen}
+                                showSaveForm={showSaveForm}
+                                setShowSaveForm={setShowSaveForm}
+                                currentPostData={{}}
+                                onSavePost={handleSavePreset}
+                                onLoadPreset={handleLoadPreset}
+                                presetsList={presets}
+                                onDeletePreset={handleDeletePreset}
+                                direction="up"
+                            />
+                        }
+                    />
+                )}
+
+                {activeTab === 'saved' && (
+                    <SavedTab
+                        savedPosts={savedPosts}
+                        searchResults={searchResults}
+                        totalSavedCount={totalSavedCount}
+                        searchQuery={searchQuery}
+                        isSearching={isSearching}
+                        sortOrder={sortOrder}
+                        onSearchChange={setSearchQuery}
+                        onSortChange={setSortOrder}
+                        onLoadPost={(p) => {
+                            setTopic(p.topic);
+                            setGeneratedCaption(p.caption);
+                            setCaptionType(p.captionType);
+                            setGeneratedMediaUrls(p.mediaUrls);
+                            setMediaType(p.mediaType);
+                            setSelectedThemeId(p.themeId);
+                            setSpecificVisuals(p.visuals);
+                            setSpecificOutfit(p.outfit);
+                            setGeneratedPrompt(p.prompt);
+                            setActiveTab('create');
+                        }}
+                        onDeletePost={async (id) => {
+                            if (!confirm("Delete post?")) return;
+                            await dbService.deletePost(id);
+                            setSavedPosts(prev => prev.filter(p => p.id !== id));
+                            setTotalSavedCount(c => c - 1);
+                        }}
+                        onImportReferences={handleImportReferences}
+                        onImportIGArchive={handleImportIGArchive}
+                        onLoadMore={async () => {
+                            if (isLoadingMore || totalSavedCount <= savedPosts.length) return;
+                            setIsLoadingMore(true);
+                            try {
+                                const next = await dbService.getRecentPostsBatch(24, savedPosts.length, sortOrder);
+                                setSavedPosts(prev => [...prev, ...next]);
+                            } finally { setIsLoadingMore(false); }
+                        }}
+                    />
+                )}
+
+                {activeTab === 'edit' && (
+                    <EditTab
+                        refineTarget={refineTarget}
+                        setRefineTarget={setRefineTarget}
+                        refinePrompt={refinePrompt}
+                        setRefinePrompt={setRefinePrompt}
+                        refineImageSize={refineImageSize}
+                        setRefineImageSize={setRefineImageSize}
+                        refineNumImages={refineNumImages}
+                        setRefineNumImages={setRefineNumImages}
+                        selectedModel={selectedModel}
+                        setSelectedModel={setSelectedModel}
+                        refineAdditionalImages={refineAdditionalImages}
+                        setRefineAdditionalImages={setRefineAdditionalImages}
+                        refineResultUrl={refineResultUrl}
+                        setRefineResultUrl={setRefineResultUrl}
+                        isRefining={isRefining}
+                        onRefineSubmit={async () => {
+                            if (!refineTarget || !refinePrompt) return;
+                            setIsRefining(true);
+                            try {
+                                const urlToBase64 = async (url: string) => {
+                                    const res = await fetch(url);
+                                    const blob = await res.blob();
+                                    return new Promise<string>(r => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => r((reader.result as string).split(',')[1]);
+                                        reader.readAsDataURL(blob);
+                                    });
+                                };
+                                const base64 = await urlToBase64(refineTarget.url);
+                                const contentParts: any[] = [{ inlineData: { mimeType: "image/jpeg", data: base64 } }];
+                                refineAdditionalImages.forEach(img => {
+                                    contentParts.push({ inlineData: { mimeType: "image/jpeg", data: img.base64.split(',')[1] } });
+                                });
+
+                                const req: GenerationRequest = {
+                                    type: 'image',
+                                    prompt: refinePrompt,
+                                    model: selectedModel,
+                                    aspectRatio,
+                                    contentParts,
+                                    editConfig: { imageSize: refineImageSize, numImages: refineNumImages }
+                                };
+                                const url = await geminiService.generateMedia(req);
+                                if (url) setRefineResultUrl(url);
+                            } catch (e) { console.error(e); alert("Refine failed"); } finally { setIsRefining(false); }
+                        }}
+                        onApproveRefinement={handleApproveRefinement}
+                        onExit={() => setActiveTab('create')}
+                        onI2VEntry={(url) => handleI2VEntry(url, -1)}
+                        presetsDropdown={
+                            <PresetsDropdown
+                                isOpen={isPresetsOpen}
+                                setIsOpen={setIsPresetsOpen}
+                                showSaveForm={showSaveForm}
+                                setShowSaveForm={setShowSaveForm}
+                                currentPostData={{}}
+                                onSavePost={handleSavePreset}
+                                onLoadPreset={handleLoadPreset}
+                                presetsList={presets}
+                                onDeletePreset={handleDeletePreset}
+                                direction="down"
+                            />
+                        }
+                    />
+                )}
+
+                {activeTab === 'animate' && (
+                    <AnimateTab
+                        i2vTarget={i2vTarget}
+                        setI2VTarget={setI2VTarget}
+                        i2vPrompt={i2vPrompt}
+                        setI2VPrompt={setI2VPrompt}
+                        i2vAspectRatio={i2vAspectRatio}
+                        setI2VAspectRatio={setI2vAspectRatio}
+                        videoDuration={videoDuration}
+                        setVideoDuration={setVideoDuration}
+                        videoResolution={videoResolution}
+                        setVideoResolution={setVideoResolution}
+                        selectedModel={selectedModel}
+                        setSelectedModel={setSelectedModel}
+                        isGeneratingI2V={isGeneratingI2V}
+                        onGenerateI2V={async () => {
+                            if (!i2vTarget || !i2vPrompt) return;
+                            setIsGeneratingI2V(true);
+                            try {
+                                const urlToBase64 = async (url: string) => {
+                                    const res = await fetch(url);
+                                    const blob = await res.blob();
+                                    return new Promise<string>(r => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => r((reader.result as string).split(',')[1]);
+                                        reader.readAsDataURL(blob);
+                                    });
+                                };
+                                const base64 = await urlToBase64(i2vTarget.url);
+                                const req: GenerationRequest = {
+                                    type: 'video',
+                                    prompt: i2vPrompt,
+                                    model: selectedModel,
+                                    aspectRatio: i2vAspectRatio,
+                                    videoConfig: {
+                                        resolution: videoResolution,
+                                        durationSeconds: videoDuration.replace('s', ''),
+                                        withAudio: false
+                                    },
+                                    contentParts: [{ inlineData: { mimeType: "image/jpeg", data: base64 } }]
+                                };
+                                const url = await geminiService.generateMedia(req);
+                                if (url) setI2VResultUrl(url);
+                            } catch (e) { console.error(e); alert("Video gen failed"); } finally { setIsGeneratingI2V(false); }
+                        }}
+                        generatedI2VUrl={i2vResultUrl}
+                        onExit={() => setActiveTab('create')}
+                        onApproveI2V={() => {
+                            if (!i2vResultUrl) return;
+                            if (i2vTarget && i2vTarget.index !== -1) {
+                                // Replace original
+                                setGeneratedMediaUrls(prev => {
+                                    const next = [...prev];
+                                    next[i2vTarget.index] = i2vResultUrl;
+                                    return next;
+                                });
+                            } else {
+                                // Add new
+                                setGeneratedMediaUrls(prev => [...prev, i2vResultUrl]);
+                            }
+                            setI2VTarget(null);
+                            setI2VResultUrl(null);
+                            setActiveTab('create');
+                        }}
+                        onDiscardI2V={() => {
+                            setI2VResultUrl(null);
+                        }}
+                        presetsDropdown={
+                            <PresetsDropdown
+                                isOpen={isPresetsOpen}
+                                setIsOpen={setIsPresetsOpen}
+                                showSaveForm={showSaveForm}
+                                setShowSaveForm={setShowSaveForm}
+                                currentPostData={{}}
+                                onSavePost={handleSavePreset}
+                                onLoadPreset={handleLoadPreset}
+                                presetsList={presets}
+                                onDeletePreset={handleDeletePreset}
+                                direction="down"
+                            />
+                        }
+                    />
+                )}
+
+                {activeTab === 'scripts' && <ScriptsTab />}
+                {activeTab === 'settings' && (
+                    <SettingsTab
+                        themes={themes}
+                        setThemes={persistThemes}
+                        captionStyles={captionStyles}
+                        setCaptionStyles={persistCaptionStyles}
+                        onExit={() => setActiveTab('create')}
+                    />
+                )}
+            </div>
+        </div>
+    );
+}
