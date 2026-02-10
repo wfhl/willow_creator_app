@@ -7,6 +7,8 @@ export interface DBFolder {
     name: string;
     parentId: string | null; // null for root
     timestamp: number;
+    color?: string;
+    icon?: string;
 }
 
 export interface DBAsset {

@@ -19,7 +19,7 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
                 </div>
             </div>
 
-            <nav className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5 overflow-x-auto no-scrollbar mx-2 scroll-smooth">
+            <nav className="hidden md:flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5 overflow-x-auto no-scrollbar mx-2 scroll-smooth">
                 <button
                     onClick={() => setActiveTab('create')}
                     className={`px-3 md:px-4 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all shrink-0 ${activeTab === 'create' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'

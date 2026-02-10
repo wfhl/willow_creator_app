@@ -2,7 +2,11 @@
 
 @layer base {
   body {
-    @apply antialiased text-white bg-[#050505] overflow-x-hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: white;
+    background: #050505;
+    overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
   }
 }
@@ -15,6 +19,51 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  .tap-highlight-none {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .active-scale {
+    transition: transform 0.1s;
+  }
+
+  .active-scale:active {
+    transform: scale(0.96);
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+    }
+
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .pb-safe-area {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .bottom-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 150;
+    background-color: #0a0a0a;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top-left-radius: 2.5rem;
+    border-top-right-radius: 2.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
 

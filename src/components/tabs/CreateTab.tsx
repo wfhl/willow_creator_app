@@ -1,5 +1,5 @@
 import React, { type ChangeEvent } from 'react';
-import { Layers, Edit2, ImagePlus, ChevronDown, Video as VideoIcon, Sparkles, Copy, Loader2, Dices, Image as ImageIcon, Wand2, Download, Save } from 'lucide-react';
+import { Layers, Edit2, ImagePlus, ChevronDown, Video as VideoIcon, Sparkles, Copy, Loader2, Dices, Image as ImageIcon, Wand2, Download, Save, X, Upload, RotateCw, Trash2 } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
 import type { DBAsset as Asset } from '../../lib/dbService';
 import { AssetUploader } from '../asset-uploader';
@@ -62,6 +62,10 @@ interface CreateTabProps {
     onGenerateCaptionOnly: () => void;
     onSaveToAssets: (url: string, type: 'image' | 'video', name?: string) => void;
     onPreview: (url: string) => void;
+    onDownload: (url: string, prefix?: string) => void;
+    onUploadToPost: (files: FileList | null) => void;
+    onRemoveMedia: (index: number) => void;
+    onRerollMedia: (index: number) => void;
 }
 
 export function CreateTab({
@@ -119,7 +123,11 @@ export function CreateTab({
     presetsDropdown,
     onGenerateCaptionOnly,
     onSaveToAssets,
-    onPreview
+    onPreview,
+    onDownload,
+    onUploadToPost,
+    onRemoveMedia,
+    onRerollMedia
 }: CreateTabProps) {
 
     const currentTheme = selectedThemeId === 'CUSTOM'
@@ -151,7 +159,30 @@ export function CreateTab({
                         {/* Theme Selection */}
                         <div className="space-y-2">
                             <label className="text-xs text-white/50 uppercase tracking-wider font-bold">Theme</label>
-                            <div className="grid grid-cols-2 gap-2">
+
+                            {/* Mobile Dropdown */}
+                            <div className="md:hidden">
+                                <div className="relative">
+                                    <select
+                                        value={selectedThemeId}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setSelectedThemeId(val);
+                                            if (val === 'CUSTOM') setSpecificVisuals("");
+                                        }}
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-base text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                    >
+                                        {themes.map(theme => (
+                                            <option key={theme.id} value={theme.id}>{theme.name}</option>
+                                        ))}
+                                        <option value="CUSTOM">Custom / Manual</option>
+                                    </select>
+                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
+                                </div>
+                            </div>
+
+                            {/* Desktop Grid */}
+                            <div className="hidden md:grid grid-cols-2 gap-2">
                                 {themes.map(theme => (
                                     <button
                                         key={theme.id}
@@ -198,7 +229,7 @@ export function CreateTab({
                                     value={customTheme}
                                     onChange={(e) => setCustomTheme(e.target.value)}
                                     placeholder="Enter a theme, quote, or concept to base the entire post on... (e.g., 'Embrace the journey, not just the destination' or 'Ethereal forest goddess')"
-                                    className="w-full bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-blue-400/70 placeholder:text-blue-200/30 transition-colors min-h-[100px]"
+                                    className="w-full bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 text-base md:text-sm text-white focus:outline-none focus:border-blue-400/70 placeholder:text-blue-200/30 transition-colors min-h-[100px]"
                                 />
                                 <p className="text-xs text-blue-300/60 mt-2">This will be used as the foundation for generating the concept, visuals, and caption.</p>
                             </div>
@@ -220,7 +251,7 @@ export function CreateTab({
                                         value={specificVisuals}
                                         onChange={(e) => setSpecificVisuals(e.target.value)}
                                         placeholder="Enter a quote to base the image on, or a custom visual description..."
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-500/50 placeholder:text-white/20 transition-colors min-h-[80px]"
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-base md:text-sm text-white focus:outline-none focus:border-emerald-500/50 placeholder:text-white/20 transition-colors min-h-[80px]"
                                     />
                                 ) : (
                                     <input
@@ -228,7 +259,7 @@ export function CreateTab({
                                         value={specificVisuals}
                                         onChange={(e) => setSpecificVisuals(e.target.value)}
                                         placeholder={(currentTheme as any).defaultSetting || (currentTheme as any).defaultAction || (currentTheme as any).defaultVisuals}
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-500/50 placeholder:text-white/20 transition-colors"
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-base md:text-sm text-white focus:outline-none focus:border-emerald-500/50 placeholder:text-white/20 transition-colors"
                                     />
                                 )}
                             </div>
@@ -246,7 +277,7 @@ export function CreateTab({
                                     value={specificOutfit}
                                     onChange={(e) => setSpecificOutfit(e.target.value)}
                                     placeholder={currentTheme.defaultOutfit}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-500/50 placeholder:text-white/20 transition-colors"
+                                    className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-base md:text-sm text-white focus:outline-none focus:border-emerald-500/50 placeholder:text-white/20 transition-colors"
                                 />
                             </div>
                         </div>
@@ -282,7 +313,7 @@ export function CreateTab({
                             <textarea
                                 value={generatedPrompt}
                                 onChange={(e) => setGeneratedPrompt(e.target.value)}
-                                className="w-full p-3 bg-black/60 border border-white/10 rounded-lg text-[10px] text-white/60 font-mono leading-relaxed focus:outline-none focus:border-emerald-500/50 transition-colors min-h-[100px]"
+                                className="w-full p-3 bg-black/60 border border-white/10 rounded-lg text-base md:text-[10px] text-white/60 font-mono leading-relaxed focus:outline-none focus:border-emerald-500/50 transition-colors min-h-[100px]"
                             />
 
                             {/* Settings Bar */}
@@ -330,7 +361,7 @@ export function CreateTab({
                                                     setAspectRatio(e.target.value);
                                                 }
                                             }}
-                                            className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                            className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-base md:text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
                                         >
                                             {selectedModel.includes('v4.5') ? (
                                                 <>
@@ -367,7 +398,7 @@ export function CreateTab({
                                             <select
                                                 value={videoDuration}
                                                 onChange={(e) => setVideoDuration(e.target.value)}
-                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-base md:text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
                                             >
                                                 {selectedModel.includes('veo-3') ? (
                                                     videoResolution === '1080p' ? (
@@ -399,7 +430,7 @@ export function CreateTab({
                                             <select
                                                 value={videoResolution}
                                                 onChange={(e) => setVideoResolution(e.target.value)}
-                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-base md:text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
                                             >
                                                 {selectedModel.includes('veo-3') ? (
                                                     <>
@@ -426,7 +457,7 @@ export function CreateTab({
                                             <select
                                                 value={createNumImages}
                                                 onChange={(e) => setCreateNumImages(Number(e.target.value))}
-                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-base md:text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
                                             >
                                                 <option value={1}>1</option>
                                                 <option value={2}>2</option>
@@ -502,14 +533,7 @@ export function CreateTab({
                                                     </button>
                                                 )}
                                                 <button
-                                                    onClick={() => {
-                                                        const a = document.createElement('a');
-                                                        a.href = url;
-                                                        a.download = `willow_generated_${Date.now()}_${idx}.${isVideo ? 'mp4' : 'png'}`;
-                                                        document.body.appendChild(a);
-                                                        a.click();
-                                                        document.body.removeChild(a);
-                                                    }}
+                                                    onClick={() => onDownload(url, `willow_generated_${idx}`)}
                                                     className="p-1 hover:bg-white/20 rounded"
                                                     title="Download"
                                                 >
@@ -521,6 +545,21 @@ export function CreateTab({
                                                     title="Save to Assets"
                                                 >
                                                     <Save className="w-4 h-4 text-white" />
+                                                </button>
+                                                <div className="w-px h-4 bg-white/20 mx-1"></div>
+                                                <button
+                                                    onClick={() => onRerollMedia(idx)}
+                                                    className="p-1 hover:bg-white/20 rounded"
+                                                    title="Reroll (Regenerate)"
+                                                >
+                                                    <RotateCw className="w-4 h-4 text-white" />
+                                                </button>
+                                                <button
+                                                    onClick={() => onRemoveMedia(idx)}
+                                                    className="p-1 hover:bg-red-500/40 rounded text-red-400 hover:text-white"
+                                                    title="Remove"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
                                         </div>
@@ -558,7 +597,7 @@ export function CreateTab({
                                         value={topic}
                                         onChange={(e) => setTopic(e.target.value)}
                                         placeholder="e.g. Morning thoughts, The future of AI..."
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-base md:text-sm text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
                                     />
                                 </div>
                                 <div className="w-1/3 space-y-1">
@@ -567,7 +606,7 @@ export function CreateTab({
                                         <select
                                             value={captionType}
                                             onChange={(e) => setCaptionType(e.target.value)}
-                                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white appearance-none focus:outline-none focus:border-emerald-500/50 cursor-pointer"
+                                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-base md:text-sm text-white appearance-none focus:outline-none focus:border-emerald-500/50 cursor-pointer"
                                         >
                                             {captionStyles.map(t => (
                                                 <option key={t.id} value={t.id}>{t.label}</option>
@@ -584,7 +623,7 @@ export function CreateTab({
                                     value={generatedCaption}
                                     onChange={(e) => setGeneratedCaption(e.target.value)}
                                     placeholder="Generated caption will appear here..."
-                                    className="w-full h-full min-h-[150px] bg-black/40 border border-white/10 rounded-lg p-4 text-white/90 font-serif leading-relaxed resize-none focus:outline-none focus:border-emerald-500/50 transition-colors"
+                                    className="w-full h-full min-h-[150px] bg-black/40 border border-white/10 rounded-lg p-4 text-base md:text-sm text-white/90 font-serif leading-relaxed resize-none focus:outline-none focus:border-emerald-500/50 transition-colors"
                                 />
                                 {isGeneratingCaption && (
                                     <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center">
@@ -607,7 +646,7 @@ export function CreateTab({
                     <div className="flex bg-white/5 rounded-xl p-1 border border-white/5 shrink-0">
                         <button
                             onClick={() => setMediaType('image')}
-                            className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all ${mediaType === 'image'
+                            className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all active-scale ${mediaType === 'image'
                                 ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
                                 : 'text-white/40 hover:text-white hover:bg-white/5'
                                 }`}
@@ -616,7 +655,7 @@ export function CreateTab({
                         </button>
                         <button
                             onClick={() => setMediaType('video')}
-                            className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all ${mediaType === 'video'
+                            className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all active-scale ${mediaType === 'video'
                                 ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
                                 : 'text-white/40 hover:text-white hover:bg-white/5'
                                 }`}
@@ -631,33 +670,38 @@ export function CreateTab({
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleGenerateRandomPost}
-                            className="p-3 bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 border border-white/10 hover:border-emerald-500/30 rounded-xl transition-all group"
+                            className="p-3 bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 border border-white/10 hover:border-emerald-500/30 rounded-xl transition-all group active-scale"
                             title="Surprise Me (Random Concept)"
                         >
                             <Dices className="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity" />
                         </button>
 
-                        <div className="relative">
-                            {!showSaveForm ? (
-                                <button
-                                    onClick={() => setShowSaveForm(true)}
-                                    // disabled={!generatedMediaUrls.length}
-                                    className="p-3 bg-white/5 hover:bg-white/10 disabled:opacity-30 border border-white/10 rounded-xl transition-all"
-                                    title="Save to Post Library"
-                                >
-                                    <Layers className="w-5 h-5 opacity-60" />
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={handleSavePost}
-                                    disabled={isSaving}
-                                    className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs uppercase tracking-widest rounded-xl transition-all flex items-center gap-2"
-                                >
-                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                    Save Post
-                                </button>
-                            )}
-                        </div>
+                        <button
+                            onClick={() => setShowSaveForm(true)}
+                            // disabled={!generatedMediaUrls.length}
+                            className={`p-3 bg-white/5 hover:bg-white/10 disabled:opacity-30 border border-white/10 rounded-xl transition-all active-scale ${showSaveForm ? 'text-emerald-400 border-emerald-500/50 bg-emerald-500/10' : ''}`}
+                            title="Save to Post Library"
+                        >
+                            <Save className="w-5 h-5 opacity-60" />
+                        </button>
+                    </div>
+
+                    <div className="relative">
+                        <input
+                            type="file"
+                            multiple
+                            accept="image/*,video/*"
+                            className="hidden"
+                            id="upload-media-post"
+                            onChange={(e) => onUploadToPost(e.target.files)}
+                        />
+                        <label
+                            htmlFor="upload-media-post"
+                            className="p-3 bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 border border-white/10 hover:border-emerald-500/30 rounded-xl transition-all group active-scale cursor-pointer flex items-center justify-center"
+                            title="Upload Custom Media to Post"
+                        >
+                            <Upload className="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                        </label>
                     </div>
 
                     {/* Right: Generate Button */}
@@ -679,6 +723,79 @@ export function CreateTab({
                     </button>
                 </div>
             </div>
-        </div>
+
+            {/* Mobile Save Post Bottom Sheet */}
+            {
+                showSaveForm && (
+                    <div className="md:hidden fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowSaveForm(false)}>
+                        <div
+                            className="bottom-sheet p-6 space-y-6"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-2" />
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-xl font-bold font-serif text-white">Save to Library</h3>
+                                <button onClick={() => setShowSaveForm(false)} className="p-2 bg-white/5 rounded-full text-white/40">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Post Topic / Title</label>
+                                    <input
+                                        type="text"
+                                        value={topic}
+                                        onChange={(e) => setTopic(e.target.value)}
+                                        placeholder="Enter a title for this post..."
+                                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-base text-white focus:border-emerald-500 transition-all shadow-inner"
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        handleSavePost();
+                                        setShowSaveForm(false);
+                                    }}
+                                    disabled={isSaving}
+                                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-black font-bold text-sm uppercase tracking-widest rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                                >
+                                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                                    {isSaving ? 'SAVING...' : 'CONFIRM SAVE'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Desktop Save Row (Optional inline fallback) */}
+            {
+                showSaveForm && (
+                    <div className="hidden md:flex fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl p-4 items-center gap-4 animate-in slide-in-from-bottom-4 duration-300 z-50">
+                        <input
+                            type="text"
+                            value={topic}
+                            onChange={(e) => setTopic(e.target.value)}
+                            placeholder="Post topic..."
+                            className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:border-emerald-500 outline-none w-64"
+                            autoFocus
+                        />
+                        <button
+                            onClick={handleSavePost}
+                            disabled={isSaving}
+                            className="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs uppercase tracking-widest rounded-lg transition-all flex items-center gap-2"
+                        >
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                            Save Post
+                        </button>
+                        <button onClick={() => setShowSaveForm(false)} className="text-white/40 hover:text-white">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                )
+            }
+        </div >
     );
 }

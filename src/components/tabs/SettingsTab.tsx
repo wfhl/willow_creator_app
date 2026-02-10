@@ -187,7 +187,7 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                                                         <input
                                                             value={tempTheme.name}
                                                             onChange={e => setTempTheme({ ...tempTheme, name: e.target.value })}
-                                                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none"
+                                                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-base md:text-sm text-white focus:border-emerald-500/50 outline-none"
                                                         />
                                                     </div>
                                                     <div className="space-y-1">
@@ -195,7 +195,7 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                                                         <input
                                                             value={tempTheme.description}
                                                             onChange={e => setTempTheme({ ...tempTheme, description: e.target.value })}
-                                                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none"
+                                                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-base md:text-sm text-white focus:border-emerald-500/50 outline-none"
                                                         />
                                                     </div>
                                                 </div>
@@ -205,7 +205,7 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                                                         value={tempTheme.basePrompt}
                                                         onChange={e => setTempTheme({ ...tempTheme, basePrompt: e.target.value })}
                                                         rows={3}
-                                                        className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none font-mono text-xs"
+                                                        className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-base md:text-sm text-white focus:border-emerald-500/50 outline-none font-mono text-xs"
                                                     />
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-4">
@@ -214,7 +214,7 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                                                         <input
                                                             value={tempTheme.defaultOutfit || ''}
                                                             onChange={e => setTempTheme({ ...tempTheme, defaultOutfit: e.target.value })}
-                                                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none"
+                                                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-base md:text-sm text-white focus:border-emerald-500/50 outline-none"
                                                         />
                                                     </div>
                                                     <div className="space-y-1">
@@ -222,7 +222,7 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                                                         <input
                                                             value={tempTheme.defaultSetting || tempTheme.defaultVisuals || ''}
                                                             onChange={e => setTempTheme({ ...tempTheme, defaultSetting: e.target.value, defaultVisuals: e.target.value })}
-                                                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none"
+                                                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-base md:text-sm text-white focus:border-emerald-500/50 outline-none"
                                                         />
                                                     </div>
                                                 </div>
@@ -364,7 +364,7 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                                                         value={tempStyle.prompt}
                                                         onChange={e => setTempStyle({ ...tempStyle, prompt: e.target.value })}
                                                         rows={4}
-                                                        className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none font-sans"
+                                                        className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-base md:text-sm text-white focus:border-emerald-500/50 outline-none font-sans"
                                                     />
                                                 </div>
                                                 <div className="flex justify-end gap-2 pt-2">

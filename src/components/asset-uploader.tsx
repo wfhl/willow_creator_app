@@ -158,7 +158,7 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                     {isLoadingLibrary ? (
                         <div className="p-8 text-center text-white/30 text-xs">Loading archives...</div>
                     ) : (
-                        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-[300px] overflow-y-auto custom-scrollbar p-1">
+                        <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 max-h-[300px] overflow-y-auto custom-scrollbar p-1">
                             {libraryImages.map((filename, idx) => (
                                 <div
                                     key={idx}

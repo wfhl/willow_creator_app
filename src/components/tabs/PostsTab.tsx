@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Download, ImagePlus, Search, Loader2, X, ChevronLeft, ChevronRight, Image as ImageIcon, Save } from 'lucide-react';
+import { Download, ImagePlus, Search, Loader2, X, ChevronLeft, ChevronRight, Image as ImageIcon, Save, PenTool, RotateCcw } from 'lucide-react';
 import type { DBSavedPost as SavedPost } from '../../lib/dbService';
 import { WILLOW_THEMES } from '../willow-presets';
 import JSZip from 'jszip'; // For download logic if we move it here, or pass handler
@@ -17,6 +17,7 @@ interface PostsTabProps {
     onSearchChange: (query: string) => void;
     onSortChange: (order: 'prev' | 'next') => void;
     onLoadPost: (post: SavedPost) => void;
+    onRecall: (post: SavedPost) => void;
     onDeletePost: (id: string) => void;
     onImportReferences: () => void;
     onImportIGArchive: () => void;
@@ -35,6 +36,7 @@ export function PostsTab({
     onSearchChange,
     onSortChange,
     onLoadPost,
+    onRecall,
     onDeletePost,
     onImportReferences,
     onImportIGArchive,
@@ -203,7 +205,7 @@ Total Media Items: ${post.mediaUrls.length}
                             value={searchQuery}
                             onChange={(e) => onSearchChange(e.target.value)}
                             placeholder="Search library..."
-                            className="w-full px-4 py-2.5 pl-10 pr-10 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50 focus:bg-white/10 transition-all"
+                            className="w-full px-4 py-2.5 pl-10 pr-10 bg-white/5 border border-white/10 rounded-lg text-base md:text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50 focus:bg-white/10 transition-all"
                         />
                         <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${isSearching ? 'text-emerald-400 animate-pulse' : 'text-white/40'}`} />
                         {isSearching && (
@@ -224,13 +226,13 @@ Total Media Items: ${post.mediaUrls.length}
                     <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 shrink-0 justify-center">
                         <button
                             onClick={() => onSortChange('prev')}
-                            className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${sortOrder === 'prev' ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+                            className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all active-scale ${sortOrder === 'prev' ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
                         >
                             Newest
                         </button>
                         <button
                             onClick={() => onSortChange('next')}
-                            className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${sortOrder === 'next' ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+                            className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all active-scale ${sortOrder === 'next' ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
                         >
                             Oldest
                         </button>
@@ -350,12 +352,12 @@ Total Media Items: ${post.mediaUrls.length}
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                onSaveToAssets(currentMedia, isVideo ? 'video' : 'image', `${post.topic} - item ${currentIndex + 1}`);
+                                                onRecall(post);
                                             }}
                                             className="p-1.5 bg-black/50 text-white rounded-md hover:bg-emerald-600/80 backdrop-blur-sm"
-                                            title="Save to Assets"
+                                            title="Recall to Create"
                                         >
-                                            <Save className="w-3 h-3" />
+                                            <RotateCcw className="w-3 h-3" />
                                         </button>
                                         <button
                                             onClick={(e) => {

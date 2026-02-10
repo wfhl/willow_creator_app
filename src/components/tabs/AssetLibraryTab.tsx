@@ -10,7 +10,14 @@ import {
     X,
     Grid,
     List,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Edit2,
+    Star,
+    Heart,
+    Camera,
+    Music,
+    Briefcase,
+    Home
 } from 'lucide-react';
 import { dbService } from '../../lib/dbService';
 import type { DBAsset, DBFolder } from '../../lib/dbService';
@@ -27,7 +34,15 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+    const [editingFolder, setEditingFolder] = useState<DBFolder | null>(null);
     const [newFolderName, setNewFolderName] = useState("");
+    const [newFolderColor, setNewFolderColor] = useState("");
+    const [newFolderIcon, setNewFolderIcon] = useState("");
+    const [draggedAssetId, setDraggedAssetId] = useState<string | null>(null);
+    const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+
+    const FOLDER_COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1'];
+    const FOLDER_ICONS = ['folder', 'star', 'heart', 'camera', 'video', 'music', 'briefcase', 'home'];
 
     const loadContent = useCallback(async () => {
         try {
@@ -62,16 +77,93 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
 
     const handleCreateFolder = async () => {
         if (!newFolderName.trim()) return;
-        const newFolder: DBFolder = {
-            id: crypto.randomUUID(),
-            name: newFolderName.trim(),
-            parentId: currentFolderId,
-            timestamp: Date.now()
-        };
-        await dbService.saveFolder(newFolder);
+
+        if (editingFolder) {
+            const updated = { ...editingFolder, name: newFolderName.trim(), color: newFolderColor, icon: newFolderIcon };
+            await dbService.saveFolder(updated);
+        } else {
+            const newFolder: DBFolder = {
+                id: crypto.randomUUID(),
+                name: newFolderName.trim(),
+                parentId: currentFolderId,
+                timestamp: Date.now(),
+                color: newFolderColor,
+                icon: newFolderIcon
+            };
+            await dbService.saveFolder(newFolder);
+        }
+
         setNewFolderName("");
+        setNewFolderColor("");
+        setNewFolderIcon("");
+        setEditingFolder(null);
         setShowNewFolderModal(false);
         loadContent();
+    };
+
+    const openEditFolder = (folder: DBFolder) => {
+        setEditingFolder(folder);
+        setNewFolderName(folder.name);
+        setNewFolderColor(folder.color || "");
+        setNewFolderIcon(folder.icon || "");
+        setShowNewFolderModal(true);
+    };
+
+    // Drag and Drop Handlers
+    const handleDragStart = (e: React.DragEvent, assetId: string) => {
+        setDraggedAssetId(assetId);
+        e.dataTransfer.setData('text/plain', assetId);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+
+
+    const handleDragEnterTarget = (e: React.DragEvent, targetId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragOverTarget(targetId);
+    };
+
+    const handleDragLeaveTarget = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Only clear if leaving to outside (simple debounce logic or check relatedTarget could be better, but simple is ok for now)
+        setDragOverTarget(null);
+    };
+
+    // Improved DragLeave needed to avoid flickering:
+    // Actually, simplest is to let onDragEnter of new target override old one.
+    // If leaving a target to essentially "nothing", we clear.
+
+    const handleDrop = async (e: React.DragEvent, targetFolderId: string | null) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragOverTarget(null);
+
+        const assetId = draggedAssetId;
+        if (!assetId) return;
+
+        try {
+            // Find the asset first (we need its full object to update)
+            const assetToMove = assets.find(a => a.id === assetId);
+            if (assetToMove) {
+                // If moving to same folder, ignore
+                if (assetToMove.folderId === targetFolderId) return;
+
+                const updatedAsset = { ...assetToMove, folderId: targetFolderId };
+                // Optimistic update locally
+                setAssets(prev => prev.filter(a => a.id !== assetId)); // Remove from current view
+                await dbService.saveAsset(updatedAsset);
+
+                // If dropped on root or parent crumb, it disappears from current view (assets) which is correct.
+                // If dropped on a folder in list, it also disappears (moved into it).
+            }
+        } catch (error) {
+            console.error("Failed to move asset:", error);
+            loadContent(); // Revert on failure
+        } finally {
+            setDraggedAssetId(null);
+        }
     };
 
     const handleUploadAssets = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,10 +209,13 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
                     <div className="flex items-center gap-2 md:gap-4 shrink-0 overflow-hidden">
                         <h2 className="text-lg md:text-2xl font-bold font-serif text-white/90 truncate shrink-0">Assets</h2>
                         <div className="h-6 w-px bg-white/10 mx-1 md:mx-2 shrink-0" />
-                        <div className="flex items-center gap-1 text-[10px] md:text-sm text-white/40 overflow-x-auto no-scrollbar whitespace-nowrap scroll-smooth">
+                        <div className="flex items-center gap-1 text-[10px] md:text-sm text-white/40 overflow-x-auto no-scrollbar whitespace-nowrap scroll-smooth py-1">
                             <button
                                 onClick={() => handleNavigate(null)}
-                                className="hover:text-emerald-400 transition-colors"
+                                onDragOver={(e) => handleDragEnterTarget(e, 'root')}
+                                onDragLeave={handleDragLeaveTarget}
+                                onDrop={(e) => handleDrop(e, null)}
+                                className={`transition-all rounded px-2 py-0.5 ${dragOverTarget === 'root' ? 'bg-emerald-500/20 text-emerald-400 scale-105 font-bold shadow-lg shadow-emerald-500/10' : 'hover:text-emerald-400'}`}
                             >
                                 Root
                             </button>
@@ -129,7 +224,12 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
                                     <ChevronRight className="w-3 h-3 shrink-0" />
                                     <button
                                         onClick={() => handleNavigate(p)}
-                                        className={`hover:text-emerald-400 transition-colors shrink-0 ${i === path.length - 1 ? 'text-white/80 font-bold' : ''}`}
+                                        onDragOver={(e) => handleDragEnterTarget(e, p.id)}
+                                        onDragLeave={handleDragLeaveTarget}
+                                        onDrop={(e) => handleDrop(e, p.id)}
+                                        className={`transition-all rounded px-2 py-0.5 shrink-0 ${dragOverTarget === p.id
+                                            ? 'bg-emerald-500/20 text-emerald-400 scale-105 font-bold shadow-lg shadow-emerald-500/10'
+                                            : (i === path.length - 1 ? 'text-white/80 font-bold' : 'hover:text-emerald-400')}`}
                                     >
                                         {p.name}
                                     </button>
@@ -164,19 +264,19 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
                             placeholder="Search..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-white/[0.03] border border-white/5 rounded-xl py-2.5 pl-11 pr-4 text-sm text-white placeholder-white/20 focus:outline-none focus:border-emerald-500/50 transition-all font-sans"
+                            className="w-full bg-white/[0.03] border border-white/5 rounded-xl py-2.5 pl-11 pr-4 text-base md:text-sm text-white placeholder-white/20 focus:outline-none focus:border-emerald-500/50 transition-all font-sans"
                         />
                     </div>
                     <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 shrink-0">
                         <button
                             onClick={() => setViewMode('grid')}
-                            className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white/10 text-emerald-400' : 'text-white/40 hover:text-white'}`}
+                            className={`p-2 rounded-lg transition-all active-scale ${viewMode === 'grid' ? 'bg-white/10 text-emerald-400' : 'text-white/40 hover:text-white'}`}
                         >
                             <Grid className="w-4 h-4" />
                         </button>
                         <button
                             onClick={() => setViewMode('list')}
-                            className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white/10 text-emerald-400' : 'text-white/40 hover:text-white'}`}
+                            className={`p-2 rounded-lg transition-all active-scale ${viewMode === 'list' ? 'bg-white/10 text-emerald-400' : 'text-white/40 hover:text-white'}`}
                         >
                             <List className="w-4 h-4" />
                         </button>
@@ -198,43 +298,89 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
                         : "flex flex-col gap-1"
                     }>
                         {/* Render Folders */}
-                        {folders.map(folder => (
-                            <div
-                                key={folder.id}
-                                onClick={() => handleNavigate(folder)}
-                                className={viewMode === 'grid'
-                                    ? "group relative flex flex-col items-center p-4 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/5 hover:border-emerald-500/30 cursor-pointer transition-all animate-in fade-in slide-in-from-bottom-2"
-                                    : "group flex items-center gap-4 p-3 bg-white/[0.02] border-b border-white/5 hover:bg-white/5 cursor-pointer transition-all"
-                                }
-                            >
-                                <FolderIcon className={viewMode === 'grid'
-                                    ? "w-12 h-12 mb-3 text-emerald-500/60 group-hover:text-emerald-400 group-hover:scale-110 transition-all duration-300"
-                                    : "w-5 h-5 text-emerald-500/60"
-                                } strokeWidth={1.5} />
+                        {folders.map(folder => {
+                            const isCustomColor = folder.color && folder.color.startsWith('#');
+                            const iconColorClass = isCustomColor ? '' : 'text-emerald-500/60 group-hover:text-emerald-400';
+                            const iconStyle = isCustomColor ? { color: folder.color } : {};
 
-                                <span className={viewMode === 'grid'
-                                    ? "text-[11px] font-medium text-white/70 text-center line-clamp-2 w-full px-2 group-hover:text-white"
-                                    : "text-sm text-white/70 flex-1 group-hover:text-white"
-                                }>
-                                    {folder.name}
-                                </span>
+                            const isDragOver = dragOverTarget === folder.id;
 
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id, folder.name); }}
-                                    className="absolute top-2 right-2 p-1.5 bg-red-500/0 text-red-500/0 group-hover:bg-red-500/10 group-hover:text-red-500/60 hover:text-red-500 rounded-lg transition-all"
+                            return (
+                                <div
+                                    key={folder.id}
+                                    onClick={() => handleNavigate(folder)}
+                                    onDragOver={(e) => handleDragEnterTarget(e, folder.id)}
+                                    onDragLeave={handleDragLeaveTarget}
+                                    onDrop={(e) => handleDrop(e, folder.id)}
+                                    className={viewMode === 'grid'
+                                        ? `group relative flex flex-col items-center justify-center aspect-square p-4 bg-white/[0.02] border rounded-2xl cursor-pointer transition-all animate-in fade-in slide-in-from-bottom-2 ${isDragOver
+                                            ? 'border-emerald-500 bg-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.2)] z-10'
+                                            : 'border-white/5 hover:bg-white/5 hover:border-emerald-500/30'}`
+                                        : `group flex items-center gap-4 p-3 bg-white/[0.02] border-b cursor-pointer transition-all ${isDragOver
+                                            ? 'border-emerald-500 bg-emerald-500/10'
+                                            : 'border-white/5 hover:bg-white/5'}`
+                                    }
                                 >
-                                    <Trash2 className="w-3 h-3" />
-                                </button>
-                            </div>
-                        ))}
+                                    <div className="relative">
+                                        {(() => {
+                                            const IconComponent = {
+                                                'folder': FolderIcon,
+                                                'star': Star,
+                                                'heart': Heart,
+                                                'camera': Camera,
+                                                'video': FileVideo,
+                                                'music': Music,
+                                                'briefcase': Briefcase,
+                                                'home': Home
+                                            }[folder.icon || 'folder'] || FolderIcon;
+
+                                            return (
+                                                <IconComponent
+                                                    className={viewMode === 'grid'
+                                                        ? `w-12 h-12 mb-3 ${iconColorClass} group-hover:scale-110 transition-all duration-300`
+                                                        : `w-5 h-5 ${iconColorClass}`
+                                                    }
+                                                    style={iconStyle}
+                                                    strokeWidth={1.5}
+                                                />
+                                            );
+                                        })()}
+                                    </div>
+
+                                    <span className={viewMode === 'grid'
+                                        ? "text-[10px] md:text-xs font-bold text-white/50 group-hover:text-white uppercase tracking-widest text-center truncate w-full mt-4 transition-colors"
+                                        : "text-sm text-white/70 flex-1 group-hover:text-white"
+                                    }>
+                                        {folder.name}
+                                    </span>
+
+                                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); openEditFolder(folder); }}
+                                            className="p-1.5 hover:bg-white/10 text-white/40 hover:text-white rounded-lg transition-all"
+                                        >
+                                            <Edit2 className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id, folder.name); }}
+                                            className="p-1.5 hover:bg-red-500/10 text-white/40 hover:text-red-500 rounded-lg transition-all"
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        })}
 
                         {/* Render Assets */}
                         {assets.map(asset => (
                             <div
                                 key={asset.id}
+                                draggable={true}
+                                onDragStart={(e) => handleDragStart(e, asset.id)}
                                 className={viewMode === 'grid'
-                                    ? "group relative aspect-square bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden hover:border-emerald-500/30 transition-all animate-in fade-in slide-in-from-bottom-4 duration-500"
-                                    : "group flex items-center gap-4 p-2 bg-white/[0.02] border-b border-white/5 hover:bg-white/5 transition-all"
+                                    ? "group relative aspect-square bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden hover:border-emerald-500/30 transition-all animate-in fade-in slide-in-from-bottom-4 duration-500 cursor-grab active:cursor-grabbing"
+                                    : "group flex items-center gap-4 p-2 bg-white/[0.02] border-b border-white/5 hover:bg-white/5 transition-all cursor-grab active:cursor-grabbing"
                                 }
                             >
                                 {viewMode === 'grid' ? (
@@ -317,8 +463,61 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
                             value={newFolderName}
                             onChange={(e) => setNewFolderName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
-                            className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 px-6 text-white placeholder-white/20 focus:outline-none focus:border-emerald-500 transition-all mb-8 shadow-inner"
+                            className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 px-6 text-base text-white placeholder-white/20 focus:outline-none focus:border-emerald-500 transition-all mb-6 shadow-inner"
                         />
+
+                        {/* Folder Customization */}
+                        <div className="space-y-4 mb-8">
+                            <div>
+                                <label className="text-xs text-white/40 uppercase font-bold tracking-widest block mb-2">Folder Color</label>
+                                <div className="flex gap-2">
+                                    {FOLDER_COLORS.map(color => (
+                                        <button
+                                            key={color}
+                                            onClick={() => setNewFolderColor(color)}
+                                            className={`w-6 h-6 rounded-full border transition-all ${newFolderColor === color ? 'border-white scale-110' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                                            style={{ backgroundColor: color }}
+                                        />
+                                    ))}
+                                    <button
+                                        onClick={() => setNewFolderColor("")}
+                                        className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${!newFolderColor ? 'border-white bg-white/10' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                                        title="Default"
+                                    >
+                                        <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs text-white/40 uppercase font-bold tracking-widest block mb-2">Folder Icon</label>
+                                <div className="flex gap-2 flex-wrap">
+                                    {FOLDER_ICONS.map(iconName => {
+                                        const IconC = {
+                                            'folder': FolderIcon,
+                                            'star': Star,
+                                            'heart': Heart,
+                                            'camera': Camera,
+                                            'video': FileVideo,
+                                            'music': Music,
+                                            'briefcase': Briefcase,
+                                            'home': Home
+                                        }[iconName] || FolderIcon;
+
+                                        return (
+                                            <button
+                                                key={iconName}
+                                                onClick={() => setNewFolderIcon(iconName)}
+                                                className={`p-2 rounded-lg border transition-all ${newFolderIcon === iconName ? 'bg-white/10 border-white text-white' : 'border-transparent text-white/40 hover:text-white hover:bg-white/5'}`}
+                                            >
+                                                <IconC className="w-5 h-5" />
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="flex gap-4">
                             <button
                                 onClick={() => setShowNewFolderModal(false)}

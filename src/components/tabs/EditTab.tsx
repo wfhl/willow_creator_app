@@ -27,6 +27,13 @@ interface EditTabProps {
     presetsDropdown: React.ReactNode;
     onSaveToAssets: (url: string, type: 'image' | 'video', name?: string) => void;
     onPreview: (url: string) => void;
+    onDownload: (url: string, prefix?: string) => void;
+
+    // New Props
+    enableSafety?: boolean;
+    setEnableSafety?: (val: boolean) => void;
+    enhancePromptMode?: "standard" | "fast";
+    setEnhancePromptMode?: (val: "standard" | "fast") => void;
 }
 
 export function EditTab({
@@ -52,7 +59,12 @@ export function EditTab({
     onI2VEntry,
     presetsDropdown,
     onSaveToAssets,
-    onPreview
+    onPreview,
+    onDownload,
+    enableSafety,
+    setEnableSafety,
+    enhancePromptMode,
+    setEnhancePromptMode
 }: EditTabProps) {
     const [isDragging, setIsDragging] = useState(false);
 
@@ -237,7 +249,7 @@ export function EditTab({
                                         value={refinePrompt}
                                         onChange={(e) => setRefinePrompt(e.target.value)}
                                         placeholder="E.g., change eye color to deep blue, add more freckles, make the background a sunset forest, adjust lighting to be warmer..."
-                                        className="w-full h-[250px] p-6 bg-black/40 border border-white/10 rounded-xl text-sm text-white focus:border-emerald-500/50 focus:outline-none transition-all resize-none font-serif leading-relaxed"
+                                        className="w-full h-[250px] p-6 bg-black/40 border border-white/10 rounded-xl text-base md:text-sm text-white focus:border-emerald-500/50 focus:outline-none transition-all resize-none font-serif leading-relaxed"
                                     />
                                     {/* Model Selector & Parameters Bar */}
                                     <div className="flex items-center justify-between gap-4 p-2">
@@ -247,7 +259,7 @@ export function EditTab({
                                                 <select
                                                     value={selectedModel}
                                                     onChange={(e) => setSelectedModel(e.target.value)}
-                                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500/50 outline-none"
+                                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none"
                                                 >
                                                     <option value="nano-banana-pro-preview">Nano Banana (Refine)</option>
                                                     <option value="fal-ai/bytedance/seedream/v4/edit">Seedream 4.0 Edit</option>
@@ -263,7 +275,7 @@ export function EditTab({
                                                     <select
                                                         value={refineImageSize}
                                                         onChange={(e) => setRefineImageSize(e.target.value)}
-                                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-xs text-white focus:border-emerald-500/50 outline-none cursor-pointer hover:bg-white/5 transition-colors"
+                                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none cursor-pointer hover:bg-white/5 transition-colors"
                                                     >
                                                         {selectedModel.includes('v4.5') ? (
                                                             <>
@@ -301,12 +313,34 @@ export function EditTab({
                                             )}
 
                                             {(selectedModel.includes('seedream') || selectedModel.includes('grok')) && (
-                                                <div className="space-y-1 w-28 animate-in fade-in slide-in-from-left-2 duration-300">
-                                                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Safety</label>
-                                                    <div className="px-3 py-2 bg-white/5 rounded-lg border border-white/10 text-xs text-white/60 italic text-center">
-                                                        Disabled
+                                                <>
+                                                    <div className="space-y-1 w-28 animate-in fade-in slide-in-from-left-2 duration-300">
+                                                        <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Safety</label>
+                                                        <button
+                                                            onClick={() => setEnableSafety && setEnableSafety(!enableSafety)}
+                                                            className={`w-full px-2 py-2 rounded-lg border text-xs font-medium transition-all flex items-center justify-center gap-2 ${enableSafety
+                                                                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                                                                : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+                                                                }`}
+                                                        >
+                                                            {enableSafety ? 'Enabled' : 'Disabled'}
+                                                        </button>
                                                     </div>
-                                                </div>
+
+                                                    {selectedModel.includes('seedream') && (
+                                                        <div className="space-y-1 w-32 animate-in fade-in slide-in-from-left-2 duration-300">
+                                                            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Enhance</label>
+                                                            <select
+                                                                value={enhancePromptMode || "standard"}
+                                                                onChange={(e) => setEnhancePromptMode && setEnhancePromptMode(e.target.value as "standard" | "fast")}
+                                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-xs text-white focus:border-emerald-500/50 outline-none cursor-pointer hover:bg-white/5 transition-colors"
+                                                            >
+                                                                <option value="standard">Standard</option>
+                                                                <option value="fast">Fast</option>
+                                                            </select>
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </div>
@@ -332,7 +366,7 @@ export function EditTab({
                                     <button
                                         onClick={onRefineSubmit}
                                         disabled={isRefining || !refinePrompt}
-                                        className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all ${isRefining ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
+                                        className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all active-scale ${isRefining || !refinePrompt ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
                                             }`}
                                     >
                                         <Sparkles className="w-5 h-5" />
@@ -369,14 +403,7 @@ export function EditTab({
                                                 <VideoIcon className="w-4 h-4 text-white" />
                                             </button>
                                             <button
-                                                onClick={() => {
-                                                    const a = document.createElement('a');
-                                                    a.href = refineResultUrl!;
-                                                    a.download = `willow_refined_${Date.now()}.png`;
-                                                    document.body.appendChild(a);
-                                                    a.click();
-                                                    document.body.removeChild(a);
-                                                }}
+                                                onClick={() => onDownload(refineResultUrl!, `willow_refined_${Date.now()}.png`)}
                                                 className="p-1 hover:bg-white/20 rounded"
                                                 title="Download"
                                             >
@@ -396,14 +423,14 @@ export function EditTab({
                                         {refineTarget.index !== -1 && (
                                             <button
                                                 onClick={() => onApproveRefinement('replace')}
-                                                className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-black rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/40"
+                                                className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-black rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/40 active-scale"
                                             >
                                                 Replace Original
                                             </button>
                                         )}
                                         <button
                                             onClick={() => onApproveRefinement('add')}
-                                            className={`flex-1 py-4 text-white border border-white/20 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${refineTarget.index === -1
+                                            className={`flex-1 py-4 text-white border border-white/20 rounded-xl font-bold text-xs uppercase tracking-widest transition-all active-scale ${refineTarget.index === -1
                                                 ? 'col-span-2 bg-emerald-600 hover:bg-emerald-500 text-black border-0 shadow-lg shadow-emerald-900/40'
                                                 : 'bg-white/10 hover:bg-white/20'
                                                 }`}

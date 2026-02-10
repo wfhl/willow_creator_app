@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { ChevronDown, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, Sparkles, Trash2, X } from 'lucide-react';
 
 interface PresetsDropdownProps {
     isOpen: boolean;
@@ -57,7 +57,7 @@ export function PresetsDropdown({
                         setIsOpen(!isOpen);
                         setShowSaveForm(false);
                     }}
-                    className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 transition-all ${isOpen ? 'text-emerald-400' : 'text-white/40 hover:text-emerald-400'}`}
+                    className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 transition-all active-scale ${isOpen ? 'text-emerald-400' : 'text-white/40 hover:text-emerald-400'}`}
                 >
                     <div className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-emerald-500' : 'bg-white/20'}`}></div>
                     Presets
@@ -70,50 +70,90 @@ export function PresetsDropdown({
 
                     {/* Header Actions */}
                     <div className="p-2 border-b border-white/5 bg-white/5 flex gap-2">
-                        {!showSaveForm ? (
-                            <button
-                                onClick={() => setShowSaveForm(true)}
-                                className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
-                            >
-                                <Sparkles className="w-3 h-3" /> Save Context
-                            </button>
-                        ) : (
-                            <div className="w-full">
+                        <button
+                            onClick={() => setShowSaveForm(true)}
+                            className={`w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 active-scale ${showSaveForm ? 'bg-emerald-500/30' : ''}`}
+                        >
+                            <Sparkles className="w-3 h-3" /> Save Context
+                        </button>
+                    </div>
+
+                    {/* Mobile Save Sheet (Rendered outside for mobile) */}
+                    {showSaveForm && (
+                        <div className="md:hidden fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowSaveForm(false)}>
+                            <div className="bottom-sheet p-6 space-y-6" onClick={e => e.stopPropagation()}>
+                                <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-2" />
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-xl font-bold font-serif text-white">Save Context</h3>
+                                    <button onClick={() => setShowSaveForm(false)} className="p-2 bg-white/5 rounded-full text-white/40">
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
                                 <form
                                     onSubmit={(e) => {
                                         e.preventDefault();
                                         onSavePost(currentPostData, presetName);
                                         setShowSaveForm(false);
                                     }}
-                                    className="space-y-2 animate-in fade-in slide-in-from-top-1"
+                                    className="space-y-4"
                                 >
-                                    <input
-                                        type="text"
-                                        placeholder="Name this preset..."
-                                        className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-white focus:border-emerald-500/50 outline-none"
-                                        autoFocus
-                                        value={presetName}
-                                        onChange={(e) => setPresetName(e.target.value)}
-                                    />
-                                    <div className="flex gap-1">
-                                        <button
-                                            type="submit"
-                                            className="flex-1 py-1 bg-emerald-500 text-black rounded text-[10px] font-bold uppercase"
-                                        >
-                                            Confirm
-                                        </button>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Preset Name</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Name this preset..."
+                                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-base text-white focus:border-emerald-500 transition-all shadow-inner"
+                                            autoFocus
+                                            value={presetName}
+                                            onChange={(e) => setPresetName(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex gap-3">
                                         <button
                                             type="button"
                                             onClick={() => setShowSaveForm(false)}
-                                            className="px-2 py-1 bg-white/10 text-white rounded text-[10px]"
+                                            className="flex-1 py-4 bg-white/5 text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest border border-white/10"
                                         >
                                             Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="flex-[2] py-4 bg-emerald-500 text-black rounded-2xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-emerald-500/20 active-scale"
+                                        >
+                                            Confirm Save
                                         </button>
                                     </div>
                                 </form>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
+
+                    {/* Desktop Inline Form */}
+                    {showSaveForm && (
+                        <div className="hidden md:block p-2 border-b border-white/10 bg-emerald-500/5 animate-in slide-in-from-top-2 duration-200">
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    onSavePost(currentPostData, presetName);
+                                    setShowSaveForm(false);
+                                }}
+                                className="space-y-2"
+                            >
+                                <input
+                                    type="text"
+                                    placeholder="Name this preset..."
+                                    className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-white focus:border-emerald-500/50 outline-none"
+                                    autoFocus
+                                    value={presetName}
+                                    onChange={(e) => setPresetName(e.target.value)}
+                                />
+                                <div className="flex gap-1">
+                                    <button type="submit" className="flex-1 py-1 bg-emerald-500 text-black rounded text-[10px] font-bold uppercase">Confirm</button>
+                                    <button type="button" onClick={() => setShowSaveForm(false)} className="px-2 py-1 bg-white/10 text-white rounded text-[10px]">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
 
                     {/* Presets List */}
                     <div className="max-h-64 overflow-y-auto custom-scrollbar p-1 space-y-0.5">

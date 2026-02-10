@@ -21,13 +21,19 @@ interface AnimateTabProps {
     generatedI2VUrl: string | null;
     onExit: () => void;
 
-    // New Actions
     onApproveI2V: () => void;
     onDiscardI2V: () => void;
-
     presetsDropdown: React.ReactNode;
     onSaveToAssets: (url: string, type: 'image' | 'video', name?: string) => void;
     onPreview: (url: string) => void;
+    onDownload: (url: string, prefix?: string) => void;
+
+    // New Props for Seedance
+    withAudio?: boolean;
+    setWithAudio?: (val: boolean) => void;
+    cameraFixed?: boolean;
+    setCameraFixed?: (val: boolean) => void;
+
 }
 
 export function AnimateTab({
@@ -51,13 +57,19 @@ export function AnimateTab({
     onDiscardI2V,
     presetsDropdown,
     onSaveToAssets,
-    onPreview
+    onPreview,
+    onDownload,
+    withAudio,
+    setWithAudio,
+    cameraFixed,
+    setCameraFixed,
+
 }: AnimateTabProps) {
     const [isDragging, setIsDragging] = useState(false);
 
     // Ensure we are on a video model when mounting or if model is invalid
     useEffect(() => {
-        const isVideoModel = selectedModel.includes('video') || selectedModel.includes('veo');
+        const isVideoModel = selectedModel.includes('video') || selectedModel.includes('veo') || selectedModel.includes('seedance');
         if (!isVideoModel) {
             // Default to Grok Video
             setSelectedModel('xai/grok-imagine-video/image-to-video');
@@ -66,10 +78,18 @@ export function AnimateTab({
         } else {
             // Validate constraints for current video model
             if (selectedModel.includes('grok')) {
-                if (!['5s', '6s', '9s'].includes(videoDuration)) setVideoDuration('5s');
+                if (!['5s', '6s', '9s', '10s', '15s'].includes(videoDuration)) setVideoDuration('6s');
                 if (videoResolution !== '720p') setVideoResolution('720p');
             } else if (selectedModel.includes('veo-3')) {
                 if (videoResolution === '1080p' && videoDuration !== '8s') setVideoDuration('8s');
+            } else if (selectedModel.includes('seedance')) {
+                // Seedance supports 4-12s, allow standard fallback
+            } else if (selectedModel.includes('wan')) {
+                // Wan 2.5: 5, 10. Wan 2.6: 5, 10, 15.
+                if (!['5s', '10s', '15s'].includes(videoDuration)) setVideoDuration('5s');
+                if (selectedModel.includes('wan-25') && videoDuration === '15s') setVideoDuration('10s');
+                // Wan 2.6 Flash only supports 720p, 1080p
+                if (selectedModel.includes('flash') && videoResolution === '480p') setVideoResolution('720p');
             }
         }
     }, [selectedModel, videoDuration, videoResolution, setSelectedModel, setVideoDuration, setVideoResolution]);
@@ -197,7 +217,7 @@ export function AnimateTab({
                                         value={i2vPrompt}
                                         onChange={(e) => setI2VPrompt(e.target.value)}
                                         placeholder="Describe the motion... (e.g., camera pans slowly right, hair blowing in wind, blinking eyes)"
-                                        className="w-full h-[150px] p-6 bg-black/40 border border-white/10 rounded-xl text-sm text-white focus:border-emerald-500/50 focus:outline-none transition-all resize-none font-serif leading-relaxed"
+                                        className="w-full h-[150px] p-6 bg-black/40 border border-white/10 rounded-xl text-base md:text-sm text-white focus:border-emerald-500/50 focus:outline-none transition-all resize-none font-serif leading-relaxed"
                                     />
                                     {/* Video Settings */}
                                     <div className="grid grid-cols-2 gap-4">
@@ -214,14 +234,24 @@ export function AnimateTab({
                                                     } else if (newModel.includes('veo-3')) {
                                                         setVideoDuration('8s');
                                                         setVideoResolution('1080p');
+                                                    } else if (newModel.includes('seedance')) {
+                                                        setVideoDuration('5s');
+                                                        setVideoResolution('720p'); // default
+                                                        setWithAudio?.(true);
+                                                    } else if (newModel.includes('wan')) {
+                                                        setVideoDuration('5s');
+                                                        setVideoResolution('1080p');
                                                     } else {
                                                         setVideoDuration('6s');
                                                         setVideoResolution('720p');
                                                     }
                                                 }}
-                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500/50 outline-none"
+                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none"
                                             >
                                                 <option value="xai/grok-imagine-video/image-to-video">Grok 2 Video (Beta)</option>
+                                                <option value="fal-ai/bytedance/seedance/v1.5/pro/image-to-video">Seedance 1.5 Pro</option>
+                                                <option value="fal-ai/wan-25-preview/image-to-video">Wan 2.5 I2V Preview</option>
+                                                <option value="wan/v2.6/image-to-video/flash">Wan 2.6 Flash I2V</option>
                                                 <option value="veo-3.1-generate-preview">Veo 3.1 (Google)</option>
                                                 <option value="veo-2.0-generate-001">Veo 2.0 (Google Legacy)</option>
                                             </select>
@@ -241,10 +271,22 @@ export function AnimateTab({
                                                         }
                                                     }
                                                 }}
-                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500/50 outline-none"
+                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none"
                                             >
                                                 {selectedModel.includes('grok') ? (
                                                     <option value="720p">720p (Standard)</option>
+                                                ) : selectedModel.includes('seedance') ? (
+                                                    <>
+                                                        <option value="1080p">1080p (Full HD)</option>
+                                                        <option value="720p">720p (HD)</option>
+                                                        <option value="480p">480p (SD)</option>
+                                                    </>
+                                                ) : selectedModel.includes('wan') ? (
+                                                    <>
+                                                        <option value="1080p">1080p (Full HD)</option>
+                                                        {selectedModel.includes('wan-25') && <option value="480p">480p (SD)</option>}
+                                                        <option value="720p">720p (HD)</option>
+                                                    </>
                                                 ) : selectedModel.includes('veo-3') ? (
                                                     <>
                                                         <option value="1080p">1080p (HD - 8s Only)</option>
@@ -263,13 +305,27 @@ export function AnimateTab({
                                             <select
                                                 value={videoDuration}
                                                 onChange={(e) => setVideoDuration(e.target.value)}
-                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500/50 outline-none"
+                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none"
                                             >
                                                 {selectedModel.includes('grok') ? (
                                                     <>
                                                         <option value="5s">5 Seconds</option>
                                                         <option value="6s">6 Seconds</option>
                                                         <option value="9s">9 Seconds</option>
+                                                        <option value="10s">10 Seconds</option>
+                                                        <option value="15s">15 Seconds</option>
+                                                    </>
+                                                ) : selectedModel.includes('seedance') ? (
+                                                    <>
+                                                        {Array.from({ length: 9 }, (_, i) => i + 4).map(s => (
+                                                            <option key={s} value={`${s}s`}>{s} Seconds</option>
+                                                        ))}
+                                                    </>
+                                                ) : selectedModel.includes('wan') ? (
+                                                    <>
+                                                        <option value="5s">5 Seconds</option>
+                                                        <option value="10s">10 Seconds</option>
+                                                        {selectedModel.includes('2.6') && <option value="15s">15 Seconds</option>}
                                                     </>
                                                 ) : selectedModel.includes('veo-3') ? (
                                                     videoResolution === '1080p' ? (
@@ -294,14 +350,53 @@ export function AnimateTab({
                                             <select
                                                 value={i2vAspectRatio}
                                                 onChange={(e) => setI2VAspectRatio(e.target.value)}
-                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500/50 outline-none"
+                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none"
                                             >
                                                 <option value="auto">Matches Image</option>
                                                 <option value="16:9">16:9 Landscape</option>
                                                 <option value="9:16">9:16 Portrait</option>
                                                 <option value="1:1">1:1 Square</option>
+                                                {(selectedModel.includes('seedance')) && (
+                                                    <>
+                                                        <option value="4:3">4:3 TV</option>
+                                                        <option value="3:4">3:4 Portrait</option>
+                                                        <option value="21:9">21:9 Cinema</option>
+                                                    </>
+                                                )}
                                             </select>
                                         </div>
+                                    </div>
+
+
+
+                                    {/* Advanced Toggles */}
+                                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/5 mt-4">
+                                        {selectedModel.includes('seedance') && (
+                                            <>
+                                                <label className="flex items-center gap-3 cursor-pointer group col-span-2 md:col-span-1 p-2 rounded-lg hover:bg-white/5 transition-colors">
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={withAudio}
+                                                            onChange={(e) => setWithAudio?.(e.target.checked)}
+                                                            className="w-4 h-4 rounded border-white/20 bg-black/40 text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-0"
+                                                        />
+                                                    </div>
+                                                    <span className="text-xs text-white/60 group-hover:text-white transition-colors select-none">Generate Audio</span>
+                                                </label>
+                                                <label className="flex items-center gap-3 cursor-pointer group col-span-2 md:col-span-1 p-2 rounded-lg hover:bg-white/5 transition-colors">
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={cameraFixed}
+                                                            onChange={(e) => setCameraFixed?.(e.target.checked)}
+                                                            className="w-4 h-4 rounded border-white/20 bg-black/40 text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-0"
+                                                        />
+                                                    </div>
+                                                    <span className="text-xs text-white/60 group-hover:text-white transition-colors select-none">Fix Camera</span>
+                                                </label>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
@@ -317,7 +412,7 @@ export function AnimateTab({
                                     <button
                                         onClick={onGenerateI2V}
                                         disabled={isGeneratingI2V || !i2vPrompt}
-                                        className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all ${isGeneratingI2V || !i2vPrompt ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
+                                        className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all active-scale ${isGeneratingI2V || !i2vPrompt ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
                                             }`}
                                     >
                                         <VideoIcon className="w-5 h-5" />
@@ -349,14 +444,7 @@ export function AnimateTab({
                                         />
                                         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1">
                                             <button
-                                                onClick={() => {
-                                                    const a = document.createElement('a');
-                                                    a.href = generatedI2VUrl!;
-                                                    a.download = `willow_animated_${Date.now()}.mp4`;
-                                                    document.body.appendChild(a);
-                                                    a.click();
-                                                    document.body.removeChild(a);
-                                                }}
+                                                onClick={() => onDownload(generatedI2VUrl!, `willow_animated_${Date.now()}.mp4`)}
                                                 className="p-1 hover:bg-white/20 rounded"
                                                 title="Download"
                                             >
@@ -376,7 +464,7 @@ export function AnimateTab({
                                 <div className="grid grid-cols-1 gap-3">
                                     <button
                                         onClick={onApproveI2V}
-                                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-black rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/40"
+                                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-black rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/40 active-scale"
                                     >
                                         Add to Post
                                     </button>

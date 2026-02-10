@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Edit2, Play } from 'lucide-react';
-import { geminiService } from '../../lib/geminiService';
-import type { GenerationRequest } from '../../lib/geminiService';
+import { Edit2, Play, PenTool, Archive, Folder } from 'lucide-react';
+import { geminiService } from '../lib/geminiService';
+import type { GenerationRequest } from '../lib/geminiService';
+import { falService, type FalGenerationRequest } from '../lib/falService';
 import { dbService } from '../lib/dbService';
 import type { DBAsset as Asset, DBSavedPost as SavedPost, DBPromptPreset } from '../lib/dbService';
 import { WILLOW_PROFILE, WILLOW_THEMES, CAPTION_TEMPLATES } from './willow-presets';
@@ -94,6 +95,12 @@ export default function WillowPostCreator() {
     const [videoResolution, setVideoResolution] = useState<string>('1080p');
     const [videoDuration, setVideoDuration] = useState<string>('6s');
     const [i2vAspectRatio, setI2vAspectRatio] = useState<string>('9:16');
+    const [withAudio, setWithAudio] = useState(true);
+    const [cameraFixed, setCameraFixed] = useState(false);
+
+    // Advanced Edit Config
+    const [enableSafety, setEnableSafety] = useState(true);
+    const [enhancePromptMode, setEnhancePromptMode] = useState<"standard" | "fast">("standard");
 
     // --- INITIALIZATION EFFECTS ---
 
@@ -312,40 +319,86 @@ export default function WillowPostCreator() {
                 });
             }
 
-            const request: GenerationRequest = {
-                type: mediaType,
-                prompt: finalPrompt,
-                model: selectedModel,
-                aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
-                contentParts: contentParts,
-                videoConfig: mediaType === 'video' ? {
-                    resolution: videoResolution,
-                    durationSeconds: videoDuration.replace('s', ''),
-                    withAudio: false
-                } : undefined,
-                editConfig: { // Pass both for flexibility, backend handles routing
-                    imageSize: createImageSize,
-                    numImages: createNumImages
-                }
-            };
+            // Determine Service
+            const isFalModel = selectedModel.includes('grok') || selectedModel.includes('seedream') || selectedModel.includes('seedance') || selectedModel.includes('wan');
 
-            if (mediaType === 'image') {
-                const taskIndexes = Array.from({ length: createNumImages }, (_, i) => i);
-                const imagePromises = taskIndexes.map(async (i) => {
-                    try {
-                        if (i > 0) await new Promise(r => setTimeout(r, i * 2000));
-                        const url = await geminiService.generateMedia(request);
-                        if (url) {
-                            setGeneratedMediaUrls(prev => [...prev, url]);
-                            return url;
-                        }
-                    } catch (e) { console.error(e); }
-                    return null;
-                });
-                await Promise.all(imagePromises);
+            if (isFalModel) {
+                const request: FalGenerationRequest = {
+                    model: selectedModel,
+                    prompt: finalPrompt,
+                    aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
+                    contentParts: contentParts,
+                    videoConfig: mediaType === 'video' ? {
+                        resolution: videoResolution,
+                        durationSeconds: videoDuration.replace('s', ''),
+                        withAudio,
+                        cameraFixed
+                    } : undefined,
+                    editConfig: {
+                        imageSize: createImageSize,
+                        numImages: createNumImages,
+                        enableSafety,
+                        enhancePromptMode
+                    }
+                };
+
+                // For Fal, we generally get one result unless using text-to-image with batch
+                // FalService currently returns a single string URL usually.
+                // If we need multiple images (text-to-image), falService might need adjustment or we loop here.
+                // Current falService helper returns single URL.
+                // For Text-to-Image with numImages > 1, we might need to loop or update service.
+                // For now, let's assume single generation or loop if needed.
+
+                if (mediaType === 'image' && createNumImages > 1 && !selectedModel.includes('edit')) {
+                    const taskIndexes = Array.from({ length: createNumImages }, (_, i) => i);
+                    const promises = taskIndexes.map(async (i) => {
+                        if (i > 0) await new Promise(r => setTimeout(r, i * 500)); // Stagger
+                        return falService.generateMedia(request);
+                    });
+                    const results = await Promise.all(promises);
+                    setGeneratedMediaUrls(results);
+                } else {
+                    const url = await falService.generateMedia(request);
+                    setGeneratedMediaUrls([url]);
+                }
+
             } else {
-                const result = await geminiService.generateMedia(request);
-                if (result) setGeneratedMediaUrls([result]);
+                // Gemini / Veo
+                const request: GenerationRequest = {
+                    type: mediaType,
+                    prompt: finalPrompt,
+                    model: selectedModel,
+                    aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
+                    contentParts: contentParts,
+                    videoConfig: mediaType === 'video' ? {
+                        resolution: videoResolution,
+                        durationSeconds: videoDuration.replace('s', ''),
+                        withAudio: false
+                    } : undefined,
+                    editConfig: {
+                        imageSize: createImageSize,
+                        numImages: createNumImages
+                    }
+                };
+
+                if (mediaType === 'image') {
+                    const taskIndexes = Array.from({ length: createNumImages }, (_, i) => i);
+                    const imagePromises = taskIndexes.map(async (i) => {
+                        try {
+                            if (i > 0) await new Promise(r => setTimeout(r, i * 2000));
+                            const url = await geminiService.generateMedia(request);
+                            if (url) {
+                                setGeneratedMediaUrls(prev => [...prev, url]);
+                                return url;
+                            }
+                        } catch (e) { console.error(e); }
+                        return null;
+                    });
+                    await Promise.all(imagePromises);
+                } else {
+                    const result = await geminiService.generateMedia(request);
+                    if (result) setGeneratedMediaUrls([result]);
+                }
             }
 
         } catch (error) {
@@ -524,6 +577,36 @@ export default function WillowPostCreator() {
         setPresets(prev => prev.filter(p => p.id !== id));
     };
 
+    // --- RECALL POST ---
+    // --- RECALL POST ---
+    const handleRecallPost = (post: SavedPost) => {
+        // Correctly set "Create" tab state
+        setSelectedThemeId(post.themeId);
+        setCaptionType(post.captionType || 'A'); // Default to A if missing
+
+        // Tone/Platform are derived or not explicit in saved post, leaving defaulting logic.
+
+        setTopic(post.topic);
+        setSpecificVisuals(post.visuals);
+        setSpecificOutfit(post.outfit);
+
+        // Populate generated content if available, so user sees result immediately
+        setGeneratedCaption(post.caption);
+        setGeneratedPrompt(post.prompt);
+
+        // Ensure manual mode is respected if it was custom
+        if (post.themeId === 'CUSTOM') {
+            // Logic for custom theme is handled by selectedThemeId === 'CUSTOM'
+        }
+
+        // Prevent auto-overwrite of prompt by useEffect on mount/change if we have a saved prompt
+        if (post.prompt) {
+            ignoreNextPromptUpdate.current = true;
+        }
+
+        setActiveTab('create');
+    };
+
     const handleImportReferences = async () => {
         if (!confirm("Import 'GenReference' images into Post Library?")) return;
         try {
@@ -604,6 +687,15 @@ export default function WillowPostCreator() {
                 });
             }
 
+            // Check if already exists
+            const allAssets = await dbService.getAllAssets();
+            const exists = allAssets.find(a => a.base64 === base64);
+            if (exists) {
+                if (!confirm("This image is already in your Asset Library. Save another copy?")) {
+                    return;
+                }
+            }
+
             const newAsset: Asset = {
                 id: crypto.randomUUID(),
                 name: name || `Saved ${type} ${new Date().toLocaleString()}`,
@@ -611,14 +703,72 @@ export default function WillowPostCreator() {
                 base64: base64,
                 folderId: null, // Root by default
                 timestamp: Date.now(),
-                selected: false
+                selected: true // Mark as selected for creator's view
             };
 
             await dbService.saveAsset(newAsset);
+            setAssets(prev => [...prev.filter(a => a.base64 !== base64), newAsset]);
             alert("Saved to Asset Library!");
         } catch (err) {
             console.error("Save to assets failed:", err);
             alert("Failed to save asset.");
+        }
+    };
+
+    const handleDownload = async (url: string, prefix: string = 'willow') => {
+        try {
+            const isVideo = url.startsWith('data:video') || url.match(/\.(mp4|webm|mov)$/i);
+            const extension = isVideo ? 'mp4' : 'png';
+            const filename = `${prefix}_${Date.now()}.${extension}`;
+
+            let blob: Blob;
+            if (url.startsWith('data:')) {
+                const parts = url.split(',');
+                const mime = parts[0].match(/:(.*?);/)![1];
+                const bstr = atob(parts[1]);
+                let n = bstr.length;
+                const u8arr = new Uint8Array(n);
+                while (n--) {
+                    u8arr[n] = bstr.charCodeAt(n);
+                }
+                blob = new Blob([u8arr], { type: mime });
+            } else {
+                const response = await fetch(url);
+                blob = await response.blob();
+            }
+
+            const file = new File([blob], filename, { type: blob.type });
+
+            // Using Mobile Share API for native "Save to Photos" support
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Save to Photos',
+                    });
+                    return;
+                } catch (shareErr) {
+                    console.log("Share cancelled or failed, falling back to traditional download", shareErr);
+                }
+            }
+
+            // Fallback for desktop/unsupported browsers
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
+        } catch (err) {
+            console.error("Download failed:", err);
+            // Universal fallback
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'willow_media';
+            a.target = "_blank";
+            a.click();
         }
     };
 
@@ -648,7 +798,7 @@ export default function WillowPostCreator() {
                 savedCount={totalSavedCount}
             />
 
-            <div className="flex-1 overflow-y-auto pt-16 md:pt-20 pb-10 md:pb-20 scroll-smooth">
+            <div className="flex-1 overflow-y-auto pt-16 md:pt-20 pb-24 md:pb-10 scroll-smooth">
                 {activeTab === 'create' && (
                     <CreateTab
                         themes={themes}
@@ -698,6 +848,95 @@ export default function WillowPostCreator() {
                         generatedMediaUrls={generatedMediaUrls}
                         handleRefineEntry={handleRefineEntry}
                         handleI2VEntry={handleI2VEntry}
+                        onRemoveMedia={(index) => {
+                            setGeneratedMediaUrls(prev => prev.filter((_, i) => i !== index));
+                        }}
+                        onRerollMedia={async (index) => {
+                            // Reroll logic similar to generate but for single item and replacement
+                            const promptOverride = generatedPrompt;
+                            if (!promptOverride) return;
+
+                            // Determine if using Fal or Gemini (reuse logic from handleGenerateMedia)
+                            const isFalModel = selectedModel.includes('grok') || selectedModel.includes('seedream') || selectedModel.includes('seedance') || selectedModel.includes('wan');
+
+                            // Prepare assets part
+                            const selectedImages = assets.filter(a => a.selected && a.type === 'image');
+                            let finalPrompt = promptOverride;
+                            const contentParts: any[] = [];
+                            if (selectedImages.length > 0) {
+                                const faceInstruction = `Generate a portrait consistent with the character identity in the attached reference images. Focus on her specific red hair, blue-green eyes, and freckles. Maintain the subject's unique facial features while implementing the following scene:`;
+                                finalPrompt = `${faceInstruction} ${promptOverride}`;
+                                selectedImages.forEach(img => {
+                                    contentParts.push({
+                                        inlineData: { mimeType: "image/jpeg", data: img.base64.split(',')[1] }
+                                    });
+                                });
+                            }
+
+                            // Indicate loading state for specific item? 
+                            // For simplicity, use global loading or we'd need a map of loading indices.
+                            // Using global isGeneratingMedia is safest for now to block other actions.
+                            setIsGeneratingMedia(true);
+
+                            try {
+                                let newUrl: string | null = null;
+
+                                if (isFalModel) {
+                                    const request: FalGenerationRequest = {
+                                        model: selectedModel,
+                                        prompt: finalPrompt,
+                                        aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
+                                        contentParts: contentParts,
+                                        videoConfig: mediaType === 'video' ? {
+                                            resolution: videoResolution,
+                                            durationSeconds: videoDuration.replace('s', ''),
+                                            withAudio,
+                                            cameraFixed
+                                        } : undefined,
+                                        editConfig: {
+                                            imageSize: createImageSize,
+                                            numImages: 1, // Force 1 for reroll
+                                            enableSafety,
+                                            enhancePromptMode
+                                        }
+                                    };
+                                    newUrl = await falService.generateMedia(request);
+                                } else {
+                                    // Gemini / Veo
+                                    const request: GenerationRequest = {
+                                        type: mediaType,
+                                        prompt: finalPrompt,
+                                        model: selectedModel,
+                                        aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
+                                        contentParts: contentParts,
+                                        videoConfig: mediaType === 'video' ? {
+                                            resolution: videoResolution,
+                                            durationSeconds: videoDuration.replace('s', ''),
+                                            withAudio: false
+                                        } : undefined,
+                                        editConfig: {
+                                            imageSize: createImageSize,
+                                            numImages: 1
+                                        }
+                                    };
+                                    newUrl = await geminiService.generateMedia(request);
+                                }
+
+                                if (newUrl) {
+                                    setGeneratedMediaUrls(prev => {
+                                        const next = [...prev];
+                                        next[index] = newUrl!;
+                                        return next;
+                                    });
+                                }
+
+                            } catch (e) {
+                                console.error("Reroll failed", e);
+                                alert("Reroll failed.");
+                            } finally {
+                                setIsGeneratingMedia(false);
+                            }
+                        }}
                         onSaveToAssets={handleSaveToAssets}
                         handleCopy={(t) => navigator.clipboard.writeText(t)}
                         handleSavePost={handleSavePost}
@@ -719,6 +958,19 @@ export default function WillowPostCreator() {
                             />
                         }
                         onPreview={(url) => setPreviewContext({ urls: generatedMediaUrls, index: generatedMediaUrls.indexOf(url) })}
+                        onDownload={handleDownload}
+                        onUploadToPost={(files: FileList | null) => {
+                            if (!files) return;
+                            Array.from(files).forEach(file => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                    if (reader.result) {
+                                        setGeneratedMediaUrls(prev => [...prev, reader.result as string]);
+                                    }
+                                };
+                                reader.readAsDataURL(file);
+                            });
+                        }}
                     />
                 )}
 
@@ -744,6 +996,7 @@ export default function WillowPostCreator() {
                             setGeneratedPrompt(post.prompt);
                             setActiveTab('create');
                         }}
+                        onRecall={handleRecallPost}
                         onDeletePost={async (id) => {
                             if (!confirm("Delete this post?")) return;
                             await dbService.deletePost(id);
@@ -790,6 +1043,10 @@ export default function WillowPostCreator() {
                         refineResultUrl={refineResultUrl}
                         setRefineResultUrl={setRefineResultUrl}
                         isRefining={isRefining}
+                        enableSafety={enableSafety}
+                        setEnableSafety={setEnableSafety}
+                        enhancePromptMode={enhancePromptMode}
+                        setEnhancePromptMode={setEnhancePromptMode}
                         onRefineSubmit={async () => {
                             if (!refineTarget || !refinePrompt) return;
                             setIsRefining(true);
@@ -810,18 +1067,37 @@ export default function WillowPostCreator() {
                                     contentParts.push({ inlineData: { mimeType: "image/jpeg", data: img.base64.split(',')[1] } });
                                 });
 
-                                const req: GenerationRequest = {
-                                    type: 'edit',
-                                    prompt: refinePrompt,
-                                    model: selectedModel,
-                                    aspectRatio,
-                                    contentParts,
-                                    editConfig: {
-                                        imageSize: refineImageSize,
-                                        numImages: refineNumImages
-                                    }
-                                };
-                                const url = await geminiService.generateMedia(req);
+                                let url = "";
+                                if (selectedModel.includes('grok') || selectedModel.includes('seedream')) {
+                                    // Fal Service
+                                    const req: FalGenerationRequest = {
+                                        model: selectedModel,
+                                        prompt: refinePrompt,
+                                        contentParts,
+                                        editConfig: {
+                                            imageSize: refineImageSize,
+                                            numImages: refineNumImages,
+                                            enableSafety: false,
+                                            enhancePromptMode
+                                        }
+                                    };
+                                    url = await falService.generateMedia(req);
+                                } else {
+                                    // Gemini Service
+                                    const req: GenerationRequest = {
+                                        type: 'edit',
+                                        prompt: refinePrompt,
+                                        model: selectedModel,
+                                        aspectRatio,
+                                        contentParts,
+                                        editConfig: {
+                                            imageSize: refineImageSize,
+                                            numImages: refineNumImages
+                                        }
+                                    };
+                                    url = await geminiService.generateMedia(req);
+                                }
+
                                 if (url) setRefineResultUrl(url);
                             } catch (e) { console.error(e); alert("Refinement failed"); } finally { setIsRefining(false); }
                         }}
@@ -844,6 +1120,7 @@ export default function WillowPostCreator() {
                         }
                         onSaveToAssets={handleSaveToAssets}
                         onPreview={(url) => handleOpenPreview(url)}
+                        onDownload={handleDownload}
                     />
                 )}
 
@@ -862,6 +1139,11 @@ export default function WillowPostCreator() {
                         selectedModel={selectedModel}
                         setSelectedModel={setSelectedModel}
                         isGeneratingI2V={isGeneratingI2V}
+                        withAudio={withAudio}
+                        setWithAudio={setWithAudio}
+                        cameraFixed={cameraFixed}
+                        setCameraFixed={setCameraFixed}
+
                         onGenerateI2V={async () => {
                             if (!i2vTarget || !i2vPrompt) return;
                             setIsGeneratingI2V(true);
@@ -877,37 +1159,54 @@ export default function WillowPostCreator() {
                                     });
                                 };
                                 const base64 = await urlToBase64(i2vTarget.url);
-                                const req: GenerationRequest = {
-                                    type: 'video',
-                                    prompt: i2vPrompt,
-                                    model: selectedModel,
-                                    aspectRatio: i2vAspectRatio,
-                                    videoConfig: {
-                                        resolution: videoResolution,
-                                        durationSeconds: videoDuration.replace('s', ''),
-                                        withAudio: false
-                                    },
-                                    contentParts: [{ inlineData: { mimeType: "image/jpeg", data: base64 } }]
-                                };
-                                const url = await geminiService.generateMedia(req);
+                                const contentParts = [{ inlineData: { mimeType: "image/jpeg", data: base64 } }];
+
+                                let url = "";
+                                if (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) {
+                                    // Fal Service
+                                    const req: FalGenerationRequest = {
+                                        model: selectedModel,
+                                        prompt: i2vPrompt,
+                                        aspectRatio: i2vAspectRatio,
+                                        contentParts,
+                                        videoConfig: {
+                                            resolution: videoResolution,
+                                            durationSeconds: videoDuration.replace('s', ''),
+                                            withAudio,
+                                            cameraFixed
+                                        },
+                                        editConfig: {
+                                            enableSafety: false
+                                        }
+                                    };
+                                    url = await falService.generateMedia(req);
+                                } else {
+                                    // Gemini / Veo Service
+                                    const req: GenerationRequest = {
+                                        type: 'video',
+                                        prompt: i2vPrompt,
+                                        model: selectedModel,
+                                        aspectRatio: i2vAspectRatio,
+                                        videoConfig: {
+                                            resolution: videoResolution,
+                                            durationSeconds: videoDuration.replace('s', ''),
+                                            withAudio: false
+                                        },
+                                        contentParts
+                                    };
+                                    url = await geminiService.generateMedia(req);
+                                }
+
                                 if (url) setI2VResultUrl(url);
-                            } catch (e) { console.error(e); alert("Video gen failed"); } finally { setIsGeneratingI2V(false); }
+                            } catch (e: any) { console.error(e); alert(`Video gen failed: ${e.message || e}`); } finally { setIsGeneratingI2V(false); }
                         }}
                         generatedI2VUrl={i2vResultUrl}
                         onExit={() => setActiveTab('create')}
                         onApproveI2V={() => {
                             if (!i2vResultUrl) return;
-                            if (i2vTarget && i2vTarget.index !== -1) {
-                                // Replace original
-                                setGeneratedMediaUrls(prev => {
-                                    const next = [...prev];
-                                    next[i2vTarget.index] = i2vResultUrl;
-                                    return next;
-                                });
-                            } else {
-                                // Add new
-                                setGeneratedMediaUrls(prev => [...prev, i2vResultUrl]);
-                            }
+                            // Always add as new item, preserve original
+                            setGeneratedMediaUrls(prev => [...prev, i2vResultUrl]);
+
                             setI2VTarget(null);
                             setI2VResultUrl(null);
                             setActiveTab('create');
@@ -931,6 +1230,7 @@ export default function WillowPostCreator() {
                         }
                         onSaveToAssets={handleSaveToAssets}
                         onPreview={(url) => handleOpenPreview(url)}
+                        onDownload={handleDownload}
                     />
                 )}
 
@@ -944,6 +1244,47 @@ export default function WillowPostCreator() {
                         onExit={() => setActiveTab('create')}
                     />
                 )}
+            </div>
+
+            {/* Mobile Bottom Navigation */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-white/10 z-[100] px-4 pb-safe-area">
+                <nav className="flex items-center justify-around h-16">
+                    <button
+                        onClick={() => setActiveTab('create')}
+                        className={`flex flex-col items-center gap-1 transition-all active-scale ${activeTab === 'create' ? 'text-emerald-400' : 'text-white/40'}`}
+                    >
+                        <PenTool className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Create</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('edit')}
+                        className={`flex flex-col items-center gap-1 transition-all active-scale ${activeTab === 'edit' ? 'text-emerald-400' : 'text-white/40'}`}
+                    >
+                        <Edit2 className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Refine</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('animate')}
+                        className={`flex flex-col items-center gap-1 transition-all active-scale ${activeTab === 'animate' ? 'text-emerald-400' : 'text-white/40'}`}
+                    >
+                        <Play className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Animate</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('posts')}
+                        className={`flex flex-col items-center gap-1 transition-all active-scale ${activeTab === 'posts' ? 'text-emerald-400' : 'text-white/40'}`}
+                    >
+                        <Archive className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Posts</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('assets')}
+                        className={`flex flex-col items-center gap-1 transition-all active-scale ${activeTab === 'assets' ? 'text-emerald-400' : 'text-white/40'}`}
+                    >
+                        <Folder className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Assets</span>
+                    </button>
+                </nav>
             </div>
 
             {/* Media Preview Modal */}
@@ -1037,19 +1378,19 @@ export default function WillowPostCreator() {
                             )}
 
                             <button
-                                onClick={() => {
-                                    const a = document.createElement('a');
-                                    a.href = previewUrl;
-                                    const isVideo = previewUrl.startsWith('data:video') || previewUrl.match(/\.(mp4|webm|mov)$/i);
-                                    a.download = `willow_preview_${Date.now()}.${isVideo ? 'mp4' : 'png'}`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                }}
+                                onClick={() => handleDownload(previewUrl!, 'willow_preview')}
                                 className="px-4 md:px-6 py-2 bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/50 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-black transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
                                 Download
+                            </button>
+
+                            <button
+                                onClick={() => handleSaveToAssets(previewUrl, previewUrl.startsWith('data:video') || previewUrl.match(/\.(mp4|webm|mov)$/i) ? 'video' : 'image')}
+                                className="px-4 md:px-6 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-emerald-400 transition-all flex items-center gap-2"
+                            >
+                                <Archive className="w-3 md:w-4 h-3 md:h-4" />
+                                Save to Library
                             </button>
                         </div>
                     </div>
