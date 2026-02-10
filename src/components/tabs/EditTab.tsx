@@ -1,5 +1,5 @@
-import React, { type ChangeEvent } from 'react';
-import { Sparkles, Edit2, ImagePlus, X, RefreshCw, Download, Video as VideoIcon } from 'lucide-react';
+import React, { useState, type ChangeEvent } from 'react';
+import { Sparkles, Edit2, ImagePlus, X, RefreshCw, Download, Video as VideoIcon, Save } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
 import type { DBAsset as Asset } from '../../lib/dbService';
 
@@ -25,6 +25,8 @@ interface EditTabProps {
     onExit: () => void;
     onI2VEntry: (url: string) => void;
     presetsDropdown: React.ReactNode;
+    onSaveToAssets: (url: string, type: 'image' | 'video', name?: string) => void;
+    onPreview: (url: string) => void;
 }
 
 export function EditTab({
@@ -48,27 +50,62 @@ export function EditTab({
 
     onExit,
     onI2VEntry,
-    presetsDropdown
+    presetsDropdown,
+    onSaveToAssets,
+    onPreview
 }: EditTabProps) {
+    const [isDragging, setIsDragging] = useState(false);
+
+    // Helper to process a file to a data URL
+    const processFile = (file: File) => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (re) => {
+            if (re.target?.result) {
+                setRefineTarget({ url: re.target.result as string, index: -1 });
+            }
+        };
+        reader.readAsDataURL(file);
+    };
 
     // Internal handler for uploading the main refine target if none exists
     const handleRefineImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (re) => {
-                if (re.target?.result) {
-                    setRefineTarget({ url: re.target.result as string, index: -1 });
-                }
-            };
-            reader.readAsDataURL(file);
+            processFile(e.target.files[0]);
+        }
+    };
+
+    // Drag and Drop handlers
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            processFile(e.dataTransfer.files[0]);
         }
     };
 
     if (!refineTarget) {
         return (
-            <div className="max-w-[1200px] mx-auto w-full p-8 pb-32 flex flex-col items-center justify-center min-h-[60vh]">
-                <div className="text-center space-y-6 max-w-lg">
+            <div
+                className={`max-w-[1200px] mx-auto w-full p-8 pb-32 flex flex-col items-center justify-center min-h-[60vh] transition-all duration-300 ${isDragging ? 'bg-emerald-500/5 scale-[1.01]' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+            >
+                <div className="text-center space-y-6 max-w-lg pointer-events-none">
                     <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 inline-block">
                         <Edit2 className="w-12 h-12 text-emerald-400" />
                     </div>
@@ -77,10 +114,14 @@ export function EditTab({
                         <p className="text-white/40">Upload an image to start refining its details, outfits, or style.</p>
                     </div>
 
-                    <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-white/10 rounded-2xl bg-white/5 hover:bg-white/10 hover:border-emerald-500/50 transition-all cursor-pointer group">
+                    <label
+                        className={`flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-2xl transition-all cursor-pointer group pointer-events-auto ${isDragging ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-emerald-500/50'}`}
+                    >
                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <ImagePlus className="w-10 h-10 text-white/20 group-hover:text-emerald-400 transition-colors mb-4" />
-                            <p className="mb-2 text-sm text-white/60"><span className="font-semibold text-emerald-400">Click to upload</span> or drag and drop</p>
+                            <ImagePlus className={`w-10 h-10 transition-colors mb-4 ${isDragging ? 'text-emerald-400 animate-bounce' : 'text-white/20 group-hover:text-emerald-400'}`} />
+                            <p className="mb-2 text-sm text-white/60">
+                                {isDragging ? <span className="text-emerald-400 font-bold">Drop it here!</span> : <><span className="font-semibold text-emerald-400">Click to upload</span> or drag and drop</>}
+                            </p>
                             <p className="text-xs text-white/40">PNG, JPG or WebP</p>
                         </div>
                         <input type="file" className="hidden" accept="image/*" onChange={handleRefineImageUpload} />
@@ -114,8 +155,13 @@ export function EditTab({
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
                     <div className="p-8 border-r border-white/5">
                         <div className="aspect-[3/4] bg-black/40 rounded-xl overflow-hidden border border-white/10 shadow-inner group relative">
-                            <img src={refineTarget.url} alt="Target" className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+                            <img
+                                src={refineTarget.url}
+                                alt="Target"
+                                className="w-full h-full object-cover cursor-zoom-in"
+                                onClick={() => onPreview(refineTarget.url)}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4 pointer-events-none">
                                 <p className="text-[10px] text-white/60 uppercase tracking-widest font-bold">Source Reference</p>
                             </div>
                         </div>
@@ -158,7 +204,15 @@ export function EditTab({
                                                             reader.onload = () => resolve(reader.result as string);
                                                             reader.readAsDataURL(file);
                                                         });
-                                                        newAssets.push({ id: crypto.randomUUID(), base64, type: 'image', selected: true });
+                                                        newAssets.push({
+                                                            id: crypto.randomUUID(),
+                                                            name: file.name,
+                                                            base64,
+                                                            type: 'image',
+                                                            folderId: null,
+                                                            timestamp: Date.now(),
+                                                            selected: true
+                                                        });
                                                     }
                                                     setRefineAdditionalImages(prev => [...prev, ...newAssets]);
                                                 }
@@ -293,7 +347,12 @@ export function EditTab({
                                         <Sparkles className="w-3 h-3" /> Refined Result
                                     </label>
                                     <div className="aspect-[3/4] bg-black/40 rounded-xl overflow-hidden border-2 border-emerald-500/30 shadow-2xl shadow-emerald-500/10 relative group">
-                                        <img src={refineResultUrl} alt="Refined Result" className="w-full h-full object-cover" />
+                                        <img
+                                            src={refineResultUrl}
+                                            alt="Refined Result"
+                                            className="w-full h-full object-cover cursor-zoom-in"
+                                            onClick={() => onPreview(refineResultUrl!)}
+                                        />
                                         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1">
                                             <button
                                                 onClick={() => setRefineTarget({ url: refineResultUrl!, index: -1 })}
@@ -322,6 +381,13 @@ export function EditTab({
                                                 title="Download"
                                             >
                                                 <Download className="w-4 h-4 text-white" />
+                                            </button>
+                                            <button
+                                                onClick={() => onSaveToAssets(refineResultUrl!, 'image', 'Refined Variation')}
+                                                className="p-1 hover:bg-emerald-500/40 rounded"
+                                                title="Save to Assets"
+                                            >
+                                                <Save className="w-4 h-4 text-white" />
                                             </button>
                                         </div>
                                     </div>

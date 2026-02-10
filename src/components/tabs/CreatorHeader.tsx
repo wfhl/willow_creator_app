@@ -1,8 +1,8 @@
-import { PenTool, Archive, Edit2, Play, Terminal, Settings } from 'lucide-react';
+import { PenTool, Archive, Folder, Edit2, Play, Terminal, Settings } from 'lucide-react';
 
 interface CreatorHeaderProps {
-    activeTab: 'create' | 'saved' | 'edit' | 'animate' | 'scripts' | 'settings';
-    setActiveTab: (tab: 'create' | 'saved' | 'edit' | 'animate' | 'scripts' | 'settings') => void;
+    activeTab: 'create' | 'posts' | 'assets' | 'edit' | 'animate' | 'scripts' | 'settings';
+    setActiveTab: (tab: 'create' | 'posts' | 'assets' | 'edit' | 'animate' | 'scripts' | 'settings') => void;
     savedCount: number;
 }
 
@@ -27,14 +27,7 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
                 >
                     <PenTool className="w-3 h-3" /> Create
                 </button>
-                <button
-                    onClick={() => setActiveTab('saved')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${activeTab === 'saved' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
-                        }`}
-                >
-                    <Archive className="w-3 h-3" /> Library
-                    <span className="bg-white/10 px-1.5 py-0.5 rounded text-[9px] min-w-[20px] text-center">{savedCount}</span>
-                </button>
+
                 <button
                     onClick={() => setActiveTab('edit')}
                     className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${activeTab === 'edit' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
@@ -62,6 +55,21 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
                         }`}
                 >
                     <Settings className="w-3 h-3" /> Settings
+                </button>
+                <button
+                    onClick={() => setActiveTab('posts')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${activeTab === 'posts' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
+                        }`}
+                >
+                    <Archive className="w-3 h-3" /> Post Library
+                    <span className="bg-white/10 px-1.5 py-0.5 rounded text-[9px] min-w-[20px] text-center">{savedCount}</span>
+                </button>
+                <button
+                    onClick={() => setActiveTab('assets')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${activeTab === 'assets' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
+                        }`}
+                >
+                    <Folder className="w-3 h-3" /> Asset Library
                 </button>
             </nav>
 

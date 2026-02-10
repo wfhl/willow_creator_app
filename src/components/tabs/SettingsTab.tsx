@@ -1,6 +1,5 @@
-
-import React, { useState } from 'react';
-import { Settings, Plus, Trash2, Save, X, Edit2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
+import { Settings, Plus, Trash2, Save, X, ChevronDown, ChevronUp } from 'lucide-react';
 
 export interface Theme {
     id: string;

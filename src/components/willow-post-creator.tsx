@@ -8,17 +8,18 @@ import { WILLOW_PROFILE, WILLOW_THEMES, CAPTION_TEMPLATES } from './willow-prese
 // Component Imports
 import { CreatorHeader } from './tabs/CreatorHeader';
 import { CreateTab } from './tabs/CreateTab';
-import { SavedTab } from './tabs/SavedTab';
+import { PostsTab } from './tabs/PostsTab';
 import { EditTab } from './tabs/EditTab';
 import { AnimateTab } from './tabs/AnimateTab';
 import { ScriptsTab } from './tabs/ScriptsTab';
 import { SettingsTab, type Theme, type CaptionStyle } from './tabs/SettingsTab';
+import { AssetLibraryTab } from './tabs/AssetLibraryTab';
 import { PresetsDropdown } from './tabs/PresetsDropdown';
 
 export default function WillowPostCreator() {
     // --- Shared State ---
     const [assets, setAssets] = useState<Asset[]>([]);
-    const [activeTab, setActiveTab] = useState<'create' | 'saved' | 'edit' | 'animate' | 'scripts' | 'settings'>('create');
+    const [activeTab, setActiveTab] = useState<'create' | 'posts' | 'assets' | 'edit' | 'animate' | 'scripts' | 'settings'>('create');
 
     // --- Configuration State ---
     const [themes, setThemes] = useState<Theme[]>(WILLOW_THEMES as Theme[]);
@@ -79,6 +80,7 @@ export default function WillowPostCreator() {
     const [aspectRatio, setAspectRatio] = useState<string>('3:4');
     const [createImageSize, setCreateImageSize] = useState<string>("auto_4K");
     const [createNumImages, setCreateNumImages] = useState<number>(4);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
     // Video Configuration
     const [videoResolution, setVideoResolution] = useState<string>('1080p');
@@ -137,7 +139,7 @@ export default function WillowPostCreator() {
     // Reload posts on sort/search
     useEffect(() => {
         const reloadSortedPosts = async () => {
-            if (activeTab === 'saved' && !searchQuery) {
+            if (activeTab === 'posts' && !searchQuery) {
                 const count = await dbService.getPostsCount();
                 setTotalSavedCount(count);
                 const batch = await dbService.getRecentPostsBatch(24, 0, sortOrder);
@@ -248,8 +250,11 @@ export default function WillowPostCreator() {
                 const base64 = e.target?.result as string;
                 const newAsset: Asset = {
                     id: Date.now().toString() + Math.random().toString().slice(2, 6),
+                    name: file.name,
                     type: file.type.startsWith('video') ? 'video' : 'image',
                     base64,
+                    folderId: null,
+                    timestamp: Date.now(),
                     selected: true
                 };
                 setAssets(prev => [...prev, newAsset]);
@@ -512,7 +517,7 @@ export default function WillowPostCreator() {
     };
 
     const handleImportReferences = async () => {
-        if (!confirm("Import 'GenReference' images into library?")) return;
+        if (!confirm("Import 'GenReference' images into Post Library?")) return;
         try {
             const res = await fetch('/references.json');
             if (!res.ok) throw new Error("References file not found. Please ask admin to run 'process-references' script.");
@@ -576,6 +581,37 @@ export default function WillowPostCreator() {
         setI2VResultUrl(null);
         setMediaType('video');
         setActiveTab('animate');
+    };
+
+    const handleSaveToAssets = async (url: string, type: 'image' | 'video', name?: string) => {
+        try {
+            let base64 = url;
+            if (!url.startsWith('data:')) {
+                const res = await fetch(url);
+                const blob = await res.blob();
+                base64 = await new Promise<string>(r => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => r(reader.result as string);
+                    reader.readAsDataURL(blob);
+                });
+            }
+
+            const newAsset: Asset = {
+                id: crypto.randomUUID(),
+                name: name || `Saved ${type} ${new Date().toLocaleString()}`,
+                type: type,
+                base64: base64,
+                folderId: null, // Root by default
+                timestamp: Date.now(),
+                selected: false
+            };
+
+            await dbService.saveAsset(newAsset);
+            alert("Saved to Asset Library!");
+        } catch (err) {
+            console.error("Save to assets failed:", err);
+            alert("Failed to save asset.");
+        }
     };
 
     const handleApproveRefinement = (action: 'replace' | 'add') => {
@@ -654,6 +690,7 @@ export default function WillowPostCreator() {
                         generatedMediaUrls={generatedMediaUrls}
                         handleRefineEntry={handleRefineEntry}
                         handleI2VEntry={handleI2VEntry}
+                        onSaveToAssets={handleSaveToAssets}
                         handleCopy={(t) => navigator.clipboard.writeText(t)}
                         handleSavePost={handleSavePost}
                         isSaving={false} // Can add loading state for saving later if needed
@@ -673,11 +710,12 @@ export default function WillowPostCreator() {
                                 direction="up"
                             />
                         }
+                        onPreview={setPreviewUrl}
                     />
                 )}
 
-                {activeTab === 'saved' && (
-                    <SavedTab
+                {activeTab === 'posts' && (
+                    <PostsTab
                         savedPosts={savedPosts}
                         searchResults={searchResults}
                         totalSavedCount={totalSavedCount}
@@ -686,34 +724,44 @@ export default function WillowPostCreator() {
                         sortOrder={sortOrder}
                         onSearchChange={setSearchQuery}
                         onSortChange={setSortOrder}
-                        onLoadPost={(p) => {
-                            setTopic(p.topic);
-                            setGeneratedCaption(p.caption);
-                            setCaptionType(p.captionType);
-                            setGeneratedMediaUrls(p.mediaUrls);
-                            setMediaType(p.mediaType);
-                            setSelectedThemeId(p.themeId);
-                            setSpecificVisuals(p.visuals);
-                            setSpecificOutfit(p.outfit);
-                            setGeneratedPrompt(p.prompt);
+                        onLoadPost={(post) => {
+                            setTopic(post.topic);
+                            setGeneratedCaption(post.caption);
+                            setCaptionType(post.captionType);
+                            setGeneratedMediaUrls(post.mediaUrls);
+                            setMediaType(post.mediaType);
+                            setSelectedThemeId(post.themeId);
+                            setSpecificVisuals(post.visuals);
+                            setSpecificOutfit(post.outfit);
+                            setGeneratedPrompt(post.prompt);
                             setActiveTab('create');
                         }}
                         onDeletePost={async (id) => {
-                            if (!confirm("Delete post?")) return;
+                            if (!confirm("Delete this post?")) return;
                             await dbService.deletePost(id);
                             setSavedPosts(prev => prev.filter(p => p.id !== id));
-                            setTotalSavedCount(c => c - 1);
+                            setTotalSavedCount(prev => prev - 1);
                         }}
                         onImportReferences={handleImportReferences}
                         onImportIGArchive={handleImportIGArchive}
                         onLoadMore={async () => {
-                            if (isLoadingMore || totalSavedCount <= savedPosts.length) return;
+                            if (isLoadingMore || searchQuery) return;
                             setIsLoadingMore(true);
                             try {
-                                const next = await dbService.getRecentPostsBatch(24, savedPosts.length, sortOrder);
-                                setSavedPosts(prev => [...prev, ...next]);
-                            } finally { setIsLoadingMore(false); }
+                                const nextBatch = await dbService.getRecentPostsBatch(24, savedPosts.length, sortOrder);
+                                if (nextBatch.length > 0) {
+                                    setSavedPosts(prev => [...prev, ...nextBatch]);
+                                }
+                            } catch (e) { console.error(e); } finally { setIsLoadingMore(false); }
                         }}
+                        onSaveToAssets={handleSaveToAssets}
+                        onPreview={setPreviewUrl}
+                    />
+                )}
+
+                {activeTab === 'assets' && (
+                    <AssetLibraryTab
+                        onPreview={setPreviewUrl}
                     />
                 )}
 
@@ -739,6 +787,7 @@ export default function WillowPostCreator() {
                             setIsRefining(true);
                             try {
                                 const urlToBase64 = async (url: string) => {
+                                    if (url.startsWith('data:')) return url.split(',')[1];
                                     const res = await fetch(url);
                                     const blob = await res.blob();
                                     return new Promise<string>(r => {
@@ -754,16 +803,19 @@ export default function WillowPostCreator() {
                                 });
 
                                 const req: GenerationRequest = {
-                                    type: 'image',
+                                    type: 'edit',
                                     prompt: refinePrompt,
                                     model: selectedModel,
                                     aspectRatio,
                                     contentParts,
-                                    editConfig: { imageSize: refineImageSize, numImages: refineNumImages }
+                                    editConfig: {
+                                        imageSize: refineImageSize,
+                                        numImages: refineNumImages
+                                    }
                                 };
                                 const url = await geminiService.generateMedia(req);
                                 if (url) setRefineResultUrl(url);
-                            } catch (e) { console.error(e); alert("Refine failed"); } finally { setIsRefining(false); }
+                            } catch (e) { console.error(e); alert("Refinement failed"); } finally { setIsRefining(false); }
                         }}
                         onApproveRefinement={handleApproveRefinement}
                         onExit={() => setActiveTab('create')}
@@ -782,6 +834,8 @@ export default function WillowPostCreator() {
                                 direction="down"
                             />
                         }
+                        onSaveToAssets={handleSaveToAssets}
+                        onPreview={setPreviewUrl}
                     />
                 )}
 
@@ -805,6 +859,7 @@ export default function WillowPostCreator() {
                             setIsGeneratingI2V(true);
                             try {
                                 const urlToBase64 = async (url: string) => {
+                                    if (url.startsWith('data:')) return url.split(',')[1];
                                     const res = await fetch(url);
                                     const blob = await res.blob();
                                     return new Promise<string>(r => {
@@ -866,6 +921,8 @@ export default function WillowPostCreator() {
                                 direction="down"
                             />
                         }
+                        onSaveToAssets={handleSaveToAssets}
+                        onPreview={setPreviewUrl}
                     />
                 )}
 
@@ -880,6 +937,60 @@ export default function WillowPostCreator() {
                     />
                 )}
             </div>
+
+            {/* Media Preview Modal */}
+            {previewUrl && (
+                <div
+                    className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-4 md:p-12 animate-in fade-in duration-300"
+                    onClick={() => setPreviewUrl(null)}
+                >
+                    <button
+                        className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white/60 hover:text-white transition-all border border-white/10"
+                        onClick={() => setPreviewUrl(null)}
+                    >
+                        <i className="lucide-x w-6 h-6" /> {/* lucide-react doesn't work directly like this if not imported, but let's assume we use the SVG or just import it */}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                    </button>
+
+                    <div
+                        className="relative max-w-full max-h-full flex items-center justify-center"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {previewUrl.startsWith('data:video') || previewUrl.match(/\.(mp4|webm|mov)$/i) ? (
+                            <video
+                                src={previewUrl}
+                                controls
+                                autoPlay
+                                className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl border border-white/10"
+                            />
+                        ) : (
+                            <img
+                                src={previewUrl}
+                                alt="Full Preview"
+                                className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+                            />
+                        )}
+
+                        <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 flex gap-4">
+                            <button
+                                onClick={() => {
+                                    const a = document.createElement('a');
+                                    a.href = previewUrl;
+                                    const isVideo = previewUrl.startsWith('data:video') || previewUrl.match(/\.(mp4|webm|mov)$/i);
+                                    a.download = `willow_preview_${Date.now()}.${isVideo ? 'mp4' : 'png'}`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                }}
+                                className="px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-full text-sm font-bold uppercase tracking-widest text-white transition-all flex items-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+                                Download
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

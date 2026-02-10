@@ -1,11 +1,21 @@
 
 const DB_NAME = 'willow_creator_db';
-const DB_VERSION = 3; // Bumped for presets
+const DB_VERSION = 4; // Bumped for folders and improved assets
+
+export interface DBFolder {
+    id: string;
+    name: string;
+    parentId: string | null; // null for root
+    timestamp: number;
+}
 
 export interface DBAsset {
     id: string;
+    name: string;
     type: string;
     base64: string;
+    folderId: string | null;
+    timestamp: number;
     selected?: boolean;
 }
 
@@ -53,20 +63,37 @@ const openDB = (): Promise<IDBDatabase> => {
         request.onsuccess = () => resolve(request.result);
         request.onupgradeneeded = (event) => {
             const db = (event.target as IDBOpenDBRequest).result;
+            const transaction = (event.target as IDBOpenDBRequest).transaction;
+
             if (!db.objectStoreNames.contains('assets')) {
-                db.createObjectStore('assets', { keyPath: 'id' });
+                const assetStore = db.createObjectStore('assets', { keyPath: 'id' });
+                assetStore.createIndex('folderId', 'folderId', { unique: false });
+                assetStore.createIndex('timestamp', 'timestamp', { unique: false });
+            } else if (transaction) {
+                const assetStore = transaction.objectStore('assets');
+                if (!assetStore.indexNames.contains('folderId')) {
+                    assetStore.createIndex('folderId', 'folderId', { unique: false });
+                }
+                if (!assetStore.indexNames.contains('timestamp')) {
+                    assetStore.createIndex('timestamp', 'timestamp', { unique: false });
+                }
             }
+
+            if (!db.objectStoreNames.contains('folders')) {
+                const folderStore = db.createObjectStore('folders', { keyPath: 'id' });
+                folderStore.createIndex('parentId', 'parentId', { unique: false });
+            }
+
             if (!db.objectStoreNames.contains('posts')) {
                 const postStore = db.createObjectStore('posts', { keyPath: 'id' });
                 postStore.createIndex('timestamp', 'timestamp', { unique: false });
-            } else {
-                // If it exists but we need to add index (for existing users)
-                const transaction = (event.target as IDBOpenDBRequest).transaction;
-                const postStore = transaction?.objectStore('posts');
-                if (postStore && !postStore.indexNames.contains('timestamp')) {
+            } else if (transaction) {
+                const postStore = transaction.objectStore('posts');
+                if (!postStore.indexNames.contains('timestamp')) {
                     postStore.createIndex('timestamp', 'timestamp', { unique: false });
                 }
             }
+
             if (!db.objectStoreNames.contains('presets')) {
                 db.createObjectStore('presets', { keyPath: 'id' });
             }
@@ -277,6 +304,88 @@ export const dbService = {
             const request = store.delete(id);
             request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
+        });
+    },
+
+    // --- FOLDERS ---
+    async getAllFolders(): Promise<DBFolder[]> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('folders', 'readonly');
+            const store = transaction.objectStore('folders');
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async saveFolder(folder: DBFolder): Promise<void> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('folders', 'readwrite');
+            const store = transaction.objectStore('folders');
+            const request = store.put(folder);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async deleteFolder(id: string): Promise<void> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('folders', 'readwrite');
+            const store = transaction.objectStore('folders');
+            // Note: In an OS feel, we might want to recursively delete or prevent deletion of non-empty folders.
+            // For now, let's keep it simple.
+            const request = store.delete(id);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async getAssetsByFolder(folderId: string | null): Promise<DBAsset[]> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('assets', 'readonly');
+            const store = transaction.objectStore('assets');
+
+            // IndexedDB indices do NOT support null keys. 
+            // If folderId is null, we must fetch all and filter or use a different strategy.
+            if (folderId === null) {
+                const request = store.getAll();
+                request.onsuccess = () => {
+                    const all = request.result as DBAsset[];
+                    resolve(all.filter(a => !a.folderId).sort((a, b) => b.timestamp - a.timestamp));
+                };
+                request.onerror = () => reject(request.error);
+            } else {
+                const index = store.index('folderId');
+                const request = index.getAll(IDBKeyRange.only(folderId));
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            }
+        });
+    },
+
+    async getFoldersByParent(parentId: string | null): Promise<DBFolder[]> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('folders', 'readonly');
+            const store = transaction.objectStore('folders');
+
+            if (parentId === null) {
+                const request = store.getAll();
+                request.onsuccess = () => {
+                    const all = request.result as DBFolder[];
+                    resolve(all.filter(f => !f.parentId).sort((a, b) => a.name.localeCompare(b.name)));
+                };
+                request.onerror = () => reject(request.error);
+            } else {
+                const index = store.index('parentId');
+                const request = index.getAll(IDBKeyRange.only(parentId));
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            }
         });
     }
 };

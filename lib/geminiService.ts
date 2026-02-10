@@ -35,7 +35,7 @@ export interface AnalysisResult {
 }
 
 export interface GenerationRequest {
-    type: 'image' | 'video';
+    type: 'image' | 'video' | 'edit';
     prompt: string;
     aspectRatio: string;
     styleReference?: string;

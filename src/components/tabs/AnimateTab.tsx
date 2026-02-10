@@ -1,6 +1,6 @@
 
-import { useEffect, type ChangeEvent } from 'react';
-import { Video as VideoIcon, ImagePlus, X, RefreshCw, Play } from 'lucide-react';
+import React, { useEffect, useState, type ChangeEvent } from 'react';
+import { Video as VideoIcon, ImagePlus, X, RefreshCw, Play, Save, Download } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
 
 interface AnimateTabProps {
@@ -26,6 +26,8 @@ interface AnimateTabProps {
     onDiscardI2V: () => void;
 
     presetsDropdown: React.ReactNode;
+    onSaveToAssets: (url: string, type: 'image' | 'video', name?: string) => void;
+    onPreview: (url: string) => void;
 }
 
 export function AnimateTab({
@@ -47,8 +49,11 @@ export function AnimateTab({
     onExit,
     onApproveI2V,
     onDiscardI2V,
-    presetsDropdown
+    presetsDropdown,
+    onSaveToAssets,
+    onPreview
 }: AnimateTabProps) {
+    const [isDragging, setIsDragging] = useState(false);
 
     // Ensure we are on a video model when mounting or if model is invalid
     useEffect(() => {
@@ -61,9 +66,7 @@ export function AnimateTab({
         } else {
             // Validate constraints for current video model
             if (selectedModel.includes('grok')) {
-                // Grok supports 5s, 6s, 9s
                 if (!['5s', '6s', '9s'].includes(videoDuration)) setVideoDuration('5s');
-                // Grok currently favors 720p in this integration
                 if (videoResolution !== '720p') setVideoResolution('720p');
             } else if (selectedModel.includes('veo-3')) {
                 if (videoResolution === '1080p' && videoDuration !== '8s') setVideoDuration('8s');
@@ -71,23 +74,55 @@ export function AnimateTab({
         }
     }, [selectedModel, videoDuration, videoResolution, setSelectedModel, setVideoDuration, setVideoResolution]);
 
+    // Helper to process a file to a data URL
+    const processFile = (file: File) => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (re) => {
+            if (re.target?.result) {
+                setI2VTarget({ url: re.target.result as string, index: -1 });
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleI2VImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (re) => {
-                if (re.target?.result) {
-                    setI2VTarget({ url: re.target.result as string, index: -1 });
-                }
-            };
-            reader.readAsDataURL(file);
+            processFile(e.target.files[0]);
+        }
+    };
+
+    // Drag and Drop handlers
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            processFile(e.dataTransfer.files[0]);
         }
     };
 
     if (!i2vTarget) {
         return (
-            <div className="max-w-[1200px] mx-auto w-full p-8 pb-32 flex flex-col items-center justify-center min-h-[60vh]">
-                <div className="text-center space-y-6 max-w-lg">
+            <div
+                className={`max-w-[1200px] mx-auto w-full p-8 pb-32 flex flex-col items-center justify-center min-h-[60vh] transition-all duration-300 ${isDragging ? 'bg-emerald-500/5 scale-[1.01]' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+            >
+                <div className="text-center space-y-6 max-w-lg pointer-events-none">
                     <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 inline-block">
                         <VideoIcon className="w-12 h-12 text-emerald-400" />
                     </div>
@@ -96,10 +131,14 @@ export function AnimateTab({
                         <p className="text-white/40">Upload an image to animate it using Veo or Grok models.</p>
                     </div>
 
-                    <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-white/10 rounded-2xl bg-white/5 hover:bg-white/10 hover:border-emerald-500/50 transition-all cursor-pointer group">
+                    <label
+                        className={`flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-2xl transition-all cursor-pointer group pointer-events-auto ${isDragging ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-emerald-500/50'}`}
+                    >
                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <ImagePlus className="w-10 h-10 text-white/20 group-hover:text-emerald-400 transition-colors mb-4" />
-                            <p className="mb-2 text-sm text-white/60"><span className="font-semibold text-emerald-400">Click to upload</span> or drag and drop</p>
+                            <ImagePlus className={`w-10 h-10 transition-colors mb-4 ${isDragging ? 'text-emerald-400 animate-bounce' : 'text-white/20 group-hover:text-emerald-400'}`} />
+                            <p className="mb-2 text-sm text-white/60">
+                                {isDragging ? <span className="text-emerald-400 font-bold">Drop it here!</span> : <><span className="font-semibold text-emerald-400">Click to upload</span> or drag and drop</>}
+                            </p>
                             <p className="text-xs text-white/40">PNG, JPG or WebP</p>
                         </div>
                         <input type="file" className="hidden" accept="image/*" onChange={handleI2VImageUpload} />
@@ -133,8 +172,13 @@ export function AnimateTab({
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
                     <div className="p-8 border-r border-white/5">
                         <div className="aspect-[3/4] bg-black/40 rounded-xl overflow-hidden border border-white/10 shadow-inner group relative">
-                            <img src={i2vTarget.url} alt="Target" className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+                            <img
+                                src={i2vTarget.url}
+                                alt="Target"
+                                className="w-full h-full object-cover cursor-zoom-in"
+                                onClick={() => onPreview(i2vTarget.url)}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4 pointer-events-none">
                                 <p className="text-[10px] text-white/60 uppercase tracking-widest font-bold">Source Reference</p>
                             </div>
                         </div>
@@ -164,10 +208,6 @@ export function AnimateTab({
                                                 onChange={(e) => {
                                                     const newModel = e.target.value;
                                                     setSelectedModel(newModel);
-
-                                                    // Reset params if needed based on new model defaults
-                                                    // This logic could be moved to a useEffect if we want more reactivity, 
-                                                    // but setting reasonable defaults on change is good UX.
                                                     if (newModel.includes('grok')) {
                                                         setVideoDuration('5s');
                                                         setVideoResolution('720p');
@@ -193,8 +233,6 @@ export function AnimateTab({
                                                 onChange={(e) => {
                                                     const newRes = e.target.value;
                                                     setVideoResolution(newRes);
-
-                                                    // Veo 3.1 Constraints
                                                     if (selectedModel.includes('veo-3')) {
                                                         if (newRes === '1080p') {
                                                             setVideoDuration('8s');
@@ -259,7 +297,6 @@ export function AnimateTab({
                                                 className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500/50 outline-none"
                                             >
                                                 <option value="auto">Matches Image</option>
-                                                {/* Grok might have specifics, keeping auto for safety for all, but showing opts */}
                                                 <option value="16:9">16:9 Landscape</option>
                                                 <option value="9:16">9:16 Portrait</option>
                                                 <option value="1:1">1:1 Square</option>
@@ -300,7 +337,15 @@ export function AnimateTab({
                                             controls
                                             loop
                                             autoPlay
-                                            className="w-full h-full object-cover"
+                                            className="w-full h-full object-cover cursor-zoom-in"
+                                            onClick={(e) => {
+                                                // If they click the video itself (not controls), open preview
+                                                // But video tag clicks on controls might be tricky.
+                                                // Let's just make it clear.
+                                                if (e.target === e.currentTarget) {
+                                                    onPreview(generatedI2VUrl!);
+                                                }
+                                            }}
                                         />
                                         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1">
                                             <button
@@ -315,9 +360,14 @@ export function AnimateTab({
                                                 className="p-1 hover:bg-white/20 rounded"
                                                 title="Download"
                                             >
-                                                <div className="w-4 h-4 text-white">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
-                                                </div>
+                                                <Download className="w-4 h-4 text-white" />
+                                            </button>
+                                            <button
+                                                onClick={() => onSaveToAssets(generatedI2VUrl!, 'video', 'Animated Video')}
+                                                className="p-1 hover:bg-emerald-500/40 rounded"
+                                                title="Save to Assets"
+                                            >
+                                                <Save className="w-4 h-4 text-white" />
                                             </button>
                                         </div>
                                     </div>

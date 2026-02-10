@@ -1,5 +1,5 @@
 import React, { type ChangeEvent } from 'react';
-import { Layers, Edit2, ImagePlus, ChevronDown, Video as VideoIcon, Sparkles, Copy, Loader2, Dices, Image as ImageIcon, Wand2, Download } from 'lucide-react';
+import { Layers, Edit2, ImagePlus, ChevronDown, Video as VideoIcon, Sparkles, Copy, Loader2, Dices, Image as ImageIcon, Wand2, Download, Save } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
 import type { DBAsset as Asset } from '../../lib/dbService';
 import { AssetUploader } from '../asset-uploader';
@@ -60,40 +60,67 @@ interface CreateTabProps {
     setShowSaveForm: (val: boolean) => void;
     presetsDropdown: React.ReactNode;
     onGenerateCaptionOnly: () => void;
+    onSaveToAssets: (url: string, type: 'image' | 'video', name?: string) => void;
+    onPreview: (url: string) => void;
 }
 
-export function CreateTab(props: CreateTabProps) {
-    const {
-        themes, captionStyles,
-        selectedThemeId, setSelectedThemeId,
-        customTheme, setCustomTheme,
-        specificVisuals, setSpecificVisuals,
-        specificOutfit, setSpecificOutfit,
-        assets, onAssetsAdd, onAssetRemove, onAssetToggle,
-        handleInputImageUpload,
-        generatedPrompt, setGeneratedPrompt,
-        selectedModel, setSelectedModel,
-        mediaType, setMediaType,
-        aspectRatio, setAspectRatio,
-        createImageSize, setCreateImageSize,
-        createNumImages, setCreateNumImages,
-        videoResolution, setVideoResolution,
-        videoDuration, setVideoDuration,
-        topic, setTopic,
-        captionType, setCaptionType,
-        generatedCaption, setGeneratedCaption,
-        isDreaming, handleDreamConcept,
-        handleGenerateContent,
-        isGeneratingMedia, isGeneratingCaption,
-        handleGenerateRandomPost,
-        generatedMediaUrls,
-        handleRefineEntry, handleI2VEntry,
-        handleCopy,
-        handleSavePost, isSaving,
-        showSaveForm, setShowSaveForm,
-        presetsDropdown,
-        onGenerateCaptionOnly
-    } = props;
+export function CreateTab({
+    themes,
+    captionStyles,
+    selectedThemeId,
+    setSelectedThemeId,
+    customTheme,
+    setCustomTheme,
+    specificVisuals,
+    setSpecificVisuals,
+    specificOutfit,
+    setSpecificOutfit,
+    assets,
+    onAssetsAdd,
+    onAssetRemove,
+    onAssetToggle,
+    handleInputImageUpload,
+    generatedPrompt,
+    setGeneratedPrompt,
+    selectedModel,
+    setSelectedModel,
+    mediaType,
+    setMediaType,
+    aspectRatio,
+    setAspectRatio,
+    createImageSize,
+    setCreateImageSize,
+    createNumImages,
+    setCreateNumImages,
+    videoResolution,
+    setVideoResolution,
+    videoDuration,
+    setVideoDuration,
+    topic,
+    setTopic,
+    captionType,
+    setCaptionType,
+    generatedCaption,
+    setGeneratedCaption,
+    isDreaming,
+    handleDreamConcept,
+    handleGenerateContent,
+    isGeneratingMedia,
+    isGeneratingCaption,
+    handleGenerateRandomPost,
+    generatedMediaUrls,
+    handleRefineEntry,
+    handleI2VEntry,
+    handleCopy,
+    handleSavePost,
+    isSaving,
+    showSaveForm,
+    setShowSaveForm,
+    presetsDropdown,
+    onGenerateCaptionOnly,
+    onSaveToAssets,
+    onPreview
+}: CreateTabProps) {
 
     const currentTheme = selectedThemeId === 'CUSTOM'
         ? { name: 'Custom', defaultOutfit: 'custom', defaultVisuals: 'custom' }
@@ -440,9 +467,22 @@ export function CreateTab(props: CreateTabProps) {
                                     return (
                                         <div key={idx} className="relative group aspect-[3/4]">
                                             {isVideo ? (
-                                                <video src={url} controls className="w-full h-full object-cover rounded-lg shadow-2xl" />
+                                                <video
+                                                    src={url}
+                                                    controls
+                                                    className="w-full h-full object-cover rounded-lg shadow-2xl cursor-pointer"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        onPreview(url);
+                                                    }}
+                                                />
                                             ) : (
-                                                <img src={url} alt={`Generated ${idx}`} className="w-full h-full object-cover rounded-lg shadow-2xl" />
+                                                <img
+                                                    src={url}
+                                                    alt={`Generated ${idx}`}
+                                                    className="w-full h-full object-cover rounded-lg shadow-2xl cursor-pointer"
+                                                    onClick={() => onPreview(url)}
+                                                />
                                             )}
                                             <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1">
                                                 <button
@@ -474,6 +514,13 @@ export function CreateTab(props: CreateTabProps) {
                                                     title="Download"
                                                 >
                                                     <Download className="w-4 h-4 text-white" />
+                                                </button>
+                                                <button
+                                                    onClick={() => onSaveToAssets(url, isVideo ? 'video' : 'image', `Generated ${isVideo ? 'Video' : 'Image'}`)}
+                                                    className="p-1 hover:bg-emerald-500/40 rounded"
+                                                    title="Save to Assets"
+                                                >
+                                                    <Save className="w-4 h-4 text-white" />
                                                 </button>
                                             </div>
                                         </div>
@@ -596,7 +643,7 @@ export function CreateTab(props: CreateTabProps) {
                                     onClick={() => setShowSaveForm(true)}
                                     // disabled={!generatedMediaUrls.length}
                                     className="p-3 bg-white/5 hover:bg-white/10 disabled:opacity-30 border border-white/10 rounded-xl transition-all"
-                                    title="Save to Library"
+                                    title="Save to Post Library"
                                 >
                                     <Layers className="w-5 h-5 opacity-60" />
                                 </button>
@@ -607,7 +654,7 @@ export function CreateTab(props: CreateTabProps) {
                                     className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs uppercase tracking-widest rounded-xl transition-all flex items-center gap-2"
                                 >
                                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                    Confirm Save
+                                    Save Post
                                 </button>
                             )}
                         </div>

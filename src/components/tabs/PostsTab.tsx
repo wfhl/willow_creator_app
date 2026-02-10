@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Download, ImagePlus, Search, Loader2, X, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
+import { Download, ImagePlus, Search, Loader2, X, ChevronLeft, ChevronRight, Image as ImageIcon, Save } from 'lucide-react';
 import type { DBSavedPost as SavedPost } from '../../lib/dbService';
 import { WILLOW_THEMES } from '../willow-presets';
 import JSZip from 'jszip'; // For download logic if we move it here, or pass handler
@@ -7,7 +7,7 @@ import JSZip from 'jszip'; // For download logic if we move it here, or pass han
 // but for a true refactor, download logic *should* be here.
 // I'll keep download logic inside this component as it's self-contained
 
-interface SavedTabProps {
+interface PostsTabProps {
     savedPosts: SavedPost[];
     searchResults: SavedPost[];
     totalSavedCount: number;
@@ -21,9 +21,11 @@ interface SavedTabProps {
     onImportReferences: () => void;
     onImportIGArchive: () => void;
     onLoadMore: () => void;
+    onSaveToAssets: (url: string, type: 'image' | 'video', name?: string) => void;
+    onPreview: (url: string) => void;
 }
 
-export function SavedTab({
+export function PostsTab({
     savedPosts,
     searchResults,
     totalSavedCount,
@@ -36,8 +38,10 @@ export function SavedTab({
     onDeletePost,
     onImportReferences,
     onImportIGArchive,
-    onLoadMore
-}: SavedTabProps) {
+    onLoadMore,
+    onSaveToAssets,
+    onPreview
+}: PostsTabProps) {
     const observerTarget = useRef<HTMLDivElement>(null);
     const [carouselIndexes, setCarouselIndexes] = useState<Record<string, number>>({});
 
@@ -269,8 +273,11 @@ Total Media Items: ${post.mediaUrls.length}
                         const hasMultipleMedia = mediaUrls.length > 1;
 
                         return (
-                            <div key={post.id} onClick={() => onLoadPost(post)} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-emerald-500/50 transition-all cursor-pointer group flex flex-col h-full">
-                                <div className="aspect-[3/4] relative bg-black/40">
+                            <div key={post.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-emerald-500/50 transition-all group flex flex-col h-full">
+                                <div
+                                    className="aspect-[3/4] relative bg-black/40 cursor-zoom-in"
+                                    onClick={() => onPreview(currentMedia)}
+                                >
                                     {currentMedia ? (
                                         isVideo ?
                                             <video
@@ -343,6 +350,16 @@ Total Media Items: ${post.mediaUrls.length}
                                         </button>
                                         <button
                                             onClick={(e) => {
+                                                e.stopPropagation();
+                                                onSaveToAssets(currentMedia, isVideo ? 'video' : 'image', `${post.topic} - item ${currentIndex + 1}`);
+                                            }}
+                                            className="p-1.5 bg-black/50 text-white rounded-md hover:bg-emerald-600/80 backdrop-blur-sm"
+                                            title="Save to Assets"
+                                        >
+                                            <Save className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
                                                 e.stopPropagation(); // Use StopPropagation for delete logic
                                                 onDeletePost(post.id);
                                             }}
@@ -367,7 +384,10 @@ Total Media Items: ${post.mediaUrls.length}
                                     </div>
                                 </div>
 
-                                <div className="p-4 flex flex-col gap-3 flex-1 bg-gradient-to-b from-white/[0.02] to-transparent">
+                                <div
+                                    className="p-4 flex flex-col gap-3 flex-1 bg-gradient-to-b from-white/[0.02] to-transparent cursor-pointer hover:bg-white/5 transition-colors"
+                                    onClick={() => onLoadPost(post)}
+                                >
                                     <div className="flex justify-between items-start gap-2">
                                         <div className="flex-1">
                                             <h3 className="text-sm font-bold text-white/90 line-clamp-1">{post.topic || "Untitled Post"}</h3>
