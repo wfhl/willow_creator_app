@@ -640,7 +640,7 @@ export default function WillowPostCreator() {
                 savedCount={totalSavedCount}
             />
 
-            <div className="flex-1 overflow-y-auto pt-20 pb-20 scroll-smooth">
+            <div className="flex-1 overflow-y-auto pt-16 md:pt-20 pb-10 md:pb-20 scroll-smooth">
                 {activeTab === 'create' && (
                     <CreateTab
                         themes={themes}
@@ -941,37 +941,38 @@ export default function WillowPostCreator() {
             {/* Media Preview Modal */}
             {previewUrl && (
                 <div
-                    className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-4 md:p-12 animate-in fade-in duration-300"
+                    className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-2 md:p-12 animate-in fade-in duration-300"
                     onClick={() => setPreviewUrl(null)}
                 >
                     <button
-                        className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white/60 hover:text-white transition-all border border-white/10"
+                        className="absolute top-4 right-4 md:top-6 md:right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white/60 hover:text-white transition-all border border-white/10 z-[1001]"
                         onClick={() => setPreviewUrl(null)}
                     >
-                        <i className="lucide-x w-6 h-6" /> {/* lucide-react doesn't work directly like this if not imported, but let's assume we use the SVG or just import it */}
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
                     </button>
 
                     <div
-                        className="relative max-w-full max-h-full flex items-center justify-center"
+                        className="relative w-full h-full flex flex-col items-center justify-center"
                         onClick={e => e.stopPropagation()}
                     >
-                        {previewUrl.startsWith('data:video') || previewUrl.match(/\.(mp4|webm|mov)$/i) ? (
-                            <video
-                                src={previewUrl}
-                                controls
-                                autoPlay
-                                className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl border border-white/10"
-                            />
-                        ) : (
-                            <img
-                                src={previewUrl}
-                                alt="Full Preview"
-                                className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl border border-white/10"
-                            />
-                        )}
+                        <div className="flex-1 flex items-center justify-center min-h-0 w-full">
+                            {previewUrl.startsWith('data:video') || previewUrl.match(/\.(mp4|webm|mov)$/i) ? (
+                                <video
+                                    src={previewUrl}
+                                    controls
+                                    autoPlay
+                                    className="max-w-full max-h-full rounded-xl md:rounded-2xl shadow-2xl border border-white/10"
+                                />
+                            ) : (
+                                <img
+                                    src={previewUrl}
+                                    alt="Full Preview"
+                                    className="max-w-full max-h-full object-contain rounded-xl md:rounded-2xl shadow-2xl border border-white/10"
+                                />
+                            )}
+                        </div>
 
-                        <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 flex gap-4">
+                        <div className="mt-4 shrink-0 flex gap-4 pb-4">
                             <button
                                 onClick={() => {
                                     const a = document.createElement('a');
@@ -982,7 +983,7 @@ export default function WillowPostCreator() {
                                     a.click();
                                     document.body.removeChild(a);
                                 }}
-                                className="px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-full text-sm font-bold uppercase tracking-widest text-white transition-all flex items-center gap-2"
+                                className="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/50 rounded-full text-xs font-bold uppercase tracking-widest text-black transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
                                 Download

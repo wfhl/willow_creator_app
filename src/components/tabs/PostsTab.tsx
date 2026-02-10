@@ -171,15 +171,15 @@ Total Media Items: ${post.mediaUrls.length}
     };
 
     return (
-        <div className="max-w-[1600px] mx-auto w-full p-8 pb-32">
+        <div className="max-w-[1600px] mx-auto w-full p-4 md:p-8 pb-32">
             <div className="flex flex-col gap-4 mb-6">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <h2 className="text-xl font-bold font-serif text-white/90">Saved Library</h2>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                         <button
                             type="button"
                             onClick={onImportReferences}
-                            className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded flex items-center gap-2 transition-all text-white/60 hover:text-white"
+                            className="text-[10px] md:text-xs px-2 md:px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded flex items-center gap-2 transition-all text-white/60 hover:text-white"
                         >
                             <ImagePlus className="w-3 h-3" />
                             Import References
@@ -187,23 +187,23 @@ Total Media Items: ${post.mediaUrls.length}
                         <button
                             type="button"
                             onClick={onImportIGArchive}
-                            className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded flex items-center gap-2 transition-all text-white/60 hover:text-white"
+                            className="text-[10px] md:text-xs px-2 md:px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded flex items-center gap-2 transition-all text-white/60 hover:text-white"
                         >
                             <Download className="w-3 h-3" />
-                            Import Instagram Archive
+                            Import Archive
                         </button>
                     </div>
                 </div>
 
                 {/* Search Bar & Sort */}
-                <div className="flex gap-4 items-center">
+                <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
                     <div className="relative flex-1">
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => onSearchChange(e.target.value)}
-                            placeholder="Search by topic, caption, tags, or theme..."
-                            className="w-full px-4 py-2.5 pl-10 pr-10 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-emerald-500/50 focus:bg-white/10 transition-all"
+                            placeholder="Search library..."
+                            className="w-full px-4 py-2.5 pl-10 pr-10 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50 focus:bg-white/10 transition-all"
                         />
                         <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${isSearching ? 'text-emerald-400 animate-pulse' : 'text-white/40'}`} />
                         {isSearching && (
@@ -215,23 +215,22 @@ Total Media Items: ${post.mediaUrls.length}
                             <button
                                 onClick={() => onSearchChange("")}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded transition-all"
-                                title="Clear search"
                             >
                                 <X className="w-4 h-4 text-white/60" />
                             </button>
                         )}
                     </div>
 
-                    <div className="flex bg-white/5 border border-white/10 rounded-lg p-1 shrink-0">
+                    <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 shrink-0 justify-center">
                         <button
                             onClick={() => onSortChange('prev')}
-                            className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-wider transition-all ${sortOrder === 'prev' ? 'bg-emerald-500 text-black' : 'text-white/40 hover:text-white'}`}
+                            className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${sortOrder === 'prev' ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
                         >
                             Newest
                         </button>
                         <button
                             onClick={() => onSortChange('next')}
-                            className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-wider transition-all ${sortOrder === 'next' ? 'bg-emerald-500 text-black' : 'text-white/40 hover:text-white'}`}
+                            className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-[10px] uppercase font-bold tracking-widest transition-all ${sortOrder === 'next' ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
                         >
                             Oldest
                         </button>

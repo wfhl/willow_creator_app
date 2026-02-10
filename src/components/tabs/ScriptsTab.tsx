@@ -2,7 +2,7 @@ import { Terminal } from 'lucide-react';
 
 export function ScriptsTab() {
     return (
-        <div className="max-w-[1200px] mx-auto w-full p-8 pb-32 flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="max-w-[1200px] mx-auto w-full p-4 md:p-8 pb-32 flex flex-col items-center justify-center min-h-[60vh]">
             <div className="text-center space-y-6 max-w-lg">
                 <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 inline-block">
                     <Terminal className="w-12 h-12 text-emerald-400" />

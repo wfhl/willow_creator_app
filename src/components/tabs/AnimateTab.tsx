@@ -149,7 +149,7 @@ export function AnimateTab({
     }
 
     return (
-        <div className="max-w-[1200px] mx-auto w-full p-8 pb-32">
+        <div className="max-w-[1200px] mx-auto w-full p-4 md:p-8 pb-32">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
@@ -170,7 +170,7 @@ export function AnimateTab({
 
             <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
-                    <div className="p-8 border-r border-white/5">
+                    <div className="p-4 md:p-8 border-b lg:border-b-0 lg:border-r border-white/5">
                         <div className="aspect-[3/4] bg-black/40 rounded-xl overflow-hidden border border-white/10 shadow-inner group relative">
                             <img
                                 src={i2vTarget.url}
@@ -183,7 +183,7 @@ export function AnimateTab({
                             </div>
                         </div>
                     </div>
-                    <div className="p-8 space-y-8 flex flex-col justify-center bg-black/20">
+                    <div className="p-4 md:p-8 space-y-6 md:space-y-8 flex flex-col justify-center bg-black/20">
                         {!generatedI2VUrl ? (
                             <>
                                 <div className="space-y-4">

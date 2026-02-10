@@ -102,50 +102,50 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
     };
 
     return (
-        <div className="max-w-[1000px] mx-auto w-full p-8 pb-32">
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
+        <div className="max-w-[1000px] mx-auto w-full p-4 md:p-8 pb-32">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 pb-4 border-b border-white/10 gap-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                        <Settings className="w-6 h-6 text-emerald-400" />
+                        <Settings className="w-5 h-5 md:w-6 md:h-6 text-emerald-400" />
                     </div>
                     <div>
-                        <h2 className="text-2xl font-bold font-serif text-white/90">Configuration</h2>
-                        <p className="text-xs text-white/40 uppercase tracking-widest">Manage Themes & Styles</p>
+                        <h2 className="text-xl md:text-2xl font-bold font-serif text-white/90">Configuration</h2>
+                        <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Themes & Styles</p>
                     </div>
                 </div>
                 <button
                     onClick={onExit}
-                    className="px-4 py-2 hover:bg-white/5 rounded-lg text-white/60 transition-all border border-white/10 flex items-center gap-2"
+                    className="w-full md:w-auto px-4 py-2 hover:bg-white/5 rounded-lg text-white/60 transition-all border border-white/10 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest"
                 >
                     <X className="w-4 h-4" /> Close Settings
                 </button>
             </div>
 
-            <div className="flex gap-8">
-                {/* Sidebar */}
-                <div className="w-64 space-y-2">
+            <div className="flex flex-col md:flex-row gap-6 md:gap-8">
+                {/* Sidebar / Tabs */}
+                <div className="flex md:flex-col gap-2 p-1 bg-white/5 rounded-xl border border-white/5 md:bg-transparent md:border-0 md:p-0 md:w-64 shrink-0">
                     <button
                         onClick={() => setActiveSection('themes')}
-                        className={`w-full text-left px-4 py-3 rounded-xl transition-all font-bold text-sm uppercase tracking-wider ${activeSection === 'themes'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        className={`flex-1 md:flex-none text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'themes'
+                            ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
                             : 'text-white/40 hover:bg-white/5 hover:text-white'
                             }`}
                     >
-                        Visual Themes
+                        Themes
                     </button>
                     <button
                         onClick={() => setActiveSection('captions')}
-                        className={`w-full text-left px-4 py-3 rounded-xl transition-all font-bold text-sm uppercase tracking-wider ${activeSection === 'captions'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        className={`flex-1 md:flex-none text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'captions'
+                            ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
                             : 'text-white/40 hover:bg-white/5 hover:text-white'
                             }`}
                     >
-                        Caption Styles
+                        Styles
                     </button>
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-6 min-h-[60vh]">
+                <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 md:p-6 min-h-[50vh]">
                     {activeSection === 'themes' && (
                         <div className="space-y-6">
                             <div className="flex justify-between items-center">

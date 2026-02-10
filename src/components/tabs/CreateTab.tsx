@@ -127,8 +127,8 @@ export function CreateTab({
         : themes.find(t => t.id === selectedThemeId) || themes[0];
 
     return (
-        <div className="max-w-[1600px] mx-auto w-full p-8 pb-32">
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 h-full">
+        <div className="max-w-[1600px] mx-auto w-full p-4 md:p-8 pb-32">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 h-full">
 
                 {/* === LEFT COLUMN: VISUAL DESIGN (MEDIA) === */}
                 <div className="space-y-6 flex flex-col h-full">
@@ -600,14 +600,14 @@ export function CreateTab({
             </div>
 
             {/* === ACTION BAR === */}
-            <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/95 to-transparent z-50 pointer-events-none flex justify-center">
-                <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl p-2 flex items-center gap-4 pointer-events-auto backdrop-blur-xl ring-1 ring-white/5">
+            <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black via-black/95 to-transparent z-50 pointer-events-none flex justify-center">
+                <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl p-1.5 md:p-2 flex flex-wrap md:flex-nowrap items-center justify-center gap-2 md:gap-4 pointer-events-auto backdrop-blur-xl ring-1 ring-white/5 max-w-full overflow-hidden">
 
                     {/* Left: Mode Toggle */}
-                    <div className="flex bg-white/5 rounded-xl p-1 border border-white/5">
+                    <div className="flex bg-white/5 rounded-xl p-1 border border-white/5 shrink-0">
                         <button
                             onClick={() => setMediaType('image')}
-                            className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${mediaType === 'image'
+                            className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all ${mediaType === 'image'
                                 ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
                                 : 'text-white/40 hover:text-white hover:bg-white/5'
                                 }`}
@@ -616,7 +616,7 @@ export function CreateTab({
                         </button>
                         <button
                             onClick={() => setMediaType('video')}
-                            className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${mediaType === 'video'
+                            className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all ${mediaType === 'video'
                                 ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
                                 : 'text-white/40 hover:text-white hover:bg-white/5'
                                 }`}
@@ -665,17 +665,17 @@ export function CreateTab({
                         onClick={handleGenerateContent}
                         disabled={isGeneratingMedia || isGeneratingCaption}
                         className={`
-                                h-12 px-8 rounded-xl font-bold uppercase tracking-widest text-sm
+                                h-10 md-h-12 px-4 md:px-8 rounded-xl font-bold uppercase tracking-widest text-[10px] md:text-sm
                                 bg-gradient-to-r from-emerald-600 to-emerald-500 
                                 hover:from-emerald-500 hover:to-emerald-400 
                                 text-black shadow-lg shadow-emerald-500/20 
                                 hover:shadow-emerald-500/40 hover:-translate-y-0.5
                                 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0
-                                transition-all flex items-center gap-2
+                                transition-all flex items-center gap-2 shrink-0
                             `}
                     >
                         {(isGeneratingMedia || isGeneratingCaption) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-purple-300" />}
-                        {(isGeneratingMedia || isGeneratingCaption) ? "Generating..." : "Generate Content"}
+                        {(isGeneratingMedia || isGeneratingCaption) ? "Working..." : "Generate"}
                     </button>
                 </div>
             </div>

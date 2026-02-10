@@ -110,14 +110,14 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
     };
 
     return (
-        <div className="max-w-[1600px] mx-auto w-full p-8 pb-32 flex flex-col h-full bg-[#050505]">
+        <div className="max-w-[1600px] mx-auto w-full p-4 md:p-8 pb-32 flex flex-col h-full bg-[#050505] min-h-0">
             {/* Header / Toolbar */}
-            <div className="flex flex-col gap-6 mb-8">
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                        <h2 className="text-2xl font-bold font-serif text-white/90">Asset Library</h2>
-                        <div className="h-6 w-px bg-white/10 mx-2" />
-                        <div className="flex items-center gap-1 text-sm text-white/40">
+            <div className="flex flex-col gap-4 mb-6">
+                <div className="flex justify-between items-center gap-4">
+                    <div className="flex items-center gap-2 md:gap-4 shrink-0 overflow-hidden">
+                        <h2 className="text-lg md:text-2xl font-bold font-serif text-white/90 truncate shrink-0">Assets</h2>
+                        <div className="h-6 w-px bg-white/10 mx-1 md:mx-2 shrink-0" />
+                        <div className="flex items-center gap-1 text-[10px] md:text-sm text-white/40 overflow-x-auto no-scrollbar whitespace-nowrap scroll-smooth">
                             <button
                                 onClick={() => handleNavigate(null)}
                                 className="hover:text-emerald-400 transition-colors"
@@ -126,10 +126,10 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
                             </button>
                             {path.map((p, i) => (
                                 <React.Fragment key={p.id}>
-                                    <ChevronRight className="w-3 h-3" />
+                                    <ChevronRight className="w-3 h-3 shrink-0" />
                                     <button
                                         onClick={() => handleNavigate(p)}
-                                        className={`hover:text-emerald-400 transition-colors ${i === path.length - 1 ? 'text-white/80 font-bold' : ''}`}
+                                        className={`hover:text-emerald-400 transition-colors shrink-0 ${i === path.length - 1 ? 'text-white/80 font-bold' : ''}`}
                                     >
                                         {p.name}
                                     </button>
@@ -138,32 +138,33 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
                         </div>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-2 shrink-0">
                         <button
                             onClick={() => setShowNewFolderModal(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest text-white/80 transition-all hover:border-white/20"
+                            className="flex items-center gap-2 p-2 md:px-4 md:py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white/80 transition-all"
+                            title="New Folder"
                         >
                             <FolderPlus className="w-4 h-4" />
-                            New Folder
+                            <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">New</span>
                         </button>
-                        <label className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/50 rounded-lg text-xs font-bold uppercase tracking-widest text-black cursor-pointer transition-all shadow-lg shadow-emerald-500/20">
+                        <label className="flex items-center gap-2 p-2 md:px-4 md:py-2 bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/50 rounded-lg text-black cursor-pointer transition-all shadow-lg shadow-emerald-500/20">
                             <Upload className="w-4 h-4" />
-                            Upload
+                            <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">Upload</span>
                             <input type="file" multiple className="hidden" onChange={handleUploadAssets} />
                         </label>
                     </div>
                 </div>
 
                 {/* Sub-toolbar: Search & View Modes */}
-                <div className="flex justify-between items-center gap-4">
+                <div className="flex items-center gap-3">
                     <div className="relative flex-1 group">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-emerald-400 transition-colors" />
                         <input
                             type="text"
-                            placeholder="Search assets and folders..."
+                            placeholder="Search..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-white/[0.03] border border-white/5 rounded-xl py-3 pl-12 pr-4 text-sm text-white placeholder-white/20 focus:outline-none focus:border-emerald-500/50 focus:bg-white/5 transition-all"
+                            className="w-full bg-white/[0.03] border border-white/5 rounded-xl py-2.5 pl-11 pr-4 text-sm text-white placeholder-white/20 focus:outline-none focus:border-emerald-500/50 transition-all font-sans"
                         />
                     </div>
                     <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 shrink-0">
