@@ -22,7 +22,7 @@ interface PostsTabProps {
     onImportIGArchive: () => void;
     onLoadMore: () => void;
     onSaveToAssets: (url: string, type: 'image' | 'video', name?: string) => void;
-    onPreview: (url: string) => void;
+    onPreview: (url: string, urls?: string[]) => void;
 }
 
 export function PostsTab({
@@ -275,7 +275,7 @@ Total Media Items: ${post.mediaUrls.length}
                             <div key={post.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-emerald-500/50 transition-all group flex flex-col h-full">
                                 <div
                                     className="aspect-[3/4] relative bg-black/40 cursor-zoom-in"
-                                    onClick={() => onPreview(currentMedia)}
+                                    onClick={() => onPreview(currentMedia, mediaUrls)}
                                 >
                                     {currentMedia ? (
                                         isVideo ?

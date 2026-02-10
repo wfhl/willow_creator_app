@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Edit2, Play } from 'lucide-react';
 import { geminiService } from '../../lib/geminiService';
 import type { GenerationRequest } from '../../lib/geminiService';
 import { dbService } from '../lib/dbService';
@@ -80,7 +81,14 @@ export default function WillowPostCreator() {
     const [aspectRatio, setAspectRatio] = useState<string>('3:4');
     const [createImageSize, setCreateImageSize] = useState<string>("auto_4K");
     const [createNumImages, setCreateNumImages] = useState<number>(4);
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [previewContext, setPreviewContext] = useState<{ urls: string[], index: number } | null>(null);
+    const previewUrl = previewContext ? previewContext.urls[previewContext.index] : null;
+
+    const handleOpenPreview = (url: string, allUrls?: string[]) => {
+        const urls = allUrls || [url];
+        const index = urls.indexOf(url);
+        setPreviewContext({ urls, index: index >= 0 ? index : 0 });
+    };
 
     // Video Configuration
     const [videoResolution, setVideoResolution] = useState<string>('1080p');
@@ -710,7 +718,7 @@ export default function WillowPostCreator() {
                                 direction="up"
                             />
                         }
-                        onPreview={setPreviewUrl}
+                        onPreview={(url) => setPreviewContext({ urls: generatedMediaUrls, index: generatedMediaUrls.indexOf(url) })}
                     />
                 )}
 
@@ -755,13 +763,13 @@ export default function WillowPostCreator() {
                             } catch (e) { console.error(e); } finally { setIsLoadingMore(false); }
                         }}
                         onSaveToAssets={handleSaveToAssets}
-                        onPreview={setPreviewUrl}
+                        onPreview={(url, urls) => handleOpenPreview(url, urls)}
                     />
                 )}
 
                 {activeTab === 'assets' && (
                     <AssetLibraryTab
-                        onPreview={setPreviewUrl}
+                        onPreview={(url) => handleOpenPreview(url)}
                     />
                 )}
 
@@ -835,7 +843,7 @@ export default function WillowPostCreator() {
                             />
                         }
                         onSaveToAssets={handleSaveToAssets}
-                        onPreview={setPreviewUrl}
+                        onPreview={(url) => handleOpenPreview(url)}
                     />
                 )}
 
@@ -922,7 +930,7 @@ export default function WillowPostCreator() {
                             />
                         }
                         onSaveToAssets={handleSaveToAssets}
-                        onPreview={setPreviewUrl}
+                        onPreview={(url) => handleOpenPreview(url)}
                     />
                 )}
 
@@ -939,23 +947,48 @@ export default function WillowPostCreator() {
             </div>
 
             {/* Media Preview Modal */}
-            {previewUrl && (
+            {previewContext && previewUrl && (
                 <div
                     className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-2 md:p-12 animate-in fade-in duration-300"
-                    onClick={() => setPreviewUrl(null)}
+                    onClick={() => setPreviewContext(null)}
                 >
+                    {/* Close Button */}
                     <button
                         className="absolute top-4 right-4 md:top-6 md:right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white/60 hover:text-white transition-all border border-white/10 z-[1001]"
-                        onClick={() => setPreviewUrl(null)}
+                        onClick={() => setPreviewContext(null)}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
                     </button>
+
+                    {/* Navigation Buttons */}
+                    {previewContext.urls.length > 1 && (
+                        <>
+                            <button
+                                className="absolute left-4 md:left-8 p-4 bg-white/5 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-all border border-white/5 z-[1001]"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewContext(prev => prev ? { ...prev, index: (prev.index - 1 + prev.urls.length) % prev.urls.length } : null);
+                                }}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                            </button>
+                            <button
+                                className="absolute right-4 md:right-8 p-4 bg-white/5 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-all border border-white/5 z-[1001]"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewContext(prev => prev ? { ...prev, index: (prev.index + 1) % prev.urls.length } : null);
+                                }}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                            </button>
+                        </>
+                    )}
 
                     <div
                         className="relative w-full h-full flex flex-col items-center justify-center"
                         onClick={e => e.stopPropagation()}
                     >
-                        <div className="flex-1 flex items-center justify-center min-h-0 w-full">
+                        <div className="flex-1 flex items-center justify-center min-h-0 w-full relative">
                             {previewUrl.startsWith('data:video') || previewUrl.match(/\.(mp4|webm|mov)$/i) ? (
                                 <video
                                     src={previewUrl}
@@ -970,9 +1003,39 @@ export default function WillowPostCreator() {
                                     className="max-w-full max-h-full object-contain rounded-xl md:rounded-2xl shadow-2xl border border-white/10"
                                 />
                             )}
+
+                            {/* Counter */}
+                            <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-[10px] font-mono tracking-widest text-white/60">
+                                {previewContext.index + 1} / {previewContext.urls.length}
+                            </div>
                         </div>
 
-                        <div className="mt-4 shrink-0 flex gap-4 pb-4">
+                        <div className="mt-6 shrink-0 flex flex-wrap justify-center gap-3 md:gap-4 pb-4 px-4 w-full">
+                            {!previewUrl.startsWith('data:video') && (
+                                <>
+                                    <button
+                                        onClick={() => {
+                                            handleRefineEntry(previewUrl, previewContext.index);
+                                            setPreviewContext(null);
+                                        }}
+                                        className="px-4 md:px-6 py-2 bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/50 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-white/80 transition-all flex items-center gap-2"
+                                    >
+                                        <Edit2 className="w-3 md:w-4 h-3 md:h-4 text-emerald-400" />
+                                        Refine
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            handleI2VEntry(previewUrl, previewContext.index);
+                                            setPreviewContext(null);
+                                        }}
+                                        className="px-4 md:px-6 py-2 bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/50 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-white/80 transition-all flex items-center gap-2"
+                                    >
+                                        <Play className="w-3 md:w-4 h-3 md:h-4 text-emerald-400" />
+                                        Animate
+                                    </button>
+                                </>
+                            )}
+
                             <button
                                 onClick={() => {
                                     const a = document.createElement('a');
@@ -983,7 +1046,7 @@ export default function WillowPostCreator() {
                                     a.click();
                                     document.body.removeChild(a);
                                 }}
-                                className="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/50 rounded-full text-xs font-bold uppercase tracking-widest text-black transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                                className="px-4 md:px-6 py-2 bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/50 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-black transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
                                 Download
