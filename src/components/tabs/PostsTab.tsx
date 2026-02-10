@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Download, ImagePlus, Search, Loader2, X, ChevronLeft, ChevronRight, Image as ImageIcon, Save, PenTool, RotateCcw } from 'lucide-react';
+import { Download, ImagePlus, Search, Loader2, X, ChevronLeft, ChevronRight, Image as ImageIcon, RotateCcw } from 'lucide-react';
 import type { DBSavedPost as SavedPost } from '../../lib/dbService';
 import { WILLOW_THEMES } from '../willow-presets';
 import JSZip from 'jszip'; // For download logic if we move it here, or pass handler
@@ -22,7 +22,6 @@ interface PostsTabProps {
     onImportReferences: () => void;
     onImportIGArchive: () => void;
     onLoadMore: () => void;
-    onSaveToAssets: (url: string, type: 'image' | 'video', name?: string) => void;
     onPreview: (url: string, urls?: string[]) => void;
 }
 
@@ -41,7 +40,6 @@ export function PostsTab({
     onImportReferences,
     onImportIGArchive,
     onLoadMore,
-    onSaveToAssets,
     onPreview
 }: PostsTabProps) {
     const observerTarget = useRef<HTMLDivElement>(null);

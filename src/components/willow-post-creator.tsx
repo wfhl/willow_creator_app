@@ -1015,7 +1015,7 @@ export default function WillowPostCreator() {
                                 }
                             } catch (e) { console.error(e); } finally { setIsLoadingMore(false); }
                         }}
-                        onSaveToAssets={handleSaveToAssets}
+
                         onPreview={(url, urls) => handleOpenPreview(url, urls)}
                     />
                 )}
