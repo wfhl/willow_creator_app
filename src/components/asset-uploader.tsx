@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { Upload, X, Check, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, Check, Image as ImageIcon, Trash2, Plus } from 'lucide-react';
+import { dbService, type DBAsset } from '../lib/dbService';
 
 interface Asset {
     id: string;
@@ -21,6 +22,8 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [viewMode, setViewMode] = useState<'upload' | 'library'>('upload');
     const [libraryImages, setLibraryImages] = useState<string[]>([]);
+    const [userLibraryAssets, setUserLibraryAssets] = useState<DBAsset[]>([]);
+    const userLibInputRef = useRef<HTMLInputElement>(null);
 
     const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
     const [visibleLimit, setVisibleLimit] = useState(24);
@@ -61,8 +64,69 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
             }
             // Reset limit when opening library
             setVisibleLimit(24);
+            fetchUserLibrary();
         }
     }, [viewMode, libraryImages.length]);
+
+    const fetchUserLibrary = async () => {
+        try {
+            const assets = await dbService.getAssetsByType('face_reference');
+            setUserLibraryAssets(assets);
+        } catch (error) {
+            console.error("Failed to fetch user library:", error);
+        }
+    };
+
+    const handleUserLibUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const files = Array.from(e.target.files);
+            for (const file of files) {
+                const reader = new FileReader();
+                reader.onload = async (ev) => {
+                    if (ev.target?.result) {
+                        const base64 = ev.target.result as string;
+                        const newAsset: DBAsset = {
+                            id: crypto.randomUUID(),
+                            name: file.name,
+                            type: 'face_reference',
+                            base64: base64,
+                            folderId: null,
+                            timestamp: Date.now()
+                        };
+                        try {
+                            await dbService.saveAsset(newAsset);
+                            fetchUserLibrary(); // Refresh list
+                        } catch (err) {
+                            console.error("Failed to save asset:", err);
+                        }
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        if (userLibInputRef.current) userLibInputRef.current.value = '';
+    };
+
+    const handleDeleteUserAsset = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (confirm("Delete this reference image permanently?")) {
+            await dbService.deleteAsset(id);
+            fetchUserLibrary();
+        }
+    };
+
+    const handleUserAssetSelect = (asset: DBAsset) => {
+        // Convert base64 to file and add
+        fetch(asset.base64)
+            .then(res => res.blob())
+            .then(blob => {
+                const file = new File([blob], asset.name, { type: blob.type });
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                onAdd(dt.files);
+                setViewMode('upload');
+            });
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -177,19 +241,76 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                 </div>
             ) : (
                 <div className="space-y-2">
-                    <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold px-1">
-                        Willow's Archives
+                    <div className="flex items-center justify-between px-1">
+                        <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
+                            User Library
+                        </div>
+                        <button
+                            onClick={() => userLibInputRef.current?.click()}
+                            className="text-[10px] flex items-center gap-1 text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-wider font-medium"
+                        >
+                            <Plus className="h-3 w-3" />
+                            Add Ref
+                        </button>
+                        <input
+                            type="file"
+                            ref={userLibInputRef}
+                            className="hidden"
+                            accept="image/*"
+                            multiple
+                            onChange={handleUserLibUpload}
+                        />
+                    </div>
+
+                    {/* User Library Grid */}
+                    {userLibraryAssets.length > 0 ? (
+                        <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 mb-6 p-1">
+                            {userLibraryAssets.map((asset) => (
+                                <div
+                                    key={asset.id}
+                                    onClick={() => handleUserAssetSelect(asset)}
+                                    style={{ aspectRatio: '3/4' }}
+                                    className="rounded-md overflow-hidden border border-white/5 cursor-pointer relative group hover:border-emerald-500/50 bg-black/20 min-h-[100px]"
+                                >
+                                    <img
+                                        src={asset.base64}
+                                        alt={asset.name}
+                                        loading="lazy"
+                                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                                    />
+                                    {/* Delete Button */}
+                                    <button
+                                        onClick={(e) => handleDeleteUserAsset(asset.id, e)}
+                                        className="absolute top-1 right-1 bg-black/60 hover:bg-red-500 rounded p-1 opacity-0 group-hover:opacity-100 transition-all"
+                                    >
+                                        <Trash2 className="w-3 h-3 text-white" />
+                                    </button>
+                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/10 pointer-events-none">
+                                        {/* Hover Overlay */}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-xs text-white/20 p-2 text-center border border-dashed border-white/5 rounded italic mb-4">
+                            No personal references uploaded.
+                        </div>
+                    )}
+
+                    <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold px-1 pt-2 border-t border-white/5">
+                        System Archives
                     </div>
                     {isLoadingLibrary ? (
                         <div className="p-8 text-center text-white/30 text-xs">Loading archives...</div>
                     ) : (
                         <>
-                            <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 max-h-[300px] overflow-y-auto custom-scrollbar p-1">
+                            <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 h-[400px] overflow-y-auto custom-scrollbar p-1">
                                 {libraryImages.slice(0, visibleLimit).map((filename, idx) => (
                                     <div
                                         key={idx}
                                         onClick={() => handleLibrarySelect(filename)}
-                                        className="aspect-[3/4] rounded-md overflow-hidden border border-white/5 cursor-pointer relative group hover:border-white/30 transition-all bg-black/20"
+                                        style={{ aspectRatio: '3/4' }}
+                                        className="rounded-md overflow-hidden border border-white/5 cursor-pointer relative group hover:border-white/30 bg-black/20 min-h-[100px]"
                                     >
                                         <img
                                             src={`/GenReference/${filename}`}
@@ -208,7 +329,7 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                                 {visibleLimit < libraryImages.length && (
                                     <div
                                         ref={loadMoreRef}
-                                        className="col-span-full h-10 flex items-center justify-center text-[10px] text-white/30 uppercase tracking-widest animate-pulse"
+                                        className="col-span-full h-20 flex items-center justify-center text-[10px] text-white/30 uppercase tracking-widest animate-pulse"
                                     >
                                         Loading more...
                                     </div>

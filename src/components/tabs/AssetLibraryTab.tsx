@@ -53,8 +53,10 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
         try {
             const f = await dbService.getFoldersByParent(currentFolderId);
             const a = await dbService.getAssetsByFolder(currentFolderId);
+            // Filter out face_reference assets to keep them distinct
+            const filteredAssets = a.filter(asset => asset.type !== 'face_reference');
             setFolders(f.sort((x, y) => x.name.localeCompare(y.name)));
-            setAssets(a.sort((x, y) => y.timestamp - x.timestamp));
+            setAssets(filteredAssets.sort((x, y) => y.timestamp - x.timestamp));
         } catch (err) {
             console.error("Failed to load library content:", err);
         }

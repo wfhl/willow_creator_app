@@ -295,7 +295,7 @@ export function AnimateTab({
                                                     <>
                                                         <option value="1080p">1080p (Full HD)</option>
                                                         <option value="720p">720p (HD)</option>
-                                                        <option value="480p">480p (SD)</option>
+                                                        w           <option value="480p">480p (SD)</option>
                                                     </>
                                                 ) : selectedModel.includes('wan') ? (
                                                     <>
