@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Settings, Plus, Trash2, Save, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings, Plus, Trash2, Save, X, ChevronDown, ChevronUp, Cloud, Database } from 'lucide-react';
+import { migrationService } from '../../lib/migrationService';
 
 export interface Theme {
     id: string;
@@ -28,9 +29,11 @@ interface SettingsTabProps {
 }
 
 export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles, onExit }: SettingsTabProps) {
-    const [activeSection, setActiveSection] = useState<'themes' | 'captions'>('themes');
+    const [activeSection, setActiveSection] = useState<'themes' | 'captions' | 'sync'>('themes');
     const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
     const [editingStyleId, setEditingStyleId] = useState<string | null>(null);
+    const [migrationStatus, setMigrationStatus] = useState<string>('');
+    const [isMigrating, setIsMigrating] = useState(false);
 
     // Temporary state for editing
     const [tempTheme, setTempTheme] = useState<Theme | null>(null);
@@ -101,6 +104,25 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
         }
     };
 
+    const handleMigration = async () => {
+        if (!confirm("This will upload all local data to Supabase. Continue?")) return;
+
+        setIsMigrating(true);
+        setMigrationStatus("Initializing...");
+
+        try {
+            await migrationService.migrateAll((msg) => setMigrationStatus(msg));
+            alert("Migration completed successfully!");
+            setMigrationStatus("Completed");
+        } catch (e: any) {
+            console.error(e);
+            alert("Migration failed: " + e.message);
+            setMigrationStatus("Failed: " + e.message);
+        } finally {
+            setIsMigrating(false);
+        }
+    };
+
     return (
         <div className="max-w-[1000px] mx-auto w-full p-4 md:p-8 pb-32">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 pb-4 border-b border-white/10 gap-4">
@@ -141,6 +163,15 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                             }`}
                     >
                         Styles
+                    </button>
+                    <button
+                        onClick={() => setActiveSection('sync')}
+                        className={`flex-1 md:flex-none text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'sync'
+                            ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
+                            : 'text-white/40 hover:bg-white/5 hover:text-white'
+                            }`}
+                    >
+                        Data Sync
                     </button>
                 </div>
 
@@ -424,6 +455,39 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeSection === 'sync' && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-lg font-bold text-white">Data Synchronization</h3>
+                            </div>
+
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20 shrink-0">
+                                        <Cloud className="w-6 h-6 text-blue-400" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-white mb-1">Migrate Local to Cloud</h4>
+                                        <p className="text-xs text-white/60 mb-4">
+                                            Move all your locally stored Assets, Strategies, and Themes to your Supabase cloud account.
+                                            This allows you to access your data from any device.
+                                        </p>
+                                        <button
+                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-widest rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            onClick={handleMigration}
+                                            disabled={isMigrating}
+                                        >
+                                            <Database className="w-3 h-3" /> {isMigrating ? 'Migrating...' : 'Start Migration'}
+                                        </button>
+                                        {migrationStatus && (
+                                            <p className="text-[10px] text-blue-400 mt-2 font-mono">{migrationStatus}</p>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}

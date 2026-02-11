@@ -143,7 +143,43 @@ const openDB = (): Promise<IDBDatabase> => {
 };
 
 export const dbService = {
-    // ... (getConfig, saveConfig remain same)
+    async getConfig(id: string): Promise<any> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('configs', 'readonly');
+            const store = transaction.objectStore('configs');
+            const request = store.get(id);
+            request.onsuccess = () => resolve(request.result?.data);
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async saveConfig(id: string, data: any): Promise<void> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('configs', 'readwrite');
+            const store = transaction.objectStore('configs');
+            const request = store.put({ id, data });
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async getConfigs(): Promise<{ themes: any[], captionStyles: any[] }> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('configs', 'readonly');
+            const store = transaction.objectStore('configs');
+            const request = store.getAll();
+            request.onsuccess = () => {
+                const details = request.result;
+                const themes = details.find(d => d.id === 'themes')?.data || [];
+                const styles = details.find(d => d.id === 'caption_styles')?.data || [];
+                resolve({ themes, captionStyles: styles });
+            };
+            request.onerror = () => reject(request.error);
+        });
+    },
 
     async getAllAssets(): Promise<DBAsset[]> {
         const db = await openDB();
