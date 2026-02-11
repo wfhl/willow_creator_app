@@ -66,6 +66,9 @@ interface CreateTabProps {
     onUploadToPost: (files: FileList | null) => void;
     onRemoveMedia: (index: number) => void;
     onRerollMedia: (index: number) => void;
+    loras: Array<{ path: string; scale: number }>;
+    setLoras: (loras: Array<{ path: string; scale: number }>) => void;
+    onLoRAUpload: (file: File) => Promise<void>;
 }
 
 export function CreateTab({
@@ -127,7 +130,10 @@ export function CreateTab({
     onDownload,
     onUploadToPost,
     onRemoveMedia,
-    onRerollMedia
+    onRerollMedia,
+    loras,
+    setLoras,
+    onLoRAUpload
 }: CreateTabProps) {
 
     const currentTheme = selectedThemeId === 'CUSTOM'
@@ -293,6 +299,93 @@ export function CreateTab({
                             />
                         </div>
 
+                        {/* LoRA Controls */}
+                        {selectedModel.includes('lora') && (
+                            <div className="border-t border-white/5 pt-4 space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs text-white/50 font-bold uppercase tracking-widest flex items-center gap-2">
+                                        <Layers className="w-3 h-3 text-emerald-500" />
+                                        LoRA Weights
+                                    </label>
+                                    <div className="flex gap-3">
+                                        <label className="cursor-pointer text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1">
+                                            <Upload className="w-3 h-3" /> Upload LoRA
+                                            <input
+                                                type="file"
+                                                className="hidden"
+                                                accept=".safetensors"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) onLoRAUpload(file);
+                                                }}
+                                            />
+                                        </label>
+                                        <button
+                                            onClick={() => setLoras([...loras, { path: '', scale: 1.0 }])}
+                                            className="text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1"
+                                        >
+                                            <Sparkles className="w-3 h-3" /> Add LoRA (via Link)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {loras.length === 0 ? (
+                                    <div className="text-[10px] text-white/20 italic p-3 border border-dashed border-white/10 rounded-lg text-center">
+                                        No LoRAs added. Use LoRAs to style your video.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {loras.map((lora, idx) => (
+                                            <div key={idx} className="bg-black/20 border border-white/5 rounded-lg p-3 space-y-2">
+                                                <div className="flex justify-between items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Safetensors URL or Path"
+                                                        value={lora.path}
+                                                        onChange={(e) => {
+                                                            const newLoras = [...loras];
+                                                            newLoras[idx].path = e.target.value;
+                                                            setLoras(newLoras);
+                                                        }}
+                                                        className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-[10px] text-white focus:border-emerald-500/50 outline-none"
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            const newLoras = loras.filter((_, i) => i !== idx);
+                                                            setLoras(newLoras);
+                                                        }}
+                                                        className="p-1.5 hover:bg-red-500/20 text-red-400 rounded transition-colors"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <div className="flex-1">
+                                                        <input
+                                                            type="range"
+                                                            min="0"
+                                                            max="2"
+                                                            step="0.05"
+                                                            value={lora.scale}
+                                                            onChange={(e) => {
+                                                                const newLoras = [...loras];
+                                                                newLoras[idx].scale = parseFloat(e.target.value);
+                                                                setLoras(newLoras);
+                                                            }}
+                                                            className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                                        />
+                                                    </div>
+                                                    <span className="text-[10px] text-white/40 w-8 font-mono">
+                                                        {(lora.scale).toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Generated Prompt Preview */}
                         <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
                             <div className="flex justify-between items-center">
@@ -338,6 +431,7 @@ export function CreateTab({
                                             ) : (
                                                 <>
                                                     <option value="veo-3.1-generate-preview">Veo 3.1 (Video)</option>
+                                                    <option value="fal-ai/wan/v2.2-a14b/image-to-video/lora">Wan 2.2 w/ LoRA (FAL)</option>
                                                     <option value="veo-2.0-generate-001">Veo 2.0 (Video Legacy)</option>
                                                 </>
                                             )}

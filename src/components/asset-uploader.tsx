@@ -6,6 +6,7 @@ interface Asset {
     id: string;
     type: string; // 'image' | 'video'
     base64: string;
+    name: string;
     selected?: boolean;
 }
 
@@ -116,6 +117,12 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
     };
 
     const handleUserAssetSelect = (asset: DBAsset) => {
+        // Check if already in selected assets
+        if (assets.some(a => a.base64 === asset.base64)) {
+            // Optional: could toggle off, but for now just inform
+            return;
+        }
+
         // Convert base64 to file and add
         fetch(asset.base64)
             .then(res => res.blob())
@@ -124,32 +131,34 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                 const dt = new DataTransfer();
                 dt.items.add(file);
                 onAdd(dt.files);
-                setViewMode('upload');
+                // Stay in library view
             });
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             onAdd(e.target.files);
+            // Switch to selected view to see uploads
+            setViewMode('upload');
         }
         // Reset input
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const handleLibrarySelect = async (filename: string) => {
+        // Find if already added (imperfect check by name, but works for the GenReference/ catalog)
+        if (assets.some(a => a.name === filename)) return;
+
         try {
             const response = await fetch(`/GenReference/${filename}`);
             const blob = await response.blob();
             const file = new File([blob], filename, { type: blob.type });
 
-            // Create a fake FileList
             const dataTransfer = new DataTransfer();
             dataTransfer.items.add(file);
 
             onAdd(dataTransfer.files);
-
-            // Switch back to upload view to see the selected asset
-            setViewMode('upload');
+            // Stay in library view
         } catch (error) {
             console.error("Error selecting library asset:", error);
         }
@@ -196,48 +205,50 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
             </div>
 
             {viewMode === 'upload' ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 md:gap-3">
-                    {assets.map((asset) => (
-                        <div
-                            key={asset.id}
-                            className={`relative aspect-square rounded-lg overflow-hidden group border transition-all cursor-pointer ${asset.selected ? 'border-emerald-500 ring-2 ring-emerald-500/50' : 'border-white/10 hover:border-white/30'
-                                }`}
-                            onClick={() => onToggleSelection(asset.id)}
-                        >
-                            <img src={asset.base64} alt="Asset" className="w-full h-full object-cover" />
-
-                            {/* Selection Indicator */}
-                            {asset.selected && (
-                                <div className="absolute top-1 right-1 bg-emerald-500 rounded-full p-0.5 shadow-lg">
-                                    <Check className="h-3 w-3 text-black" />
-                                </div>
-                            )}
-
-                            {/* Remove Button (Hover) */}
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onRemove(asset.id);
-                                }}
-                                className="absolute top-1 left-1 bg-black/60 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 backdrop-blur-sm"
+                <div className="max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 md:gap-3">
+                        {assets.map((asset) => (
+                            <div
+                                key={asset.id}
+                                className={`relative aspect-square rounded-lg overflow-hidden group border transition-all cursor-pointer ${asset.selected ? 'border-emerald-500 ring-2 ring-emerald-500/50' : 'border-white/10 hover:border-white/30'
+                                    }`}
+                                onClick={() => onToggleSelection(asset.id)}
                             >
-                                <X className="h-3 w-3 text-white" />
-                            </button>
-                        </div>
-                    ))}
+                                <img src={asset.base64} alt="Asset" className="w-full h-full object-cover" />
 
-                    {/* Empty Placeholder */}
-                    {assets.length === 0 && (
-                        <div
-                            onClick={() => fileInputRef.current?.click()}
-                            className="col-span-4 aspect-[3/1] rounded-lg border border-dashed border-white/10 flex flex-col items-center justify-center text-white/30 hover:bg-white/5 hover:border-white/20 transition-all cursor-pointer gap-2"
-                        >
-                            <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center">
-                                <ImageIcon className="h-4 w-4 opacity-50" />
+                                {/* Selection Indicator */}
+                                {asset.selected && (
+                                    <div className="absolute top-1 right-1 bg-emerald-500 rounded-full p-0.5 shadow-lg">
+                                        <Check className="h-3 w-3 text-black" />
+                                    </div>
+                                )}
+
+                                {/* Remove Button (Hover) */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onRemove(asset.id);
+                                    }}
+                                    className="absolute top-1 left-1 bg-black/60 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 backdrop-blur-sm"
+                                >
+                                    <X className="h-3 w-3 text-white" />
+                                </button>
                             </div>
-                            <span className="text-xs font-medium">Drop or upload reference</span>
-                        </div>
-                    )}
+                        ))}
+
+                        {/* Empty Placeholder */}
+                        {assets.length === 0 && (
+                            <div
+                                onClick={() => fileInputRef.current?.click()}
+                                className="col-span-full aspect-[4/1] rounded-lg border border-dashed border-white/10 flex flex-col items-center justify-center text-white/30 hover:bg-white/5 hover:border-white/20 transition-all cursor-pointer gap-2"
+                            >
+                                <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center">
+                                    <ImageIcon className="h-4 w-4 opacity-50" />
+                                </div>
+                                <span className="text-xs font-medium">No images selected. Upload or choose from Library.</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             ) : (
                 <div className="space-y-2">
@@ -265,31 +276,39 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                     {/* User Library Grid */}
                     {userLibraryAssets.length > 0 ? (
                         <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 mb-6 p-1">
-                            {userLibraryAssets.map((asset) => (
-                                <div
-                                    key={asset.id}
-                                    onClick={() => handleUserAssetSelect(asset)}
-                                    style={{ aspectRatio: '3/4' }}
-                                    className="rounded-md overflow-hidden border border-white/5 cursor-pointer relative group hover:border-emerald-500/50 bg-black/20 min-h-[100px]"
-                                >
-                                    <img
-                                        src={asset.base64}
-                                        alt={asset.name}
-                                        loading="lazy"
-                                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                                    />
-                                    {/* Delete Button */}
-                                    <button
-                                        onClick={(e) => handleDeleteUserAsset(asset.id, e)}
-                                        className="absolute top-1 right-1 bg-black/60 hover:bg-red-500 rounded p-1 opacity-0 group-hover:opacity-100 transition-all"
+                            {userLibraryAssets.map((asset) => {
+                                const isSelected = assets.some(a => a.base64 === asset.base64);
+                                return (
+                                    <div
+                                        key={asset.id}
+                                        onClick={() => handleUserAssetSelect(asset)}
+                                        style={{ aspectRatio: '3/4' }}
+                                        className={`rounded-md overflow-hidden border transition-all cursor-pointer relative group bg-black/20 min-h-[100px] ${isSelected ? 'border-emerald-500 ring-1 ring-emerald-500/30' : 'border-white/5 hover:border-emerald-500/50'}`}
                                     >
-                                        <Trash2 className="w-3 h-3 text-white" />
-                                    </button>
-                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/10 pointer-events-none">
-                                        {/* Hover Overlay */}
+                                        <img
+                                            src={asset.base64}
+                                            alt={asset.name}
+                                            loading="lazy"
+                                            className={`w-full h-full object-cover transition-opacity ${isSelected ? 'opacity-100' : 'opacity-80 group-hover:opacity-100'}`}
+                                        />
+                                        {/* Selection Indicator */}
+                                        {isSelected && (
+                                            <div className="absolute top-1 right-1 bg-emerald-500 rounded-full p-0.5 shadow-lg z-10">
+                                                <Check className="h-2 w-2 text-black" />
+                                            </div>
+                                        )}
+                                        {/* Delete Button */}
+                                        {!isSelected && (
+                                            <button
+                                                onClick={(e) => handleDeleteUserAsset(asset.id, e)}
+                                                className="absolute top-1 right-1 bg-black/60 hover:bg-red-500 rounded p-1 opacity-0 group-hover:opacity-100 transition-all z-10"
+                                            >
+                                                <Trash2 className="w-3 h-3 text-white" />
+                                            </button>
+                                        )}
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="text-xs text-white/20 p-2 text-center border border-dashed border-white/5 rounded italic mb-4">
@@ -304,27 +323,36 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                         <div className="p-8 text-center text-white/30 text-xs">Loading archives...</div>
                     ) : (
                         <>
-                            <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 h-[400px] overflow-y-auto custom-scrollbar p-1">
-                                {libraryImages.slice(0, visibleLimit).map((filename, idx) => (
-                                    <div
-                                        key={idx}
-                                        onClick={() => handleLibrarySelect(filename)}
-                                        style={{ aspectRatio: '3/4' }}
-                                        className="rounded-md overflow-hidden border border-white/5 cursor-pointer relative group hover:border-white/30 bg-black/20 min-h-[100px]"
-                                    >
-                                        <img
-                                            src={`/GenReference/${filename}`}
-                                            alt={filename}
-                                            loading="lazy"
-                                            className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
-                                        />
-                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
-                                            <div className="bg-white/10 backdrop-blur-md rounded-full p-1">
-                                                <Upload className="w-3 h-3 text-white" />
+                            <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 h-[450px] overflow-y-auto custom-scrollbar p-1">
+                                {libraryImages.slice(0, visibleLimit).map((filename, idx) => {
+                                    const isSelected = assets.some(a => a.name === filename);
+                                    return (
+                                        <div
+                                            key={idx}
+                                            onClick={() => handleLibrarySelect(filename)}
+                                            style={{ aspectRatio: '3/4' }}
+                                            className={`rounded-md overflow-hidden border transition-all cursor-pointer relative group bg-black/20 min-h-[100px] ${isSelected ? 'border-emerald-500 ring-1 ring-emerald-500/30' : 'border-white/5 hover:border-white/30'}`}
+                                        >
+                                            <img
+                                                src={`/GenReference/${filename}`}
+                                                alt={filename}
+                                                loading="lazy"
+                                                className={`w-full h-full object-cover transition-opacity ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}
+                                            />
+                                            {/* Selection Indicator */}
+                                            {isSelected && (
+                                                <div className="absolute top-1 right-1 bg-emerald-500 rounded-full p-0.5 shadow-lg z-10">
+                                                    <Check className="h-2 w-2 text-black" />
+                                                </div>
+                                            )}
+                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
+                                                <div className="bg-white/10 backdrop-blur-md rounded-full p-1 text-[8px] text-white font-bold uppercase px-2 font-sans tracking-tighter">
+                                                    {isSelected ? 'Selected' : 'Add'}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                                 {/* Sentinel for Infinite Scroll */}
                                 {visibleLimit < libraryImages.length && (
                                     <div

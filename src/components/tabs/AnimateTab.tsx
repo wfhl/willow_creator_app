@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, type ChangeEvent } from 'react';
-import { Video as VideoIcon, ImagePlus, X, RefreshCw, Play, Save, Download } from 'lucide-react';
+import { Video as VideoIcon, ImagePlus, X, RefreshCw, Play, Save, Download, Layers, Sparkles, Upload, Trash2 } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
 
 interface AnimateTabProps {
@@ -34,6 +34,9 @@ interface AnimateTabProps {
     cameraFixed?: boolean;
     setCameraFixed?: (val: boolean) => void;
 
+    loras: Array<{ path: string; scale: number }>;
+    setLoras: (loras: Array<{ path: string; scale: number }>) => void;
+    onLoRAUpload: (file: File) => Promise<void>;
 }
 
 export function AnimateTab({
@@ -63,7 +66,9 @@ export function AnimateTab({
     setWithAudio,
     cameraFixed,
     setCameraFixed,
-
+    loras,
+    setLoras,
+    onLoRAUpload
 }: AnimateTabProps) {
     const [isDragging, setIsDragging] = useState(false);
 
@@ -295,7 +300,7 @@ export function AnimateTab({
                                                     <>
                                                         <option value="1080p">1080p (Full HD)</option>
                                                         <option value="720p">720p (HD)</option>
-                                                        w           <option value="480p">480p (SD)</option>
+                                                        <option value="480p">480p (SD)</option>
                                                     </>
                                                 ) : selectedModel.includes('wan') ? (
                                                     <>
@@ -383,6 +388,93 @@ export function AnimateTab({
                                             </select>
                                         </div>
                                     </div>
+
+                                    {/* LoRA Controls */}
+                                    {selectedModel.includes('lora') && (
+                                        <div className="border-t border-white/5 pt-4 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <label className="text-xs text-white/50 font-bold uppercase tracking-widest flex items-center gap-2">
+                                                    <Layers className="w-3 h-3 text-emerald-500" />
+                                                    LoRA Weights
+                                                </label>
+                                                <div className="flex gap-3">
+                                                    <label className="cursor-pointer text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 font-bold uppercase tracking-wider">
+                                                        <Upload className="w-3 h-3" /> Upload LoRA
+                                                        <input
+                                                            type="file"
+                                                            className="hidden"
+                                                            accept=".safetensors"
+                                                            onChange={(e) => {
+                                                                const file = e.target.files?.[0];
+                                                                if (file) onLoRAUpload(file);
+                                                            }}
+                                                        />
+                                                    </label>
+                                                    <button
+                                                        onClick={() => setLoras([...loras, { path: '', scale: 1.0 }])}
+                                                        className="text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 font-bold uppercase tracking-wider"
+                                                    >
+                                                        <Sparkles className="w-3 h-3" /> Add Link
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {loras.length === 0 ? (
+                                                <div className="text-[10px] text-white/20 italic p-3 border border-dashed border-white/10 rounded-lg text-center">
+                                                    No LoRAs added. Use LoRAs to style your animation.
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    {loras.map((lora, idx) => (
+                                                        <div key={idx} className="bg-black/20 border border-white/5 rounded-lg p-3 space-y-2">
+                                                            <div className="flex justify-between items-center gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Safetensors URL or Path"
+                                                                    value={lora.path}
+                                                                    onChange={(e) => {
+                                                                        const newLoras = [...loras];
+                                                                        newLoras[idx].path = e.target.value;
+                                                                        setLoras(newLoras);
+                                                                    }}
+                                                                    className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-[10px] text-white focus:border-emerald-500/50 outline-none"
+                                                                />
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const newLoras = loras.filter((_, i) => i !== idx);
+                                                                        setLoras(newLoras);
+                                                                    }}
+                                                                    className="p-1.5 hover:bg-red-500/20 text-red-400 rounded transition-colors"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" />
+                                                                </button>
+                                                            </div>
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="flex-1">
+                                                                    <input
+                                                                        type="range"
+                                                                        min="0"
+                                                                        max="2"
+                                                                        step="0.05"
+                                                                        value={lora.scale}
+                                                                        onChange={(e) => {
+                                                                            const newLoras = [...loras];
+                                                                            newLoras[idx].scale = parseFloat(e.target.value);
+                                                                            setLoras(newLoras);
+                                                                        }}
+                                                                        className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                                                    />
+                                                                </div>
+                                                                <span className="text-[10px] text-white/40 w-8 font-mono">
+                                                                    {(lora.scale).toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
 
 

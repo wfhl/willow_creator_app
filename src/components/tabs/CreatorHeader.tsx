@@ -86,35 +86,35 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
                     </button>
                 </nav>
 
-                <div className="flex items-center gap-4 shrink-0">
-                    <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 border rounded-full transition-colors ${user ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-white/5 border-white/10'}`}>
-                        <div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500 animate-pulse' : 'bg-yellow-500'}`}></div>
-                        <span className={`text-[10px] font-bold uppercase tracking-widest ${user ? 'text-emerald-400' : 'text-yellow-500/80'}`}>
-                            {user ? 'Cloud Sync' : 'Local Only'}
+                <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                    <div className={`flex items-center gap-2 px-2 md:px-3 py-1.5 border rounded-full transition-colors ${user ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-white/5 border-white/10'}`}>
+                        <div className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full ${user ? 'bg-emerald-500 animate-pulse' : 'bg-yellow-500'}`}></div>
+                        <span className={`text-[8px] md:text-[10px] font-bold uppercase tracking-widest ${user ? 'text-emerald-400' : 'text-yellow-500/80'}`}>
+                            {user ? (window.innerWidth < 768 ? 'Cloud' : 'Cloud Sync') : (window.innerWidth < 768 ? 'Local' : 'Local Only')}
                         </span>
                     </div>
 
                     {user ? (
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 md:gap-3">
                             <div className="hidden lg:block text-right">
                                 <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Logged In</p>
                                 <p className="text-xs text-white truncate max-w-[150px]">{user.email}</p>
                             </div>
-                            <button
-                                onClick={signOut}
-                                className="p-2 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-colors"
-                                title="Sign Out"
-                            >
-                                <LogOut className="w-4 h-4" />
-                            </button>
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-xs font-bold text-white shadow-lg">
+                            <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-[10px] md:text-xs font-bold text-white shadow-lg border border-white/20">
                                 {user.email?.[0].toUpperCase()}
                             </div>
+                            <button
+                                onClick={signOut}
+                                className="p-1.5 md:p-2 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-colors"
+                                title="Sign Out"
+                            >
+                                <LogOut className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                            </button>
                         </div>
                     ) : (
                         <button
                             onClick={() => setShowLogin(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                         >
                             <UserIcon className="w-3 h-3" />
                             <span>Login</span>
@@ -125,15 +125,17 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
 
             {/* Login Modal Overlay */}
             {showLogin && (
-                <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="relative w-full max-w-md">
+                <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="relative w-full max-w-sm">
                         <button
                             onClick={() => setShowLogin(false)}
-                            className="absolute top-4 right-4 z-10 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white/60 hover:text-white transition-colors"
+                            className="absolute -top-12 right-0 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white/60 hover:text-white transition-colors border border-white/10"
                         >
-                            <LogOut className="w-4 h-4 rotate-180" /> {/* Using logout icon as 'back/close' metaphor or just use X if imported */}
+                            <LogOut className="w-5 h-5 rotate-180" />
                         </button>
-                        <Login />
+                        <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-1 shadow-2xl overflow-hidden ring-1 ring-white/5">
+                            <Login />
+                        </div>
                     </div>
                 </div>
             )}

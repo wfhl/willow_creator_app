@@ -101,6 +101,7 @@ export default function WillowPostCreator() {
     // Advanced Edit Config
     const [enableSafety, setEnableSafety] = useState(true);
     const [enhancePromptMode, setEnhancePromptMode] = useState<"standard" | "fast">("standard");
+    const [loras, setLoras] = useState<Array<{ path: string; scale: number }>>([]);
 
     // --- INITIALIZATION EFFECTS ---
 
@@ -360,7 +361,8 @@ export default function WillowPostCreator() {
                         numImages: createNumImages,
                         enableSafety,
                         enhancePromptMode
-                    }
+                    },
+                    loras: loras
                 };
 
                 if (mediaType === 'image' && createNumImages > 1 && !selectedModel.includes('edit')) {
@@ -997,6 +999,17 @@ export default function WillowPostCreator() {
                         isSaving={false} // Can add loading state for saving later if needed
                         showSaveForm={showSaveForm}
                         setShowSaveForm={setShowSaveForm}
+                        loras={loras}
+                        setLoras={setLoras}
+                        onLoRAUpload={async (file: File) => {
+                            try {
+                                const url = await falService.uploadFile(file);
+                                setLoras(prev => [...prev, { path: url, scale: 1.0 }]);
+                            } catch (e) {
+                                console.error("LoRA Upload Failed", e);
+                                alert("Failed to upload LoRA");
+                            }
+                        }}
                         presetsDropdown={
                             <PresetsDropdown
                                 isOpen={isPresetsOpen}
@@ -1212,6 +1225,17 @@ export default function WillowPostCreator() {
                         setWithAudio={setWithAudio}
                         cameraFixed={cameraFixed}
                         setCameraFixed={setCameraFixed}
+                        loras={loras}
+                        setLoras={setLoras}
+                        onLoRAUpload={async (file: File) => {
+                            try {
+                                const url = await falService.uploadFile(file);
+                                setLoras(prev => [...prev, { path: url, scale: 1.0 }]);
+                            } catch (e) {
+                                console.error("LoRA Upload Failed", e);
+                                alert("Failed to upload LoRA");
+                            }
+                        }}
 
                         onGenerateI2V={async () => {
                             if (!i2vTarget || !i2vPrompt) return;
@@ -1238,6 +1262,7 @@ export default function WillowPostCreator() {
                                         prompt: i2vPrompt,
                                         aspectRatio: i2vAspectRatio,
                                         contentParts,
+                                        loras,
                                         videoConfig: {
                                             resolution: videoResolution,
                                             durationSeconds: videoDuration.replace('s', ''),

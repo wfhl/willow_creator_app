@@ -25,6 +25,7 @@ export interface FalGenerationRequest {
         enableSafety?: boolean;
         enhancePromptMode?: "standard" | "fast";
     };
+    loras?: Array<{ path: string; scale?: number }>;
 }
 
 export const falService = {
@@ -164,7 +165,7 @@ export const falService = {
                 const durationStr = request.videoConfig?.durationSeconds?.replace('s', '') || "5";
                 const fps = 16;
                 let numFrames = 81;
-                if (durationStr === "10") numFrames = 160; // Max is 161
+                if (durationStr === "10") numFrames = 161; // Max is 161
                 if (durationStr === "15") numFrames = 161; // Cap at max
 
                 input = {
@@ -175,8 +176,8 @@ export const falService = {
                     aspect_ratio: request.aspectRatio || "auto",
                     num_frames: numFrames,
                     frames_per_second: fps,
-                    enable_safety_checker: request.editConfig?.enableSafety ?? true
-                    // loras: [] // Optional
+                    enable_safety_checker: request.editConfig?.enableSafety ?? true,
+                    loras: (request.loras || []).filter(l => l.path.trim() !== "")
                 };
 
 
@@ -221,6 +222,10 @@ export const falService = {
             ? base64Data
             : `data:${mimeType};base64,${base64Data}`;
         const blob = await (await fetch(dataURI)).blob();
-        return await fal.storage.upload(blob);
+        return await this.uploadFile(blob);
+    },
+
+    async uploadFile(file: File | Blob): Promise<string> {
+        return await fal.storage.upload(file);
     }
 };

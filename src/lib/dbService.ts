@@ -143,7 +143,7 @@ const openDB = (): Promise<IDBDatabase> => {
 };
 
 export const dbService = {
-    async getConfig(id: string): Promise<any> {
+    async getConfig<T = any>(id: string): Promise<T | undefined> {
         const db = await openDB();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('configs', 'readonly');
