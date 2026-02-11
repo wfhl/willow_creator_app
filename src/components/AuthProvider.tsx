@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
+import { syncService } from '../lib/syncService';
 
 interface AuthContextType {
     session: Session | null;
@@ -29,6 +30,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
+            if (session?.user) {
+                syncService.init(session.user);
+            }
         });
 
         return () => subscription.unsubscribe();

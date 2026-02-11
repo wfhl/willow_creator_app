@@ -125,8 +125,7 @@ export default function WillowPostCreator() {
 
                 // Assets
                 const dbAssets = await dbService.getAllAssets();
-                const unselected = dbAssets.filter(a => !a.selected);
-                for (const u of unselected) await dbService.deleteAsset(u.id);
+                // Only load assets that are flagged as 'selected' into the active prompt reference state
                 setAssets(dbAssets.filter(a => a.selected));
 
                 // Posts
@@ -285,7 +284,7 @@ export default function WillowPostCreator() {
                 const newAsset: Asset = {
                     id: Date.now().toString() + Math.random().toString().slice(2, 6),
                     name: file.name,
-                    type: file.type.startsWith('video') ? 'video' : 'image',
+                    type: 'face_reference', // Explicitly mark as face reference when added via reference uploader
                     base64,
                     folderId: null,
                     timestamp: Date.now(),
@@ -755,15 +754,16 @@ export default function WillowPostCreator() {
             const newAsset: Asset = {
                 id: crypto.randomUUID(),
                 name: name || `Saved ${type} ${new Date().toLocaleString()}`,
-                type: type,
+                type: type, // Keep as 'image' or 'video' for general library
                 base64: base64,
-                folderId: null, // Root by default
+                folderId: null,
                 timestamp: Date.now(),
-                selected: true // Mark as selected for creator's view
+                selected: false // Do NOT automatically select as a prompt reference
             };
 
             await dbService.saveAsset(newAsset);
-            setAssets(prev => [...prev.filter(a => a.base64 !== base64), newAsset]);
+            // Do NOT update setAssets(prev => [...]) here.
+            // Generative results saved to the library should not become prompt references.
             alert("Saved to Asset Library!");
         } catch (err) {
             console.error("Save to assets failed:", err);

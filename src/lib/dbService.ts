@@ -142,7 +142,25 @@ const openDB = (): Promise<IDBDatabase> => {
     });
 };
 
+// --- Change Listeners for Sync Engine ---
+export type DBStore = 'assets' | 'posts' | 'presets' | 'folders' | 'generation_history';
+export type ChangeType = 'insert' | 'update' | 'delete';
+export type DBChangeListener = (store: DBStore, type: ChangeType, data: any) => void;
+
+let listeners: DBChangeListener[] = [];
+
 export const dbService = {
+    subscribe(listener: DBChangeListener) {
+        listeners.push(listener);
+        return () => {
+            listeners = listeners.filter(l => l !== listener);
+        };
+    },
+
+    notify(store: DBStore, type: ChangeType, data: any) {
+        listeners.forEach(l => l(store, type, data));
+    },
+
     async getConfig<T = any>(id: string): Promise<T | undefined> {
         const db = await openDB();
         return new Promise((resolve, reject) => {
@@ -210,7 +228,10 @@ export const dbService = {
             const transaction = db.transaction('assets', 'readwrite');
             const store = transaction.objectStore('assets');
             const request = store.put(asset);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.notify('assets', 'update', asset);
+                resolve();
+            };
             request.onerror = () => reject(request.error);
         });
     },
@@ -221,7 +242,10 @@ export const dbService = {
             const transaction = db.transaction('assets', 'readwrite');
             const store = transaction.objectStore('assets');
             const request = store.delete(id);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.notify('assets', 'delete', { id });
+                resolve();
+            };
             request.onerror = () => reject(request.error);
         });
     },
@@ -243,7 +267,10 @@ export const dbService = {
             const transaction = db.transaction('posts', 'readwrite');
             const store = transaction.objectStore('posts');
             const request = store.put(post);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.notify('posts', 'update', post);
+                resolve();
+            };
             request.onerror = () => reject(request.error);
         });
     },
@@ -254,7 +281,10 @@ export const dbService = {
             const transaction = db.transaction('posts', 'readwrite');
             const store = transaction.objectStore('posts');
             const request = store.delete(id);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.notify('posts', 'delete', { id });
+                resolve();
+            };
             request.onerror = () => reject(request.error);
         });
     },
@@ -357,7 +387,10 @@ export const dbService = {
             const transaction = db.transaction('presets', 'readwrite');
             const store = transaction.objectStore('presets');
             const request = store.put(preset);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.notify('presets', 'update', preset);
+                resolve();
+            };
             request.onerror = () => reject(request.error);
         });
     },
@@ -368,7 +401,10 @@ export const dbService = {
             const transaction = db.transaction('presets', 'readwrite');
             const store = transaction.objectStore('presets');
             const request = store.delete(id);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.notify('presets', 'delete', { id });
+                resolve();
+            };
             request.onerror = () => reject(request.error);
         });
     },
@@ -391,7 +427,10 @@ export const dbService = {
             const transaction = db.transaction('folders', 'readwrite');
             const store = transaction.objectStore('folders');
             const request = store.put(folder);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.notify('folders', 'update', folder);
+                resolve();
+            };
             request.onerror = () => reject(request.error);
         });
     },
@@ -404,7 +443,10 @@ export const dbService = {
             // Note: In an OS feel, we might want to recursively delete or prevent deletion of non-empty folders.
             // For now, let's keep it simple.
             const request = store.delete(id);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.notify('folders', 'delete', { id });
+                resolve();
+            };
             request.onerror = () => reject(request.error);
         });
     },
@@ -462,7 +504,10 @@ export const dbService = {
             const transaction = db.transaction('generation_history', 'readwrite');
             const store = transaction.objectStore('generation_history');
             const request = store.put(entry);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.notify('generation_history', 'update', entry);
+                resolve();
+            };
             request.onerror = () => reject(request.error);
         });
     },

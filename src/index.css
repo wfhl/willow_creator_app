@@ -9,6 +9,12 @@
     overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
   }
+
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
 }
 
 @layer utilities {

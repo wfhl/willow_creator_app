@@ -33,6 +33,9 @@ export const falService = {
         console.group(`[Fal.ai] Generating with ${request.model}`);
         console.log("Request:", request);
 
+        let endpoint = "";
+        let input: any = {};
+
         try {
             // 1. Handle Image Uploads (Convert base64/blobs to Fal Storage URLs)
             let primaryImageUrl = "";
@@ -60,20 +63,21 @@ export const falService = {
             }
 
             // 2. Prepare Endpoint and Input
-            let endpoint = "";
-            let input: any = {};
 
             // --- GROK MODELS ---
             if (request.model.includes('xai/grok-imagine-video/image-to-video')) {
                 endpoint = "xai/grok-imagine-video/image-to-video";
-                const duration = request.videoConfig?.durationSeconds ? parseInt(request.videoConfig.durationSeconds.replace('s', '')) : 5;
+                let duration = request.videoConfig?.durationSeconds ? parseInt(request.videoConfig.durationSeconds.replace('s', '')) : 5;
+                if (duration > 5 && duration < 10) duration = 5;
+                if (duration > 10) duration = 10;
+
                 input = {
                     prompt: request.prompt,
                     image_url: primaryImageUrl,
                     duration: duration,
-                    aspect_ratio: request.aspectRatio || "auto",
-                    resolution: request.videoConfig?.resolution || "720p"
+                    aspect_ratio: request.aspectRatio === 'auto' ? 'auto' : (request.aspectRatio || 'auto')
                 };
+                // Optional: resolution is usually fixed at 720p for this version of Grok on Fal
 
             } else if (request.model === 'xai/grok-imagine-image/edit') {
                 endpoint = "xai/grok-imagine-image/edit";
@@ -163,22 +167,31 @@ export const falService = {
                 // We map duration "5s", "10s" to appropriate frames if possible, or stick to defaults.
                 // Assuming 16 FPS: 5s = 80 frames, 10s = 160 frames.
                 const durationStr = request.videoConfig?.durationSeconds?.replace('s', '') || "5";
-                const fps = 16;
-                let numFrames = 81;
-                if (durationStr === "10") numFrames = 161; // Max is 161
-                if (durationStr === "15") numFrames = 161; // Cap at max
+                const filteredLoras = (request.loras || []).filter(l => l.path && l.path.trim() !== "");
+
+                // Wan 2.2 supported Ratios: "auto", "16:9", "9:16", "1:1"
+                let apiAspectRatio = request.aspectRatio || "auto";
+                if (!["auto", "16:9", "9:16", "1:1"].includes(apiAspectRatio)) {
+                    apiAspectRatio = "auto";
+                }
 
                 input = {
-                    prompt: request.prompt,
+                    prompt: request.prompt.trim(),
                     image_url: primaryImageUrl,
-                    // Wan 2.2 supports 480p, 580p, 720p
                     resolution: request.videoConfig?.resolution === "1080p" ? "720p" : (request.videoConfig?.resolution || "720p"),
-                    aspect_ratio: request.aspectRatio || "auto",
-                    num_frames: numFrames,
-                    frames_per_second: fps,
-                    enable_safety_checker: request.editConfig?.enableSafety ?? true,
-                    loras: (request.loras || []).filter(l => l.path.trim() !== "")
+                    aspect_ratio: apiAspectRatio,
+                    enable_safety_checker: request.editConfig?.enableSafety ?? false,
                 };
+
+                // For 10s duration, we must specify num_frames (max 161)
+                if (durationStr === "10" || durationStr === "15") {
+                    input.num_frames = 161;
+                    input.frames_per_second = 16;
+                }
+
+                if (filteredLoras.length > 0) {
+                    input.loras = filteredLoras;
+                }
 
 
             } else {
@@ -209,8 +222,15 @@ export const falService = {
             throw new Error("No media URL in Fal response: " + JSON.stringify(result));
 
         } catch (e: any) {
-            console.error("Fal generation failed:", e);
-            throw new Error(`Fal Failed: ${e.message || e}`);
+            console.error("Fal generation failed. Full Request Input:", JSON.stringify(input, null, 2));
+            console.error("Error Detail:", e);
+
+            // Try to extract more detail from the error for the alert
+            let detail = e.message || e;
+            if (e.body && typeof e.body === 'object') {
+                detail += " - " + JSON.stringify(e.body);
+            }
+            throw new Error(`Fal Failed: ${detail}`);
         } finally {
             console.groupEnd();
         }

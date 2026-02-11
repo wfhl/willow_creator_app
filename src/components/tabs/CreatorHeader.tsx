@@ -114,7 +114,7 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
                     ) : (
                         <button
                             onClick={() => setShowLogin(true)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] md:text-[10px] font-black uppercase tracking-widest rounded-full transition-all shadow-lg shadow-emerald-500/20 active:scale-95 touch-manipulation"
                         >
                             <UserIcon className="w-3 h-3" />
                             <span>Login</span>

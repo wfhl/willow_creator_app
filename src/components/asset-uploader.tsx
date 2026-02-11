@@ -282,8 +282,7 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                                     <div
                                         key={asset.id}
                                         onClick={() => handleUserAssetSelect(asset)}
-                                        style={{ aspectRatio: '3/4' }}
-                                        className={`rounded-md overflow-hidden border transition-all cursor-pointer relative group bg-black/20 min-h-[100px] ${isSelected ? 'border-emerald-500 ring-1 ring-emerald-500/30' : 'border-white/5 hover:border-emerald-500/50'}`}
+                                        className={`aspect-[3/4] rounded-md overflow-hidden border transition-all cursor-pointer relative group bg-black/20 ${isSelected ? 'border-emerald-500 ring-1 ring-emerald-500/30' : 'border-white/5 hover:border-emerald-500/50'}`}
                                     >
                                         <img
                                             src={asset.base64}
@@ -330,8 +329,7 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                                         <div
                                             key={idx}
                                             onClick={() => handleLibrarySelect(filename)}
-                                            style={{ aspectRatio: '3/4' }}
-                                            className={`rounded-md overflow-hidden border transition-all cursor-pointer relative group bg-black/20 min-h-[100px] ${isSelected ? 'border-emerald-500 ring-1 ring-emerald-500/30' : 'border-white/5 hover:border-white/30'}`}
+                                            className={`aspect-[3/4] rounded-md overflow-hidden border transition-all cursor-pointer relative group bg-black/20 ${isSelected ? 'border-emerald-500 ring-1 ring-emerald-500/30' : 'border-white/5 hover:border-white/30'}`}
                                         >
                                             <img
                                                 src={`/GenReference/${filename}`}
