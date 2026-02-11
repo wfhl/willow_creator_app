@@ -1,6 +1,6 @@
 
 const DB_NAME = 'willow_creator_db';
-const DB_VERSION = 4; // Bumped for folders and improved assets
+const DB_VERSION = 5; // Bumped for generation_history store
 
 export interface DBFolder {
     id: string;
@@ -53,6 +53,30 @@ export interface DBPromptPreset {
     timestamp: number;
 }
 
+export interface DBGenerationHistory {
+    id: string;
+    timestamp: number;
+    type: 'image' | 'video';
+    prompt: string;
+    model: string;
+    mediaUrls: string[];
+    aspectRatio?: string;
+    imageSize?: string;
+    numImages?: number;
+    videoResolution?: string;
+    videoDuration?: string;
+    withAudio?: boolean;
+    cameraFixed?: boolean;
+    themeId?: string;
+    themeName?: string;
+    topic?: string;
+    visuals?: string;
+    outfit?: string;
+    service: 'gemini' | 'fal';
+    status: 'success' | 'failed';
+    errorMessage?: string;
+}
+
 export interface DBConfig {
     id: string; // e.g. 'themes', 'caption_styles'
     data: any;
@@ -101,6 +125,12 @@ const openDB = (): Promise<IDBDatabase> => {
             }
             if (!db.objectStoreNames.contains('configs')) {
                 db.createObjectStore('configs', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('generation_history')) {
+                const historyStore = db.createObjectStore('generation_history', { keyPath: 'id' });
+                historyStore.createIndex('timestamp', 'timestamp', { unique: false });
+                historyStore.createIndex('type', 'type', { unique: false });
+                historyStore.createIndex('model', 'model', { unique: false });
             }
         };
     });
@@ -388,6 +418,73 @@ export const dbService = {
                 request.onsuccess = () => resolve(request.result);
                 request.onerror = () => reject(request.error);
             }
+        });
+    },
+
+    // --- GENERATION HISTORY ---
+    async saveGenerationHistory(entry: DBGenerationHistory): Promise<void> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('generation_history', 'readwrite');
+            const store = transaction.objectStore('generation_history');
+            const request = store.put(entry);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async getAllGenerationHistory(sortOrder: 'prev' | 'next' = 'prev'): Promise<DBGenerationHistory[]> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('generation_history', 'readonly');
+            const store = transaction.objectStore('generation_history');
+            const index = store.index('timestamp');
+            const items: DBGenerationHistory[] = [];
+            const request = index.openCursor(null, sortOrder);
+
+            request.onsuccess = (event) => {
+                const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+                if (!cursor) {
+                    resolve(items);
+                    return;
+                }
+                items.push(cursor.value);
+                cursor.continue();
+            };
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async deleteGenerationHistory(id: string): Promise<void> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('generation_history', 'readwrite');
+            const store = transaction.objectStore('generation_history');
+            const request = store.delete(id);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async clearAllGenerationHistory(): Promise<void> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('generation_history', 'readwrite');
+            const store = transaction.objectStore('generation_history');
+            const request = store.clear();
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async getGenerationHistoryCount(): Promise<number> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('generation_history', 'readonly');
+            const store = transaction.objectStore('generation_history');
+            const request = store.count();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
         });
     }
 };

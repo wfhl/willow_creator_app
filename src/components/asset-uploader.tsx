@@ -21,21 +21,46 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [viewMode, setViewMode] = useState<'upload' | 'library'>('upload');
     const [libraryImages, setLibraryImages] = useState<string[]>([]);
+
     const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
+    const [visibleLimit, setVisibleLimit] = useState(24);
+    const loadMoreRef = useRef<HTMLDivElement>(null);
+
+    // Infinite Scroll Observer
+    React.useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && visibleLimit < libraryImages.length) {
+                    setVisibleLimit((prev) => Math.min(prev + 24, libraryImages.length));
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (loadMoreRef.current) {
+            observer.observe(loadMoreRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, [visibleLimit, libraryImages.length, viewMode]);
 
     // Fetch library content when switching to library view
     React.useEffect(() => {
-        if (viewMode === 'library' && libraryImages.length === 0) {
-            setIsLoadingLibrary(true);
-            fetch('/gen-reference-manifest.json')
-                .then(res => res.json())
-                .then((files: string[]) => {
-                    // Filter for images only just in case
-                    const images = files.filter(f => /\.(jpg|jpeg|png|webp|gif)$/i.test(f));
-                    setLibraryImages(images);
-                })
-                .catch(err => console.error("Failed to load library manifest:", err))
-                .finally(() => setIsLoadingLibrary(false));
+        if (viewMode === 'library') {
+            if (libraryImages.length === 0) {
+                setIsLoadingLibrary(true);
+                fetch('/gen-reference-manifest.json')
+                    .then(res => res.json())
+                    .then((files: string[]) => {
+                        // Filter for images only just in case
+                        const images = files.filter(f => /\.(jpg|jpeg|png|webp|gif)$/i.test(f));
+                        setLibraryImages(images);
+                    })
+                    .catch(err => console.error("Failed to load library manifest:", err))
+                    .finally(() => setIsLoadingLibrary(false));
+            }
+            // Reset limit when opening library
+            setVisibleLimit(24);
         }
     }, [viewMode, libraryImages.length]);
 
@@ -158,30 +183,42 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                     {isLoadingLibrary ? (
                         <div className="p-8 text-center text-white/30 text-xs">Loading archives...</div>
                     ) : (
-                        <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 max-h-[300px] overflow-y-auto custom-scrollbar p-1">
-                            {libraryImages.map((filename, idx) => (
-                                <div
-                                    key={idx}
-                                    onClick={() => handleLibrarySelect(filename)}
-                                    className="aspect-[3/4] rounded-md overflow-hidden border border-white/5 cursor-pointer relative group hover:border-white/30 transition-all bg-black/20"
-                                >
-                                    <img
-                                        src={`/GenReference/${filename}`}
-                                        alt={filename}
-                                        loading="lazy"
-                                        className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
-                                    />
-                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
-                                        <div className="bg-white/10 backdrop-blur-md rounded-full p-1">
-                                            <Upload className="w-3 h-3 text-white" />
+                        <>
+                            <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 max-h-[300px] overflow-y-auto custom-scrollbar p-1">
+                                {libraryImages.slice(0, visibleLimit).map((filename, idx) => (
+                                    <div
+                                        key={idx}
+                                        onClick={() => handleLibrarySelect(filename)}
+                                        className="aspect-[3/4] rounded-md overflow-hidden border border-white/5 cursor-pointer relative group hover:border-white/30 transition-all bg-black/20"
+                                    >
+                                        <img
+                                            src={`/GenReference/${filename}`}
+                                            alt={filename}
+                                            loading="lazy"
+                                            className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
+                                        />
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
+                                            <div className="bg-white/10 backdrop-blur-md rounded-full p-1">
+                                                <Upload className="w-3 h-3 text-white" />
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                                {/* Sentinel for Infinite Scroll */}
+                                {visibleLimit < libraryImages.length && (
+                                    <div
+                                        ref={loadMoreRef}
+                                        className="col-span-full h-10 flex items-center justify-center text-[10px] text-white/30 uppercase tracking-widest animate-pulse"
+                                    >
+                                        Loading more...
+                                    </div>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 }

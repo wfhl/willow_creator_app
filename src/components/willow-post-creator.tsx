@@ -4,7 +4,7 @@ import { geminiService } from '../lib/geminiService';
 import type { GenerationRequest } from '../lib/geminiService';
 import { falService, type FalGenerationRequest } from '../lib/falService';
 import { dbService } from '../lib/dbService';
-import type { DBAsset as Asset, DBSavedPost as SavedPost, DBPromptPreset } from '../lib/dbService';
+import type { DBAsset as Asset, DBSavedPost as SavedPost, DBPromptPreset, DBGenerationHistory } from '../lib/dbService';
 import { WILLOW_PROFILE, WILLOW_THEMES, CAPTION_TEMPLATES } from './willow-presets';
 
 // Component Imports
@@ -201,6 +201,24 @@ export default function WillowPostCreator() {
 
     // --- LOGIC HANDLERS ---
 
+    // Keyboard Navigation for Preview Carousel
+    useEffect(() => {
+        if (!previewContext) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowLeft') {
+                setPreviewContext(prev => prev ? { ...prev, index: (prev.index - 1 + prev.urls.length) % prev.urls.length } : null);
+            } else if (e.key === 'ArrowRight') {
+                setPreviewContext(prev => prev ? { ...prev, index: (prev.index + 1) % prev.urls.length } : null);
+            } else if (e.key === 'Escape') {
+                setPreviewContext(null);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [previewContext]);
+
     const constructPrompt = () => {
         let prompt = `SUBJECT: ${WILLOW_PROFILE.subject} `;
 
@@ -304,6 +322,12 @@ export default function WillowPostCreator() {
         setIsGeneratingMedia(true);
         setGeneratedMediaUrls([]);
 
+        // Determine service type early for history tracking
+        const isFalModel = selectedModel.includes('grok') || selectedModel.includes('seedream') || selectedModel.includes('seedance') || selectedModel.includes('wan');
+        let generationSucceeded = false;
+        let generationError = '';
+        let resultUrls: string[] = [];
+
         try {
             const selectedImages = assets.filter(a => a.selected && a.type === 'image');
             let finalPrompt = finalPromptToUse;
@@ -318,9 +342,6 @@ export default function WillowPostCreator() {
                     });
                 });
             }
-
-            // Determine Service
-            const isFalModel = selectedModel.includes('grok') || selectedModel.includes('seedream') || selectedModel.includes('seedance') || selectedModel.includes('wan');
 
             if (isFalModel) {
                 const request: FalGenerationRequest = {
@@ -342,28 +363,22 @@ export default function WillowPostCreator() {
                     }
                 };
 
-                // For Fal, we generally get one result unless using text-to-image with batch
-                // FalService currently returns a single string URL usually.
-                // If we need multiple images (text-to-image), falService might need adjustment or we loop here.
-                // Current falService helper returns single URL.
-                // For Text-to-Image with numImages > 1, we might need to loop or update service.
-                // For now, let's assume single generation or loop if needed.
-
                 if (mediaType === 'image' && createNumImages > 1 && !selectedModel.includes('edit')) {
                     const taskIndexes = Array.from({ length: createNumImages }, (_, i) => i);
                     const promises = taskIndexes.map(async (i) => {
-                        if (i > 0) await new Promise(r => setTimeout(r, i * 500)); // Stagger
+                        if (i > 0) await new Promise(r => setTimeout(r, i * 500));
                         return falService.generateMedia(request);
                     });
                     const results = await Promise.all(promises);
                     setGeneratedMediaUrls(results);
+                    resultUrls = results;
                 } else {
                     const url = await falService.generateMedia(request);
                     setGeneratedMediaUrls([url]);
+                    resultUrls = [url];
                 }
 
             } else {
-                // Gemini / Veo
                 const request: GenerationRequest = {
                     type: mediaType,
                     prompt: finalPrompt,
@@ -383,29 +398,68 @@ export default function WillowPostCreator() {
 
                 if (mediaType === 'image') {
                     const taskIndexes = Array.from({ length: createNumImages }, (_, i) => i);
+                    const collectedUrls: string[] = [];
                     const imagePromises = taskIndexes.map(async (i) => {
                         try {
                             if (i > 0) await new Promise(r => setTimeout(r, i * 2000));
                             const url = await geminiService.generateMedia(request);
                             if (url) {
                                 setGeneratedMediaUrls(prev => [...prev, url]);
+                                collectedUrls.push(url);
                                 return url;
                             }
                         } catch (e) { console.error(e); }
                         return null;
                     });
                     await Promise.all(imagePromises);
+                    resultUrls = collectedUrls;
                 } else {
                     const result = await geminiService.generateMedia(request);
-                    if (result) setGeneratedMediaUrls([result]);
+                    if (result) {
+                        setGeneratedMediaUrls([result]);
+                        resultUrls = [result];
+                    }
                 }
             }
 
-        } catch (error) {
+            generationSucceeded = resultUrls.length > 0;
+
+        } catch (error: any) {
             console.error(error);
+            generationError = error?.message || 'Unknown error';
             alert("Media generation failed.");
         } finally {
             setIsGeneratingMedia(false);
+
+            // --- Save to Generation History ---
+            try {
+                const historyEntry: DBGenerationHistory = {
+                    id: crypto.randomUUID(),
+                    timestamp: Date.now(),
+                    type: mediaType,
+                    prompt: finalPromptToUse,
+                    model: selectedModel,
+                    mediaUrls: resultUrls,
+                    aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
+                    imageSize: createImageSize,
+                    numImages: createNumImages,
+                    videoResolution: mediaType === 'video' ? videoResolution : undefined,
+                    videoDuration: mediaType === 'video' ? videoDuration : undefined,
+                    withAudio: mediaType === 'video' ? withAudio : undefined,
+                    cameraFixed: mediaType === 'video' ? cameraFixed : undefined,
+                    themeId: selectedThemeId,
+                    themeName: currentTheme?.name,
+                    topic: topic || undefined,
+                    visuals: specificVisuals || undefined,
+                    outfit: specificOutfit || undefined,
+                    service: isFalModel ? 'fal' : 'gemini',
+                    status: generationSucceeded ? 'success' : 'failed',
+                    errorMessage: generationError || undefined,
+                };
+                await dbService.saveGenerationHistory(historyEntry);
+            } catch (histErr) {
+                console.error('Failed to save generation history:', histErr);
+            }
         }
     };
 
@@ -1098,7 +1152,22 @@ export default function WillowPostCreator() {
                                     url = await geminiService.generateMedia(req);
                                 }
 
-                                if (url) setRefineResultUrl(url);
+                                if (url) {
+                                    setRefineResultUrl(url);
+                                    // Save to History
+                                    try {
+                                        await dbService.saveGenerationHistory({
+                                            id: crypto.randomUUID(),
+                                            timestamp: Date.now(),
+                                            type: 'image',
+                                            prompt: refinePrompt,
+                                            model: selectedModel,
+                                            mediaUrls: [url],
+                                            service: (selectedModel.includes('grok') || selectedModel.includes('seedream')) ? 'fal' : 'gemini',
+                                            status: 'success'
+                                        });
+                                    } catch (err) { console.error("Failed to save history:", err); }
+                                }
                             } catch (e) { console.error(e); alert("Refinement failed"); } finally { setIsRefining(false); }
                         }}
                         onApproveRefinement={handleApproveRefinement}
@@ -1197,7 +1266,22 @@ export default function WillowPostCreator() {
                                     url = await geminiService.generateMedia(req);
                                 }
 
-                                if (url) setI2VResultUrl(url);
+                                if (url) {
+                                    setI2VResultUrl(url);
+                                    // Save to History
+                                    try {
+                                        await dbService.saveGenerationHistory({
+                                            id: crypto.randomUUID(),
+                                            timestamp: Date.now(),
+                                            type: 'video',
+                                            prompt: i2vPrompt,
+                                            model: selectedModel,
+                                            mediaUrls: [url],
+                                            service: (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) ? 'fal' : 'gemini',
+                                            status: 'success'
+                                        });
+                                    } catch (err) { console.error("Failed to save history:", err); }
+                                }
                             } catch (e: any) { console.error(e); alert(`Video gen failed: ${e.message || e}`); } finally { setIsGeneratingI2V(false); }
                         }}
                         generatedI2VUrl={i2vResultUrl}
