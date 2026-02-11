@@ -85,11 +85,16 @@ export function AnimateTab({
             } else if (selectedModel.includes('seedance')) {
                 // Seedance supports 4-12s, allow standard fallback
             } else if (selectedModel.includes('wan')) {
-                // Wan 2.5: 5, 10. Wan 2.6: 5, 10, 15.
-                if (!['5s', '10s', '15s'].includes(videoDuration)) setVideoDuration('5s');
-                if (selectedModel.includes('wan-25') && videoDuration === '15s') setVideoDuration('10s');
-                // Wan 2.6 Flash only supports 720p, 1080p
-                if (selectedModel.includes('flash') && videoResolution === '480p') setVideoResolution('720p');
+                // Wan 2.2: 5s, 10s. Wan 2.5: 5, 10. Wan 2.6: 5, 10, 15.
+                if (selectedModel.includes('v2.2')) {
+                    if (!['5s', '10s'].includes(videoDuration)) setVideoDuration('5s');
+                    if (videoResolution !== '720p' && videoResolution !== '480p') setVideoResolution('720p');
+                } else {
+                    if (!['5s', '10s', '15s'].includes(videoDuration)) setVideoDuration('5s');
+                    if (selectedModel.includes('wan-25') && videoDuration === '15s') setVideoDuration('10s');
+                    // Wan 2.6 Flash only supports 720p, 1080p
+                    if (selectedModel.includes('flash') && videoResolution === '480p') setVideoResolution('720p');
+                }
             }
         }
     }, [selectedModel, videoDuration, videoResolution, setSelectedModel, setVideoDuration, setVideoResolution]);
@@ -198,7 +203,17 @@ export function AnimateTab({
                                 className="w-full h-full object-cover cursor-zoom-in"
                                 onClick={() => onPreview(i2vTarget.url)}
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4 pointer-events-none">
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-end justify-between p-4 pointer-events-none">
+                                <label className="pointer-events-auto cursor-pointer bg-white/10 hover:bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2 transition-all shadow-lg">
+                                    <ImagePlus className="w-4 h-4 text-emerald-400" />
+                                    <span className="text-[10px] text-white font-bold uppercase tracking-widest">Replace</span>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handleI2VImageUpload}
+                                    />
+                                </label>
                                 <p className="text-[10px] text-white/60 uppercase tracking-widest font-bold">Source Reference</p>
                             </div>
                         </div>
@@ -252,6 +267,7 @@ export function AnimateTab({
                                                 <option value="fal-ai/bytedance/seedance/v1.5/pro/image-to-video">Seedance 1.5 Pro</option>
                                                 <option value="fal-ai/wan-25-preview/image-to-video">Wan 2.5 I2V Preview</option>
                                                 <option value="wan/v2.6/image-to-video/flash">Wan 2.6 Flash I2V</option>
+                                                <option value="fal-ai/wan/v2.2-a14b/image-to-video/lora">Wan 2.2 I2V (LoRA Support)</option>
                                                 <option value="veo-3.1-generate-preview">Veo 3.1 (Google)</option>
                                                 <option value="veo-2.0-generate-001">Veo 2.0 (Google Legacy)</option>
                                             </select>
@@ -326,6 +342,7 @@ export function AnimateTab({
                                                         <option value="5s">5 Seconds</option>
                                                         <option value="10s">10 Seconds</option>
                                                         {selectedModel.includes('2.6') && <option value="15s">15 Seconds</option>}
+                                                        {selectedModel.includes('v2.2') && <option value="10s">10 Seconds (Max)</option>}
                                                     </>
                                                 ) : selectedModel.includes('veo-3') ? (
                                                     videoResolution === '1080p' ? (

@@ -173,7 +173,17 @@ export function EditTab({
                                 className="w-full h-full object-cover cursor-zoom-in"
                                 onClick={() => onPreview(refineTarget.url)}
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4 pointer-events-none">
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-end justify-between p-4 pointer-events-none">
+                                <label className="pointer-events-auto cursor-pointer bg-white/10 hover:bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2 transition-all shadow-lg">
+                                    <ImagePlus className="w-4 h-4 text-emerald-400" />
+                                    <span className="text-[10px] text-white font-bold uppercase tracking-widest">Replace</span>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handleRefineImageUpload}
+                                    />
+                                </label>
                                 <p className="text-[10px] text-white/60 uppercase tracking-widest font-bold">Source Reference</p>
                             </div>
                         </div>

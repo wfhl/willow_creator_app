@@ -155,6 +155,31 @@ export const falService = {
                     enable_safety_checker: request.editConfig?.enableSafety ?? true
                 };
 
+                // --- WAN 2.2 IMAGE-TO-VIDEO ---
+            } else if (request.model.includes('wan/v2.2-a14b/image-to-video/lora')) {
+                endpoint = "fal-ai/wan/v2.2-a14b/image-to-video/lora";
+                // Wan 2.2: frames_per_second (4-60), num_frames (17-161). Default 81 frames / 16 fps ~= 5s.
+                // We map duration "5s", "10s" to appropriate frames if possible, or stick to defaults.
+                // Assuming 16 FPS: 5s = 80 frames, 10s = 160 frames.
+                const durationStr = request.videoConfig?.durationSeconds?.replace('s', '') || "5";
+                const fps = 16;
+                let numFrames = 81;
+                if (durationStr === "10") numFrames = 160; // Max is 161
+                if (durationStr === "15") numFrames = 161; // Cap at max
+
+                input = {
+                    prompt: request.prompt,
+                    image_url: primaryImageUrl,
+                    // Wan 2.2 supports 480p, 580p, 720p
+                    resolution: request.videoConfig?.resolution === "1080p" ? "720p" : (request.videoConfig?.resolution || "720p"),
+                    aspect_ratio: request.aspectRatio || "auto",
+                    num_frames: numFrames,
+                    frames_per_second: fps,
+                    enable_safety_checker: request.editConfig?.enableSafety ?? true
+                    // loras: [] // Optional
+                };
+
+
             } else {
                 throw new Error(`Unsupported Fal model: ${request.model}`);
             }
