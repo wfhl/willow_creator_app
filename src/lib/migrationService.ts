@@ -1,6 +1,7 @@
 
 import { supabase } from './supabaseClient';
 import { dbService } from './dbService';
+import { generateUUID } from './uuid';
 import type { Theme, CaptionStyle } from '../components/tabs/SettingsTab';
 
 export const migrationService = {
@@ -22,7 +23,7 @@ export const migrationService = {
                 const fetchRes = await fetch(url);
                 const blob = await fetchRes.blob();
                 const ext = type === 'video' ? 'mp4' : 'png';
-                const filePath = `${userId}/${crypto.randomUUID()}.${ext}`;
+                const filePath = `${userId}/${generateUUID()}.${ext}`;
 
                 const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, blob, {
                     contentType: type === 'video' ? 'video/mp4' : 'image/png',

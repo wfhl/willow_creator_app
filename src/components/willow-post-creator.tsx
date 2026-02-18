@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Edit2, Play, PenTool, Archive, Folder } from 'lucide-react';
+import { generateUUID } from '../lib/uuid';
 import { geminiService } from '../lib/geminiService';
 import type { GenerationRequest } from '../lib/geminiService';
 import { falService, type FalGenerationRequest } from '../lib/falService';
@@ -471,7 +472,7 @@ export default function WillowPostCreator() {
             // --- Save to Generation History ---
             try {
                 const historyEntry: DBGenerationHistory = {
-                    id: crypto.randomUUID(),
+                    id: generateUUID(),
                     timestamp: Date.now(),
                     type: mediaType,
                     prompt: finalPromptToUse,
@@ -617,7 +618,7 @@ export default function WillowPostCreator() {
         if (!name) name = `Preset ${new Date().toLocaleTimeString()}`;
 
         const preset: DBPromptPreset = {
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             name: name,
             description: description,
             basePrompt: promptToSave,
@@ -790,7 +791,7 @@ export default function WillowPostCreator() {
             }
 
             const newAsset: Asset = {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 name: name || `Saved ${type} ${new Date().toLocaleString()}`,
                 type: type, // Keep as 'image' or 'video' for general library
                 base64: base64,

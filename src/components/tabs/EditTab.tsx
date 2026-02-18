@@ -2,6 +2,7 @@ import React, { useState, type ChangeEvent } from 'react';
 import { Sparkles, Edit2, ImagePlus, X, RefreshCw, Download, Video as VideoIcon, Save } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
 import type { DBAsset as Asset } from '../../lib/dbService';
+import { generateUUID } from '../../lib/uuid';
 
 interface EditTabProps {
     refineTarget: { url: string, index: number } | null;
@@ -223,7 +224,7 @@ export function EditTab({
                                                             reader.readAsDataURL(file);
                                                         });
                                                         newAssets.push({
-                                                            id: crypto.randomUUID(),
+                                                            id: generateUUID(),
                                                             name: file.name,
                                                             base64,
                                                             type: 'image',

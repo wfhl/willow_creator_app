@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Settings, Plus, Trash2, Save, X, ChevronDown, ChevronUp, Cloud, Database } from 'lucide-react';
 import { migrationService } from '../../lib/migrationService';
+import { generateUUID } from '../../lib/uuid';
 
 export interface Theme {
     id: string;
@@ -42,7 +43,7 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
     const handleSaveTheme = () => {
         if (!tempTheme) return;
         if (editingThemeId === 'new') {
-            setThemes([...themes, { ...tempTheme, id: crypto.randomUUID() }]);
+            setThemes([...themes, { ...tempTheme, id: generateUUID() }]);
         } else {
             setThemes(themes.map(t => t.id === tempTheme.id ? tempTheme : t));
         }
@@ -59,7 +60,7 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
     const handleSaveStyle = () => {
         if (!tempStyle) return;
         if (editingStyleId === 'new') {
-            setCaptionStyles([...captionStyles, { ...tempStyle, id: crypto.randomUUID() }]);
+            setCaptionStyles([...captionStyles, { ...tempStyle, id: generateUUID() }]);
         } else {
             setCaptionStyles(captionStyles.map(s => s.id === tempStyle.id ? tempStyle : s));
         }

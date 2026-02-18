@@ -21,6 +21,7 @@ import {
     History
 } from 'lucide-react';
 import { dbService } from '../../lib/dbService';
+import { generateUUID } from '../../lib/uuid';
 import type { DBAsset, DBFolder, DBGenerationHistory } from '../../lib/dbService'; // Updated import
 
 interface AssetLibraryTabProps {
@@ -105,7 +106,7 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
             await dbService.saveFolder(updated);
         } else {
             const newFolder: DBFolder = {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 name: newFolderName.trim(),
                 parentId: currentFolderId,
                 timestamp: Date.now(),
@@ -197,7 +198,7 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
             reader.onload = async (event) => {
                 const base64 = event.target?.result as string;
                 const newAsset: DBAsset = {
-                    id: crypto.randomUUID(),
+                    id: generateUUID(),
                     name: file.name,
                     type: file.type.startsWith('video') ? 'video' : 'image',
                     base64,

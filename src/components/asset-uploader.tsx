@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Upload, X, Check, Image as ImageIcon, Trash2, Plus } from 'lucide-react';
 import { dbService, type DBAsset } from '../lib/dbService';
+import { generateUUID } from '../lib/uuid';
 
 interface Asset {
     id: string;
@@ -50,7 +51,7 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                     if (ev.target?.result) {
                         const base64 = ev.target.result as string;
                         const newAsset: DBAsset = {
-                            id: crypto.randomUUID(),
+                            id: generateUUID(),
                             name: file.name,
                             type: 'face_reference',
                             base64: base64,
