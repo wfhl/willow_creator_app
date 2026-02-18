@@ -81,7 +81,16 @@ export const syncService = {
             if (!existsLocally) {
                 console.log(`[Sync] Pulling cloud-only ${store}: ${cloud.id}`);
                 const mapped = this.mapFromCloud(store, cloud);
-                if (store === 'assets') await dbService.saveAsset(mapped);
+
+                if (store === 'assets') {
+                    // Start download
+                    try {
+                        const dlAsset = await this.downloadAssetFromStorage(mapped);
+                        await dbService.saveAsset(dlAsset);
+                    } catch (e) {
+                        console.error(`[Sync] Failed to download asset ${cloud.id}`, e);
+                    }
+                }
                 else if (store === 'posts') await dbService.savePost(mapped);
                 else if (store === 'presets') await dbService.savePreset(mapped);
                 else if (store === 'folders') await dbService.saveFolder(mapped);
@@ -94,14 +103,85 @@ export const syncService = {
         if (!this.user) return;
         const table = store === 'generation_history' ? 'generation_history' : store;
 
-        const payload = this.mapToCloud(store, data);
+        let payload = this.mapToCloud(store, data);
         payload.user_id = this.user.id;
+
+        if (store === 'assets') {
+            // Special handling for assets: Upload to Storage first
+            if (data.base64) {
+                try {
+                    const { publicUrl, storagePath } = await this.uploadAssetToStorage(data);
+                    payload.public_url = publicUrl;
+                    payload.storage_path = storagePath;
+                    payload.width = 0; // potentially extract from img?
+                    payload.height = 0;
+                    // Remove base64 from payload to DB
+                    delete payload.base64;
+                } catch (e) {
+                    console.error("Failed to upload asset to storage", e);
+                    throw e;
+                }
+            } else {
+                console.warn("Asset missing base64, skipping upload", data.id);
+                // If cloud has it, we just update metadata.
+                delete payload.base64;
+            }
+        }
 
         const { error } = await supabase
             .from(table)
             .upsert(payload, { onConflict: 'id' });
 
         if (error) throw error;
+    },
+
+    // --- ASSET STORAGE HELPERS ---
+
+    async uploadAssetToStorage(asset: any): Promise<{ publicUrl: string, storagePath: string }> {
+        const fileExt = asset.type === 'video' ? 'mp4' : 'jpeg'; // simple guess
+        const fileName = `${this.user!.id}/${asset.id}.${fileExt}`;
+
+        // Convert base64 to Blob
+        const base64Response = await fetch(asset.base64);
+        const blob = await base64Response.blob();
+
+        const { error: uploadError } = await supabase.storage
+            .from('user-library')
+            .upload(fileName, blob, {
+                contentType: asset.type === 'video' ? 'video/mp4' : 'image/jpeg',
+                upsert: true
+            });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('user-library')
+            .getPublicUrl(fileName);
+
+        return { publicUrl, storagePath: fileName };
+    },
+
+    async downloadAssetFromStorage(assetFromCloud: any): Promise<any> {
+        const url = assetFromCloud.publicUrl || assetFromCloud.public_url;
+        if (!url) throw new Error("No public URL for asset");
+
+        // Fetch blob
+        const response = await fetch(url);
+        const blob = await response.blob();
+
+        // Convert to base64
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64 = reader.result as string;
+                resolve({
+                    ...assetFromCloud,
+                    base64: base64
+                });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
     },
 
     async removeFromCloud(store: DBStore, id: string) {
@@ -134,11 +214,72 @@ export const syncService = {
         if (data.timestamp !== undefined) {
             mapped.timestamp = new Date(data.timestamp).toISOString();
         }
+        // New mappings
+        if (data.color !== undefined) mapped.color = data.color;
+        if (data.icon !== undefined) mapped.icon = data.icon;
+        if (data.tab !== undefined) mapped.tab = data.tab;
+
+        if (data.withAudio !== undefined) {
+            mapped.with_audio = data.withAudio;
+            delete mapped.withAudio;
+        }
+        if (data.cameraFixed !== undefined) {
+            mapped.camera_fixed = data.cameraFixed;
+            delete mapped.cameraFixed;
+        }
+
+        if (data.mediaUrls !== undefined) {
+            mapped.media_urls = data.mediaUrls;
+            delete mapped.mediaUrls;
+        }
+        if (data.mediaType !== undefined) {
+            mapped.media_type = data.mediaType;
+            delete mapped.mediaType;
+        }
+        if (data.themeId !== undefined) {
+            mapped.theme_id = data.themeId;
+            delete mapped.themeId;
+        }
         if (data.captionType !== undefined) {
             mapped.caption_type = data.captionType;
             delete mapped.captionType;
         }
-        // ... add more as needed based on schema.sql
+        if (data.videoResolution !== undefined) {
+            mapped.video_resolution = data.videoResolution;
+            delete mapped.videoResolution;
+        }
+        if (data.videoDuration !== undefined) {
+            mapped.video_duration = data.videoDuration;
+            delete mapped.videoDuration;
+        }
+        if (data.imageSize !== undefined) {
+            mapped.image_size = data.imageSize;
+            delete mapped.imageSize;
+        }
+        if (data.numImages !== undefined) {
+            mapped.num_images = data.numImages;
+            delete mapped.numImages;
+        }
+        if (data.errorMessage !== undefined) {
+            mapped.error_message = data.errorMessage;
+            delete mapped.errorMessage;
+        }
+        if (data.themeName !== undefined) {
+            mapped.theme_name = data.themeName;
+            delete mapped.themeName;
+        }
+        if (data.basePrompt !== undefined) {
+            mapped.base_prompt = data.basePrompt;
+            delete mapped.basePrompt;
+        }
+        if (data.negativePrompt !== undefined) {
+            mapped.negative_prompt = data.negativePrompt;
+            delete mapped.negativePrompt;
+        }
+        if (data.aspectRatio !== undefined) {
+            mapped.aspect_ratio = data.aspectRatio;
+            delete mapped.aspectRatio;
+        }
 
         return mapped;
     },
@@ -158,11 +299,81 @@ export const syncService = {
         if (data.timestamp !== undefined) {
             mapped.timestamp = new Date(data.timestamp).getTime();
         }
+
+        // New mappings
+        if (data.public_url !== undefined) {
+            mapped.publicUrl = data.public_url;
+            delete mapped.public_url;
+        }
+        if (data.storage_path !== undefined) {
+            mapped.storagePath = data.storage_path;
+            delete mapped.storage_path;
+        }
+        if (data.color !== undefined) mapped.color = data.color;
+        if (data.icon !== undefined) mapped.icon = data.icon;
+        if (data.tab !== undefined) mapped.tab = data.tab;
+
+        if (data.with_audio !== undefined) {
+            mapped.withAudio = data.with_audio;
+            delete mapped.with_audio;
+        }
+        if (data.camera_fixed !== undefined) {
+            mapped.cameraFixed = data.camera_fixed;
+            delete mapped.camera_fixed;
+        }
+
+        if (data.media_urls !== undefined) {
+            mapped.mediaUrls = data.media_urls;
+            delete mapped.media_urls;
+        }
+        if (data.media_type !== undefined) {
+            mapped.mediaType = data.media_type;
+            delete mapped.media_type;
+        }
+        if (data.theme_id !== undefined) {
+            mapped.themeId = data.theme_id;
+            delete mapped.theme_id;
+        }
         if (data.caption_type !== undefined) {
             mapped.captionType = data.caption_type;
             delete mapped.caption_type;
         }
-        // ... add more as needed
+        if (data.video_resolution !== undefined) {
+            mapped.videoResolution = data.video_resolution;
+            delete mapped.video_resolution;
+        }
+        if (data.video_duration !== undefined) {
+            mapped.videoDuration = data.video_duration;
+            delete mapped.video_duration;
+        }
+        if (data.image_size !== undefined) {
+            mapped.imageSize = data.image_size;
+            delete mapped.image_size;
+        }
+        if (data.num_images !== undefined) {
+            mapped.numImages = data.num_images;
+            delete mapped.num_images;
+        }
+        if (data.error_message !== undefined) {
+            mapped.errorMessage = data.error_message;
+            delete mapped.error_message;
+        }
+        if (data.theme_name !== undefined) {
+            mapped.themeName = data.theme_name;
+            delete mapped.theme_name;
+        }
+        if (data.base_prompt !== undefined) {
+            mapped.basePrompt = data.base_prompt;
+            delete mapped.base_prompt;
+        }
+        if (data.negative_prompt !== undefined) {
+            mapped.negativePrompt = data.negative_prompt;
+            delete mapped.negative_prompt;
+        }
+        if (data.aspect_ratio !== undefined) {
+            mapped.aspectRatio = data.aspect_ratio;
+            delete mapped.aspect_ratio;
+        }
 
         delete mapped.user_id; // Don't store user_id locally
         return mapped;

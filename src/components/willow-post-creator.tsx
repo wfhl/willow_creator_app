@@ -893,7 +893,7 @@ export default function WillowPostCreator() {
                 savedCount={totalSavedCount}
             />
 
-            <div className="flex-1 overflow-y-auto pt-16 md:pt-20 pb-24 md:pb-10 scroll-smooth">
+            <div className="flex-1 overflow-y-auto pt-16 md:pt-20 pb-32 md:pb-10 scroll-smooth">
                 {activeTab === 'create' && (
                     <CreateTab
                         themes={themes}

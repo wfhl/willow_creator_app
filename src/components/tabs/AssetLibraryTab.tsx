@@ -409,7 +409,7 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
                                             {folder.name}
                                         </span>
 
-                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); openEditFolder(folder); }}
                                                 className="p-1.5 hover:bg-white/10 text-white/40 hover:text-white rounded-lg transition-all"
@@ -469,11 +469,11 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
                                             )}
 
                                             {/* Overlay controls */}
-                                            <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                                 <p className="text-[9px] text-white/90 truncate font-mono">{asset.name}</p>
                                             </div>
 
-                                            <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                                            <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all translate-x-0 md:translate-x-4 md:group-hover:translate-x-0">
                                                 <button
                                                     onClick={() => handleDeleteAsset(asset.id)}
                                                     className="p-2 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-xl backdrop-blur-md transition-all shadow-lg"

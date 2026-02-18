@@ -307,14 +307,14 @@ Total Media Items: ${post.mediaUrls.length}
                                         <>
                                             <button
                                                 onClick={handleCarouselPrev(post.id, currentIndex, mediaUrls.length)}
-                                                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 text-white rounded-full hover:bg-black/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                                                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 text-white rounded-full hover:bg-black/80 backdrop-blur-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                                                 title="Previous"
                                             >
                                                 <ChevronLeft className="w-4 h-4" />
                                             </button>
                                             <button
                                                 onClick={handleCarouselNext(post.id, currentIndex, mediaUrls.length)}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 text-white rounded-full hover:bg-black/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 text-white rounded-full hover:bg-black/80 backdrop-blur-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                                                 title="Next"
                                             >
                                                 <ChevronRight className="w-4 h-4" />
@@ -336,7 +336,7 @@ Total Media Items: ${post.mediaUrls.length}
                                         </>
                                     )}
 
-                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                    <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex gap-1">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();

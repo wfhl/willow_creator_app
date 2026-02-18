@@ -651,7 +651,7 @@ export function CreateTab({
                                                     onClick={() => onPreview(url)}
                                                 />
                                             )}
-                                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1">
+                                            <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1">
                                                 <button
                                                     onClick={() => handleRefineEntry(url, idx)}
                                                     className="p-1 hover:bg-white/20 rounded"
