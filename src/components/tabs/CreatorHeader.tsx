@@ -20,69 +20,69 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
 
     return (
         <>
-            <div className="fixed top-0 left-0 right-0 z-[60] bg-black/80 backdrop-blur-md border-b border-white/10 px-4 md:px-8 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-3 flex items-center justify-between">
+            <div className="fixed top-0 left-0 right-0 z-[100] bg-black/90 backdrop-blur-xl border-b border-white/5 px-3 md:px-6 pt-[calc(0.25rem+env(safe-area-inset-top))] pb-2 flex items-center justify-between h-14 md:h-16 shadow-lg shadow-black/50">
 
-                <div className="flex items-center gap-3 md:gap-4 shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
-                        <span className="font-serif font-bold text-black text-lg">W</span>
+                <div className="flex items-center gap-2 md:gap-3 shrink-0">
+                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/10 shrink-0 border border-white/10">
+                        <span className="font-serif font-bold text-black text-sm md:text-base">W</span>
                     </div>
-                    <div className="hidden sm:block">
-                        <h1 className="text-sm font-bold text-white tracking-widest uppercase truncate max-w-[120px] md:max-w-none">Willow Creator</h1>
-                        <p className="text-[10px] text-white/40 font-mono tracking-wider">STUDIO V2.1</p>
+                    <div className="hidden sm:block leading-tight">
+                        <h1 className="text-xs font-bold text-white tracking-widest uppercase truncate">Willow</h1>
+                        <p className="text-[8px] text-white/30 font-mono tracking-wider">STUDIO V2.2</p>
                     </div>
                 </div>
 
-                <nav className="hidden md:flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5 overflow-x-auto no-scrollbar mx-2 scroll-smooth">
+                <nav className="hidden md:flex items-center gap-0.5 bg-white/[0.03] p-0.5 rounded-lg border border-white/5 mx-4 overflow-hidden">
                     <button
                         onClick={() => setActiveTab('create')}
-                        className={`px-3 md:px-4 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all shrink-0 ${activeTab === 'create' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all ${activeTab === 'create' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
                             }`}
                     >
-                        <PenTool className="w-3 h-3" /> <span className="hidden md:inline">Create</span>
+                        <PenTool className="w-3 h-3" /> <span>Create</span>
                     </button>
 
                     <button
                         onClick={() => setActiveTab('edit')}
-                        className={`px-3 md:px-4 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all shrink-0 ${activeTab === 'edit' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all ${activeTab === 'edit' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
                             }`}
                     >
-                        <Edit2 className="w-3 h-3" /> <span className="hidden md:inline">Refine</span>
+                        <Edit2 className="w-3 h-3" /> <span>Refine</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('animate')}
-                        className={`px-3 md:px-4 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all shrink-0 ${activeTab === 'animate' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all ${activeTab === 'animate' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
                             }`}
                     >
-                        <Play className="w-3 h-3" /> <span className="hidden md:inline">Animate</span>
+                        <Play className="w-3 h-3" /> <span>Animate</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('scripts')}
-                        className={`px-3 md:px-4 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all shrink-0 ${activeTab === 'scripts' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all ${activeTab === 'scripts' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
                             }`}
                     >
-                        <Terminal className="w-3 h-3" /> <span className="hidden md:inline">Scripts</span>
+                        <Terminal className="w-3 h-3" /> <span>Scripts</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('settings')}
-                        className={`px-3 md:px-4 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all shrink-0 ${activeTab === 'settings' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all ${activeTab === 'settings' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
                             }`}
                     >
-                        <Settings className="w-3 h-3" /> <span className="hidden md:inline">Settings</span>
+                        <Settings className="w-3 h-3" /> <span>Settings</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('posts')}
-                        className={`px-3 md:px-4 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all shrink-0 ${activeTab === 'posts' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all ${activeTab === 'posts' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
                             }`}
                     >
-                        <Archive className="w-3 h-3" /> <span className="hidden md:inline">Posts</span>
-                        <span className="bg-white/10 px-1.5 py-0.5 rounded text-[9px] min-w-[18px] text-center">{savedCount}</span>
+                        <Archive className="w-3 h-3" /> <span>Posts</span>
+                        <span className="bg-white/10 px-1.5 py-0.5 rounded text-[9px] min-w-[16px] text-center ml-1">{savedCount}</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('assets')}
-                        className={`px-3 md:px-4 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all shrink-0 ${activeTab === 'assets' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-all ${activeTab === 'assets' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white hover:bg-white/5'
                             }`}
                     >
-                        <Folder className="w-3 h-3" /> <span className="hidden md:inline">Assets</span>
+                        <Folder className="w-3 h-3" /> <span>Assets</span>
                     </button>
                 </nav>
 
@@ -96,19 +96,19 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
 
                     {user ? (
                         <div className="flex items-center gap-2 md:gap-3">
-                            <div className="hidden lg:block text-right">
-                                <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Logged In</p>
-                                <p className="text-xs text-white truncate max-w-[150px]">{user.email}</p>
+                            <div className="hidden lg:block text-right leading-none">
+                                <p className="text-[8px] text-white/30 font-bold uppercase tracking-widest mb-0.5">Logged In</p>
+                                <p className="text-[10px] text-white truncate max-w-[120px]">{user.email}</p>
                             </div>
-                            <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-[10px] md:text-xs font-bold text-white shadow-lg border border-white/20">
+                            <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-[9px] md:text-[10px] font-bold text-white shadow-lg border border-white/20">
                                 {user.email?.[0].toUpperCase()}
                             </div>
                             <button
                                 onClick={signOut}
-                                className="p-1.5 md:p-2 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-colors"
+                                className="p-1.5 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-colors"
                                 title="Sign Out"
                             >
-                                <LogOut className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                                <LogOut className="w-3 h-3" />
                             </button>
                         </div>
                     ) : (
@@ -117,7 +117,7 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
                                 console.log("Login clicked");
                                 setShowLogin(true);
                             }}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-[11px] font-black uppercase tracking-widest rounded-full transition-all shadow-lg shadow-emerald-500/30 active:scale-90 touch-manipulation cursor-pointer border-2 border-emerald-400/50"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-black uppercase tracking-widest rounded-full transition-all shadow-lg shadow-emerald-500/30 active:scale-95 border border-emerald-400/50"
                         >
                             <UserIcon className="w-3 h-3" />
                             <span>Login</span>
