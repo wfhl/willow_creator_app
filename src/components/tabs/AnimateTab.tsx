@@ -2,6 +2,8 @@
 import React, { useEffect, useState, type ChangeEvent } from 'react';
 import { Video as VideoIcon, ImagePlus, X, RefreshCw, Play, Save, Download, Layers, Sparkles, Upload, Trash2 } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
+import { dbService } from '../../lib/dbService';
+import { generateUUID } from '../../lib/uuid';
 
 interface AnimateTabProps {
     i2vTarget: { url: string, index: number } | null;
@@ -141,6 +143,38 @@ export function AnimateTab({
         setIsDragging(false);
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
             processFile(e.dataTransfer.files[0]);
+        }
+    };
+
+    const handleSaveLoRA = async (url: string) => {
+        if (!url) return;
+        try {
+            const folders = await dbService.getAllFolders();
+            let folder = folders.find(f => f.name === 'WAN LoRA');
+            if (!folder) {
+                folder = {
+                    id: generateUUID(),
+                    name: 'WAN LoRA',
+                    parentId: null,
+                    timestamp: Date.now(),
+                    icon: 'layers'
+                };
+                await dbService.saveFolder(folder);
+            }
+
+            const name = url.split('/').pop()?.split('?')[0] || 'Unknown LoRA';
+            await dbService.saveAsset({
+                id: generateUUID(),
+                name: name,
+                type: 'lora',
+                base64: url,
+                folderId: folder.id,
+                timestamp: Date.now()
+            });
+            alert(`Saved "${name}" to WAN LoRA folder!`);
+        } catch (e) {
+            console.error("Failed to save LoRA", e);
+            alert("Failed to save LoRA to library.");
         }
     };
 
@@ -439,6 +473,14 @@ export function AnimateTab({
                                                                     }}
                                                                     className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-[10px] text-white focus:border-emerald-500/50 outline-none"
                                                                 />
+                                                                <button
+                                                                    onClick={() => handleSaveLoRA(lora.path)}
+                                                                    className="p-1.5 hover:bg-emerald-500/20 text-emerald-400 rounded transition-colors"
+                                                                    title="Save to WAN LoRA Library"
+                                                                    disabled={!lora.path}
+                                                                >
+                                                                    <Save className="w-3 h-3" />
+                                                                </button>
                                                                 <button
                                                                     onClick={() => {
                                                                         const newLoras = loras.filter((_, i) => i !== idx);

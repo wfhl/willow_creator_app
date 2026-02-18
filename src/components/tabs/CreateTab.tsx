@@ -2,6 +2,8 @@ import React, { type ChangeEvent } from 'react';
 import { Layers, Edit2, ImagePlus, ChevronDown, Video as VideoIcon, Sparkles, Copy, Loader2, Dices, Image as ImageIcon, Wand2, Download, Save, X, Upload, RotateCw, Trash2 } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
 import type { DBAsset as Asset } from '../../lib/dbService';
+import { dbService } from '../../lib/dbService';
+import { generateUUID } from '../../lib/uuid';
 import { AssetUploader } from '../asset-uploader';
 
 import { type Theme, type CaptionStyle } from './SettingsTab';
@@ -139,6 +141,38 @@ export function CreateTab({
     const currentTheme = selectedThemeId === 'CUSTOM'
         ? { name: 'Custom', defaultOutfit: 'custom', defaultVisuals: 'custom' }
         : themes.find(t => t.id === selectedThemeId) || themes[0];
+
+    const handleSaveLoRA = async (url: string) => {
+        if (!url) return;
+        try {
+            const folders = await dbService.getAllFolders();
+            let folder = folders.find(f => f.name === 'WAN LoRA');
+            if (!folder) {
+                folder = {
+                    id: generateUUID(),
+                    name: 'WAN LoRA',
+                    parentId: null,
+                    timestamp: Date.now(),
+                    icon: 'layers'
+                };
+                await dbService.saveFolder(folder);
+            }
+
+            const name = url.split('/').pop()?.split('?')[0] || 'Unknown LoRA';
+            await dbService.saveAsset({
+                id: generateUUID(),
+                name: name,
+                type: 'lora',
+                base64: url,
+                folderId: folder.id,
+                timestamp: Date.now()
+            });
+            alert(`Saved "${name}" to WAN LoRA folder!`);
+        } catch (e) {
+            console.error("Failed to save LoRA", e);
+            alert("Failed to save LoRA to library.");
+        }
+    };
 
     return (
         <div className="max-w-[1600px] mx-auto w-full p-4 md:p-8 pb-32">
@@ -349,6 +383,14 @@ export function CreateTab({
                                                         }}
                                                         className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1.5 text-[10px] text-white focus:border-emerald-500/50 outline-none"
                                                     />
+                                                    <button
+                                                        onClick={() => handleSaveLoRA(lora.path)}
+                                                        className="p-1.5 hover:bg-emerald-500/20 text-emerald-400 rounded transition-colors"
+                                                        title="Save to WAN LoRA Library"
+                                                        disabled={!lora.path}
+                                                    >
+                                                        <Save className="w-3 h-3" />
+                                                    </button>
                                                     <button
                                                         onClick={() => {
                                                             const newLoras = loras.filter((_, i) => i !== idx);

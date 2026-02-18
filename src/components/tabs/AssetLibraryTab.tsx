@@ -18,7 +18,9 @@ import {
     Music,
     Briefcase,
     Home,
-    History
+    History,
+    Layers,
+    Copy
 } from 'lucide-react';
 import { dbService } from '../../lib/dbService';
 import { generateUUID } from '../../lib/uuid';
@@ -445,6 +447,19 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
                                                     muted
                                                     onClick={() => onPreview(asset.base64)}
                                                 />
+                                            ) : asset.type === 'lora' ? (
+                                                <div
+                                                    className="w-full h-full flex flex-col items-center justify-center bg-emerald-900/10 text-emerald-400 p-4 text-center cursor-pointer group-hover:bg-emerald-900/20 transition-colors"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(asset.base64);
+                                                        alert("LoRA URL copied to clipboard!");
+                                                    }}
+                                                >
+                                                    <Layers className="w-8 h-8 md:w-12 md:h-12 mb-2 opacity-50 group-hover:opacity-80 transition-opacity" />
+                                                    <div className="flex items-center gap-1 text-[9px] uppercase tracking-widest opacity-60 group-hover:opacity-100">
+                                                        <Copy className="w-3 h-3" /> Copy URL
+                                                    </div>
+                                                </div>
                                             ) : (
                                                 <img
                                                     src={asset.base64}
@@ -478,6 +493,10 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
                                             <div className="w-10 h-10 rounded-lg overflow-hidden bg-black shrink-0 border border-white/5">
                                                 {asset.type === 'video' ? (
                                                     <video src={asset.base64} className="w-full h-full object-cover" />
+                                                ) : asset.type === 'lora' ? (
+                                                    <div className="w-full h-full flex items-center justify-center bg-emerald-900/20 text-emerald-400">
+                                                        <Layers className="w-5 h-5" />
+                                                    </div>
                                                 ) : (
                                                     <img src={asset.base64} className="w-full h-full object-cover" />
                                                 )}
