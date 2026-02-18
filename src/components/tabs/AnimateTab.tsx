@@ -408,15 +408,39 @@ export function AnimateTab({
                                                 onChange={(e) => setI2VAspectRatio(e.target.value)}
                                                 className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none"
                                             >
-                                                <option value="auto">Matches Image</option>
-                                                <option value="16:9">16:9 Landscape</option>
-                                                <option value="9:16">9:16 Portrait</option>
-                                                <option value="1:1">1:1 Square</option>
-                                                {(selectedModel.includes('seedance')) && (
+                                                {selectedModel.includes('wan') && selectedModel.includes('v2.2') ? (
                                                     <>
+                                                        <option value="auto">Matches Image (Default)</option>
+                                                        <option value="16:9">16:9 Landscape</option>
+                                                    </>
+                                                ) : selectedModel.includes('veo') ? (
+                                                    // Veo 3 usually prefers 16:9 for HQ, but we can try others if supported or force 16:9
+                                                    <>
+                                                        <option value="16:9">16:9 Landscape (Native)</option>
+                                                    </>
+                                                ) : selectedModel.includes('wan') && (selectedModel.includes('2.5') || selectedModel.includes('2.6')) ? (
+                                                    <>
+                                                        <option value="16:9">16:9 Landscape</option>
+                                                        <option value="9:16">9:16 Portrait</option>
+                                                        <option value="1:1">1:1 Square</option>
+                                                        <option value="4:3">4:3 TV</option>
+                                                        <option value="3:4">3:4 Vertical TV</option>
+                                                        <option value="21:9">21:9 Cinema</option>
+                                                    </>
+                                                ) : (selectedModel.includes('seedance')) ? (
+                                                    <>
+                                                        <option value="16:9">16:9 Landscape</option>
+                                                        <option value="9:16">9:16 Portrait</option>
+                                                        <option value="1:1">1:1 Square</option>
                                                         <option value="4:3">4:3 TV</option>
                                                         <option value="3:4">3:4 Portrait</option>
                                                         <option value="21:9">21:9 Cinema</option>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <option value="auto">Matches Image</option>
+                                                        <option value="16:9">16:9</option>
+                                                        <option value="9:16">9:16</option>
                                                     </>
                                                 )}
                                             </select>

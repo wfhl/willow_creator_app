@@ -513,6 +513,12 @@ export function CreateTab({
                                                     <option value="portrait_hd">Portrait 2K</option>
                                                     <option value="landscape_hd">Landscape 2K</option>
                                                 </>
+                                            ) : selectedModel.includes('xai') || selectedModel.includes('nano') ? (
+                                                <>
+                                                    <option value="1:1">1:1 Square</option>
+                                                    <option value="4:3">4:3 Landscape(ish)</option>
+                                                    <option value="16:9">16:9 Landscape</option>
+                                                </>
                                             ) : (
                                                 <>
                                                     <option value="1:1">1:1</option>
