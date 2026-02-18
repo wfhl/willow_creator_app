@@ -20,7 +20,7 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
 
     return (
         <>
-            <div className="fixed top-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-md border-b border-white/10 z-50 flex items-center justify-between px-4 md:px-8">
+            <div className="fixed top-0 left-0 right-0 z-[60] bg-black/80 backdrop-blur-md border-b border-white/10 px-4 md:px-8 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-3 flex items-center justify-between">
 
                 <div className="flex items-center gap-3 md:gap-4 shrink-0">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
@@ -87,10 +87,10 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
                 </nav>
 
                 <div className="flex items-center gap-2 md:gap-4 shrink-0">
-                    <div className={`flex items-center gap-2 px-2 md:px-3 py-1.5 border rounded-full transition-colors ${user ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-white/5 border-white/10'}`}>
+                    <div className="hidden min-[450px]:flex items-center gap-2 px-2 md:px-3 py-1.5 border border-white/10 rounded-full bg-white/5 transition-colors">
                         <div className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full ${user ? 'bg-emerald-500 animate-pulse' : 'bg-yellow-500'}`}></div>
-                        <span className={`text-[8px] md:text-[10px] font-bold uppercase tracking-widest ${user ? 'text-emerald-400' : 'text-yellow-500/80'}`}>
-                            {user ? (window.innerWidth < 768 ? 'Cloud' : 'Cloud Sync') : (window.innerWidth < 768 ? 'Local' : 'Local Only')}
+                        <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest text-white/40">
+                            {user ? 'Cloud' : 'Local'}
                         </span>
                     </div>
 
@@ -113,8 +113,11 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
                         </div>
                     ) : (
                         <button
-                            onClick={() => setShowLogin(true)}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] md:text-[10px] font-black uppercase tracking-widest rounded-full transition-all shadow-lg shadow-emerald-500/20 active:scale-95 touch-manipulation"
+                            onClick={() => {
+                                console.log("Login clicked");
+                                setShowLogin(true);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-[11px] font-black uppercase tracking-widest rounded-full transition-all shadow-lg shadow-emerald-500/30 active:scale-90 touch-manipulation cursor-pointer border-2 border-emerald-400/50"
                         >
                             <UserIcon className="w-3 h-3" />
                             <span>Login</span>
@@ -125,17 +128,20 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
 
             {/* Login Modal Overlay */}
             {showLogin && (
-                <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
-                    <div className="relative w-full max-w-sm">
-                        <button
-                            onClick={() => setShowLogin(false)}
-                            className="absolute -top-12 right-0 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white/60 hover:text-white transition-colors border border-white/10"
-                        >
-                            <LogOut className="w-5 h-5 rotate-180" />
-                        </button>
-                        <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-1 shadow-2xl overflow-hidden ring-1 ring-white/5">
+                <div
+                    className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
+                    onClick={() => setShowLogin(false)}
+                >
+                    <div className="relative w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                        <div className="bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden ring-1 ring-white/5 animate-in zoom-in-95 duration-200">
                             <Login />
                         </div>
+                        <button
+                            onClick={() => setShowLogin(false)}
+                            className="mt-6 w-full py-4 text-white/30 text-[10px] font-bold uppercase tracking-widest hover:text-white transition-colors"
+                        >
+                            Close
+                        </button>
                     </div>
                 </div>
             )}

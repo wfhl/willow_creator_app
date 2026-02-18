@@ -30,8 +30,6 @@ interface EditTabProps {
     onDownload: (url: string, prefix?: string) => void;
 
     // New Props
-    enableSafety?: boolean;
-    setEnableSafety?: (val: boolean) => void;
     enhancePromptMode?: "standard" | "fast";
     setEnhancePromptMode?: (val: "standard" | "fast") => void;
 }
@@ -61,8 +59,6 @@ export function EditTab({
     onSaveToAssets,
     onPreview,
     onDownload,
-    enableSafety,
-    setEnableSafety,
     enhancePromptMode,
     setEnhancePromptMode
 }: EditTabProps) {
@@ -324,19 +320,6 @@ export function EditTab({
 
                                             {(selectedModel.includes('seedream') || selectedModel.includes('grok')) && (
                                                 <>
-                                                    <div className="space-y-1 w-28 animate-in fade-in slide-in-from-left-2 duration-300">
-                                                        <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Safety</label>
-                                                        <button
-                                                            onClick={() => setEnableSafety && setEnableSafety(!enableSafety)}
-                                                            className={`w-full px-2 py-2 rounded-lg border text-xs font-medium transition-all flex items-center justify-center gap-2 ${enableSafety
-                                                                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
-                                                                : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
-                                                                }`}
-                                                        >
-                                                            {enableSafety ? 'Enabled' : 'Disabled'}
-                                                        </button>
-                                                    </div>
-
                                                     {selectedModel.includes('seedream') && (
                                                         <div className="space-y-1 w-32 animate-in fade-in slide-in-from-left-2 duration-300">
                                                             <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Enhance</label>

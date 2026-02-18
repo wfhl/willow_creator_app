@@ -104,7 +104,7 @@ export const falService = {
                     image_urls: [primaryImageUrl, ...additionalImageUrls],
                     image_size: request.editConfig?.imageSize || "auto_4K",
                     num_images: 1,
-                    enable_safety_checker: request.editConfig?.enableSafety ?? true,
+                    enable_safety_checker: request.editConfig?.enableSafety ?? false,
                     ...(request.model.includes('v4/') ? { enhance_prompt_mode: request.editConfig?.enhancePromptMode || "standard" } : {})
                 };
             } else if (request.model.includes('seedream') && request.model.includes('text-to-image')) {
@@ -113,7 +113,7 @@ export const falService = {
                     prompt: request.prompt,
                     image_size: request.editConfig?.imageSize || "auto_4K",
                     num_images: request.editConfig?.numImages || 1,
-                    enable_safety_checker: request.editConfig?.enableSafety ?? true
+                    enable_safety_checker: request.editConfig?.enableSafety ?? false
                 };
 
             } else if (request.model.includes('wan/v2.6/image-to-video/flash')) {
@@ -126,7 +126,7 @@ export const falService = {
                     resolution: request.videoConfig?.resolution || "1080p",
                     duration: duration,
                     enable_prompt_expansion: true,
-                    enable_safety_checker: request.editConfig?.enableSafety ?? true
+                    enable_safety_checker: request.editConfig?.enableSafety ?? false
                 };
 
             } else if (request.model.includes('fal-ai/wan-25-preview/image-to-video')) {
@@ -139,7 +139,7 @@ export const falService = {
                     resolution: request.videoConfig?.resolution || "1080p",
                     duration: duration,
                     enable_prompt_expansion: true,
-                    enable_safety_checker: request.editConfig?.enableSafety ?? true
+                    enable_safety_checker: request.editConfig?.enableSafety ?? false
                 };
 
                 // --- SEEDANCE (BYTEDANCE) Video ---
@@ -157,7 +157,7 @@ export const falService = {
                     duration: duration,
                     camera_fixed: request.videoConfig?.cameraFixed || false,
                     generate_audio: request.videoConfig?.withAudio ?? true,
-                    enable_safety_checker: request.editConfig?.enableSafety ?? true
+                    enable_safety_checker: request.editConfig?.enableSafety ?? false
                 };
 
                 // --- WAN 2.2 IMAGE-TO-VIDEO ---

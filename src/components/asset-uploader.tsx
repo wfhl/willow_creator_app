@@ -22,52 +22,15 @@ interface AssetUploaderProps {
 export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, label = "Reference Assets" }: AssetUploaderProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [viewMode, setViewMode] = useState<'upload' | 'library'>('upload');
-    const [libraryImages, setLibraryImages] = useState<string[]>([]);
     const [userLibraryAssets, setUserLibraryAssets] = useState<DBAsset[]>([]);
     const userLibInputRef = useRef<HTMLInputElement>(null);
 
-    const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
-    const [visibleLimit, setVisibleLimit] = useState(24);
-    const loadMoreRef = useRef<HTMLDivElement>(null);
-
-    // Infinite Scroll Observer
-    React.useEffect(() => {
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && visibleLimit < libraryImages.length) {
-                    setVisibleLimit((prev) => Math.min(prev + 24, libraryImages.length));
-                }
-            },
-            { threshold: 0.1 }
-        );
-
-        if (loadMoreRef.current) {
-            observer.observe(loadMoreRef.current);
-        }
-
-        return () => observer.disconnect();
-    }, [visibleLimit, libraryImages.length, viewMode]);
-
-    // Fetch library content when switching to library view
+    // Fetch user library content when switching to library view
     React.useEffect(() => {
         if (viewMode === 'library') {
-            if (libraryImages.length === 0) {
-                setIsLoadingLibrary(true);
-                fetch('/gen-reference-manifest.json')
-                    .then(res => res.json())
-                    .then((files: string[]) => {
-                        // Filter for images only just in case
-                        const images = files.filter(f => /\.(jpg|jpeg|png|webp|gif)$/i.test(f));
-                        setLibraryImages(images);
-                    })
-                    .catch(err => console.error("Failed to load library manifest:", err))
-                    .finally(() => setIsLoadingLibrary(false));
-            }
-            // Reset limit when opening library
-            setVisibleLimit(24);
             fetchUserLibrary();
         }
-    }, [viewMode, libraryImages.length]);
+    }, [viewMode]);
 
     const fetchUserLibrary = async () => {
         try {
@@ -145,24 +108,6 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const handleLibrarySelect = async (filename: string) => {
-        // Find if already added (imperfect check by name, but works for the GenReference/ catalog)
-        if (assets.some(a => a.name === filename)) return;
-
-        try {
-            const response = await fetch(`/GenReference/${filename}`);
-            const blob = await response.blob();
-            const file = new File([blob], filename, { type: blob.type });
-
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-
-            onAdd(dataTransfer.files);
-            // Stay in library view
-        } catch (error) {
-            console.error("Error selecting library asset:", error);
-        }
-    };
 
     return (
         <div className="space-y-4">
@@ -251,10 +196,10 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                     </div>
                 </div>
             ) : (
-                <div className="space-y-2">
+                <div className="space-y-4">
                     <div className="flex items-center justify-between px-1">
                         <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
-                            User Library
+                            Reference Library
                         </div>
                         <button
                             onClick={() => userLibInputRef.current?.click()}
@@ -310,58 +255,10 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                             })}
                         </div>
                     ) : (
-                        <div className="text-xs text-white/20 p-2 text-center border border-dashed border-white/5 rounded italic mb-4">
+                        <div className="text-xs text-white/20 p-12 text-center border-2 border-dashed border-white/5 rounded-2xl italic mb-4">
+                            <ImageIcon className="w-8 h-8 mx-auto mb-3 opacity-10" />
                             No personal references uploaded.
                         </div>
-                    )}
-
-                    <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold px-1 pt-2 border-t border-white/5">
-                        System Archives
-                    </div>
-                    {isLoadingLibrary ? (
-                        <div className="p-8 text-center text-white/30 text-xs">Loading archives...</div>
-                    ) : (
-                        <>
-                            <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 h-[450px] overflow-y-auto custom-scrollbar p-1">
-                                {libraryImages.slice(0, visibleLimit).map((filename, idx) => {
-                                    const isSelected = assets.some(a => a.name === filename);
-                                    return (
-                                        <div
-                                            key={idx}
-                                            onClick={() => handleLibrarySelect(filename)}
-                                            className={`aspect-[3/4] rounded-md overflow-hidden border transition-all cursor-pointer relative group bg-black/20 ${isSelected ? 'border-emerald-500 ring-1 ring-emerald-500/30' : 'border-white/5 hover:border-white/30'}`}
-                                        >
-                                            <img
-                                                src={`/GenReference/${filename}`}
-                                                alt={filename}
-                                                loading="lazy"
-                                                className={`w-full h-full object-cover transition-opacity ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}
-                                            />
-                                            {/* Selection Indicator */}
-                                            {isSelected && (
-                                                <div className="absolute top-1 right-1 bg-emerald-500 rounded-full p-0.5 shadow-lg z-10">
-                                                    <Check className="h-2 w-2 text-black" />
-                                                </div>
-                                            )}
-                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
-                                                <div className="bg-white/10 backdrop-blur-md rounded-full p-1 text-[8px] text-white font-bold uppercase px-2 font-sans tracking-tighter">
-                                                    {isSelected ? 'Selected' : 'Add'}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                                {/* Sentinel for Infinite Scroll */}
-                                {visibleLimit < libraryImages.length && (
-                                    <div
-                                        ref={loadMoreRef}
-                                        className="col-span-full h-20 flex items-center justify-center text-[10px] text-white/30 uppercase tracking-widest animate-pulse"
-                                    >
-                                        Loading more...
-                                    </div>
-                                )}
-                            </div>
-                        </>
                     )}
                 </div>
             )

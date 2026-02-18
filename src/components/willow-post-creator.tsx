@@ -99,7 +99,7 @@ export default function WillowPostCreator() {
     const [cameraFixed, setCameraFixed] = useState(false);
 
     // Advanced Edit Config
-    const [enableSafety, setEnableSafety] = useState(true);
+    const [enableSafety, setEnableSafety] = useState(false);
     const [enhancePromptMode, setEnhancePromptMode] = useState<"standard" | "fast">("standard");
     const [loras, setLoras] = useState<Array<{ path: string; scale: number }>>([]);
 
@@ -135,10 +135,38 @@ export default function WillowPostCreator() {
                     const batch = await dbService.getRecentPostsBatch(24, 0, sortOrder);
                     setSavedPosts(batch);
                 }
+
+                // Parameters
+                const savedParams = await dbService.getConfig('user_parameters');
+                if (savedParams) {
+                    if (savedParams.selectedModel) setSelectedModel(savedParams.selectedModel);
+                    if (savedParams.aspectRatio) setAspectRatio(savedParams.aspectRatio);
+                    if (savedParams.createImageSize) setCreateImageSize(savedParams.createImageSize);
+                    if (savedParams.createNumImages) setCreateNumImages(savedParams.createNumImages);
+                    if (savedParams.videoResolution) setVideoResolution(savedParams.videoResolution);
+                    if (savedParams.videoDuration) setVideoDuration(savedParams.videoDuration);
+                    if (savedParams.i2vAspectRatio) setI2vAspectRatio(savedParams.i2vAspectRatio);
+                    if (savedParams.withAudio !== undefined) setWithAudio(savedParams.withAudio);
+                    if (savedParams.cameraFixed !== undefined) setCameraFixed(savedParams.cameraFixed);
+                    if (savedParams.enableSafety !== undefined) setEnableSafety(savedParams.enableSafety);
+                    if (savedParams.enhancePromptMode) setEnhancePromptMode(savedParams.enhancePromptMode);
+                    if (savedParams.mediaType) setMediaType(savedParams.mediaType);
+                    if (savedParams.selectedThemeId) setSelectedThemeId(savedParams.selectedThemeId);
+                    if (savedParams.captionType) setCaptionType(savedParams.captionType);
+                    if (savedParams.refineImageSize) setRefineImageSize(savedParams.refineImageSize);
+                }
             } catch (e) { console.error(e); }
         };
         loadInitialData();
     }, []);
+
+    // Persist Parameters Helper
+    const persistParam = async (key: string, value: any) => {
+        try {
+            const current = await dbService.getConfig('user_parameters') || {};
+            await dbService.saveConfig('user_parameters', { ...current, [key]: value });
+        } catch (e) { console.error("Failed to persist param:", e); }
+    };
 
     // Persist Configs
     const persistThemes = (newThemes: Theme[]) => {
@@ -188,11 +216,19 @@ export default function WillowPostCreator() {
                 selectedModel.includes('banana') ||
                 selectedModel.includes('seedream') ||
                 selectedModel.includes('grok-imagine-image');
-            if (!isValidImageModel) setSelectedModel('nano-banana-pro-preview');
+            if (!isValidImageModel) {
+                const defaultImageModel = 'nano-banana-pro-preview';
+                setSelectedModel(defaultImageModel);
+                persistParam('selectedModel', defaultImageModel);
+            }
         } else {
             const isValidVideoModel = selectedModel.includes('veo') ||
                 selectedModel.includes('grok-imagine-video');
-            if (!isValidVideoModel) setSelectedModel('veo-3.1-generate-preview');
+            if (!isValidVideoModel) {
+                const defaultVideoModel = 'veo-3.1-generate-preview';
+                setSelectedModel(defaultVideoModel);
+                persistParam('selectedModel', defaultVideoModel);
+            }
         }
     }, [mediaType]);
 
@@ -598,6 +634,7 @@ export default function WillowPostCreator() {
         };
         await dbService.savePreset(preset);
         setPresets(prev => [preset, ...prev]);
+        alert("Preset saved successfully!");
         return preset.id;
     };
 
@@ -860,7 +897,7 @@ export default function WillowPostCreator() {
                         themes={themes}
                         captionStyles={captionStyles}
                         selectedThemeId={selectedThemeId}
-                        setSelectedThemeId={setSelectedThemeId}
+                        setSelectedThemeId={(val) => { setSelectedThemeId(val); persistParam('selectedThemeId', val); }}
                         customTheme={customTheme}
                         setCustomTheme={setCustomTheme}
                         specificVisuals={specificVisuals}
@@ -875,24 +912,24 @@ export default function WillowPostCreator() {
                         generatedPrompt={generatedPrompt}
                         setGeneratedPrompt={setGeneratedPrompt}
                         selectedModel={selectedModel}
-                        setSelectedModel={setSelectedModel}
+                        setSelectedModel={(val) => { setSelectedModel(val); persistParam('selectedModel', val); }}
                         mediaType={mediaType}
                         onGenerateCaptionOnly={handleGenerateCaption}
-                        setMediaType={setMediaType}
+                        setMediaType={(val) => { setMediaType(val as 'image' | 'video'); persistParam('mediaType', val); }}
                         aspectRatio={aspectRatio}
-                        setAspectRatio={setAspectRatio}
+                        setAspectRatio={(val) => { setAspectRatio(val); persistParam('aspectRatio', val); }}
                         createImageSize={createImageSize}
-                        setCreateImageSize={setCreateImageSize}
+                        setCreateImageSize={(val) => { setCreateImageSize(val); persistParam('createImageSize', val); }}
                         createNumImages={createNumImages}
-                        setCreateNumImages={setCreateNumImages}
+                        setCreateNumImages={(val) => { setCreateNumImages(val); persistParam('createNumImages', val); }}
                         videoResolution={videoResolution}
-                        setVideoResolution={setVideoResolution}
+                        setVideoResolution={(val) => { setVideoResolution(val); persistParam('videoResolution', val); }}
                         videoDuration={videoDuration}
-                        setVideoDuration={setVideoDuration}
+                        setVideoDuration={(val) => { setVideoDuration(val); persistParam('videoDuration', val); }}
                         topic={topic}
                         setTopic={setTopic}
                         captionType={captionType}
-                        setCaptionType={setCaptionType}
+                        setCaptionType={(val) => { setCaptionType(val); persistParam('captionType', val); }}
                         generatedCaption={generatedCaption}
                         setGeneratedCaption={setGeneratedCaption}
                         isDreaming={isDreaming}
@@ -1100,20 +1137,18 @@ export default function WillowPostCreator() {
                         refinePrompt={refinePrompt}
                         setRefinePrompt={setRefinePrompt}
                         refineImageSize={refineImageSize}
-                        setRefineImageSize={setRefineImageSize}
+                        setRefineImageSize={(val) => { setRefineImageSize(val); persistParam('refineImageSize', val); }}
                         refineNumImages={refineNumImages}
-                        setRefineNumImages={setRefineNumImages}
+                        setRefineNumImages={(val) => { setRefineNumImages(val); persistParam('refineNumImages', val); }}
                         selectedModel={selectedModel}
-                        setSelectedModel={setSelectedModel}
+                        setSelectedModel={(val) => { setSelectedModel(val); persistParam('selectedModel', val); }}
                         refineAdditionalImages={refineAdditionalImages}
                         setRefineAdditionalImages={setRefineAdditionalImages}
                         refineResultUrl={refineResultUrl}
                         setRefineResultUrl={setRefineResultUrl}
                         isRefining={isRefining}
-                        enableSafety={enableSafety}
-                        setEnableSafety={setEnableSafety}
                         enhancePromptMode={enhancePromptMode}
-                        setEnhancePromptMode={setEnhancePromptMode}
+                        setEnhancePromptMode={(val) => { setEnhancePromptMode(val as "standard" | "fast"); persistParam('enhancePromptMode', val); }}
                         onRefineSubmit={async () => {
                             if (!refineTarget || !refinePrompt) return;
                             setIsRefining(true);
@@ -1213,18 +1248,18 @@ export default function WillowPostCreator() {
                         i2vPrompt={i2vPrompt}
                         setI2VPrompt={setI2VPrompt}
                         i2vAspectRatio={i2vAspectRatio}
-                        setI2VAspectRatio={setI2vAspectRatio}
+                        setI2VAspectRatio={(val) => { setI2vAspectRatio(val); persistParam('i2vAspectRatio', val); }}
                         videoDuration={videoDuration}
-                        setVideoDuration={setVideoDuration}
+                        setVideoDuration={(val) => { setVideoDuration(val); persistParam('videoDuration', val); }}
                         videoResolution={videoResolution}
-                        setVideoResolution={setVideoResolution}
+                        setVideoResolution={(val) => { setVideoResolution(val); persistParam('videoResolution', val); }}
                         selectedModel={selectedModel}
-                        setSelectedModel={setSelectedModel}
+                        setSelectedModel={(val) => { setSelectedModel(val); persistParam('selectedModel', val); }}
                         isGeneratingI2V={isGeneratingI2V}
                         withAudio={withAudio}
-                        setWithAudio={setWithAudio}
+                        setWithAudio={(val) => { setWithAudio(val); persistParam('withAudio', val); }}
                         cameraFixed={cameraFixed}
-                        setCameraFixed={setCameraFixed}
+                        setCameraFixed={(val) => { setCameraFixed(val); persistParam('cameraFixed', val); }}
                         loras={loras}
                         setLoras={setLoras}
                         onLoRAUpload={async (file: File) => {
