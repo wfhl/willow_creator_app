@@ -630,6 +630,7 @@ export default function WillowPostCreator() {
             negativePrompt: WILLOW_PROFILE.negativePrompt,
             videoDuration,
             videoResolution,
+            tab: activeTab,
             timestamp: Date.now()
         };
         await dbService.savePreset(preset);
@@ -1059,6 +1060,7 @@ export default function WillowPostCreator() {
                                 presetsList={presets}
                                 onDeletePreset={handleDeletePreset}
                                 direction="up"
+                                tab="create"
                             />
                         }
                         onPreview={(url) => setPreviewContext({ urls: generatedMediaUrls, index: generatedMediaUrls.indexOf(url) })}
@@ -1233,6 +1235,7 @@ export default function WillowPostCreator() {
                                 presetsList={presets}
                                 onDeletePreset={handleDeletePreset}
                                 direction="down"
+                                tab={activeTab === 'edit' ? 'edit' : 'animate'}
                             />
                         }
                         onSaveToAssets={handleSaveToAssets}
@@ -1370,6 +1373,7 @@ export default function WillowPostCreator() {
                                 presetsList={presets}
                                 onDeletePreset={handleDeletePreset}
                                 direction="down"
+                                tab="animate"
                             />
                         }
                         onSaveToAssets={handleSaveToAssets}

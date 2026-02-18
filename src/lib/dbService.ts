@@ -51,6 +51,7 @@ export interface DBPromptPreset {
     negativePrompt?: string;
     videoDuration?: string;
     videoResolution?: string;
+    tab?: string; // 'create' | 'edit' | 'animate'
     timestamp: number;
 }
 

@@ -1,7 +1,6 @@
 
 import { supabase } from './supabaseClient';
 import { dbService } from './dbService';
-import type { DBAsset, DBFolder, DBGenerationHistory, DBSavedPost, DBPromptPreset } from './dbService';
 import type { Theme, CaptionStyle } from '../components/tabs/SettingsTab';
 
 export const migrationService = {
@@ -143,6 +142,7 @@ export const migrationService = {
                 negative_prompt: pr.negativePrompt,
                 video_duration: pr.videoDuration,
                 video_resolution: pr.videoResolution,
+                tab: pr.tab,
                 timestamp: new Date(pr.timestamp).toISOString()
             });
         }

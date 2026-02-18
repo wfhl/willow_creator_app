@@ -12,6 +12,7 @@ interface PresetsDropdownProps {
     presetsList: any[]; // List of presets (saved posts)
     onDeletePreset: (id: string) => void;
     direction?: 'up' | 'down';
+    tab: string;
 }
 
 export function PresetsDropdown({
@@ -24,10 +25,13 @@ export function PresetsDropdown({
     onLoadPreset,
     presetsList,
     onDeletePreset,
-    direction = 'up'
+    direction = 'up',
+    tab
 }: PresetsDropdownProps) {
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [presetName, setPresetName] = React.useState("");
+
+    const filteredPresets = presetsList.filter(p => p.tab === tab || (!p.tab && tab === 'create'));
 
     // Close on click outside
     useEffect(() => {
@@ -157,12 +161,12 @@ export function PresetsDropdown({
 
                     {/* Presets List */}
                     <div className="max-h-64 overflow-y-auto custom-scrollbar p-1 space-y-0.5">
-                        {presetsList.length === 0 ? (
+                        {filteredPresets.length === 0 ? (
                             <div className="p-4 text-center text-white/20 text-[10px] uppercase font-bold tracking-widest">
-                                No saved presets
+                                No {tab} presets
                             </div>
                         ) : (
-                            presetsList.slice(0, 10).map((post) => ( // Limit to 10 recent for dropdown
+                            filteredPresets.slice(0, 10).map((post) => ( // Limit to 10 recent for dropdown
                                 <div key={post.id} className="group relative flex items-center justify-between px-3 py-2 hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
                                     onClick={() => onLoadPreset(post)}
                                 >
@@ -181,7 +185,7 @@ export function PresetsDropdown({
                         )}
                     </div>
 
-                    {presetsList.length > 10 && (
+                    {filteredPresets.length > 10 && (
                         <div className="p-2 border-t border-white/5 bg-black/20 text-center">
                             <span className="text-[9px] text-white/30 italic">View all in Library</span>
                         </div>
