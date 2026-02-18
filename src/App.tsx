@@ -2,6 +2,7 @@ import WillowPostCreator from './components/willow-post-creator'
 import './index.css'
 
 function App() {
+  console.log("[App] Rendering main component");
   return (
     <div className="h-screen w-screen overflow-hidden bg-black text-white">
       <WillowPostCreator />

@@ -8,6 +8,8 @@ import App from './App.tsx'
 
 const queryClient = new QueryClient()
 
+console.log("[App] Starting application initialization...");
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

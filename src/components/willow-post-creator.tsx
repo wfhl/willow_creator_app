@@ -1208,7 +1208,7 @@ export default function WillowPostCreator() {
                                     // Save to History
                                     try {
                                         await dbService.saveGenerationHistory({
-                                            id: crypto.randomUUID(),
+                                            id: generateUUID(),
                                             timestamp: Date.now(),
                                             type: 'image',
                                             prompt: refinePrompt,
@@ -1335,7 +1335,7 @@ export default function WillowPostCreator() {
                                     // Save to History
                                     try {
                                         await dbService.saveGenerationHistory({
-                                            id: crypto.randomUUID(),
+                                            id: generateUUID(),
                                             timestamp: Date.now(),
                                             type: 'video',
                                             prompt: i2vPrompt,
