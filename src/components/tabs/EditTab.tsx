@@ -17,11 +17,12 @@ interface EditTabProps {
     setSelectedModel: (val: string) => void;
     refineAdditionalImages: Asset[];
     setRefineAdditionalImages: React.Dispatch<React.SetStateAction<Asset[]>>;
-    refineResultUrl: string | null;
-    setRefineResultUrl: (val: string | null) => void;
+    refineResultUrls: string[];
+    setRefineResultUrls: (val: string[]) => void;
     isRefining: boolean;
+    refineProgress?: number;
     onRefineSubmit: () => void;
-    onApproveRefinement: (action: 'replace' | 'add') => void;
+    onApproveRefinement: (action: 'replace' | 'add', url?: string) => void;
 
     onExit: () => void;
     onI2VEntry: (url: string) => void;
@@ -48,9 +49,10 @@ export function EditTab({
     setSelectedModel,
     refineAdditionalImages,
     setRefineAdditionalImages,
-    refineResultUrl,
-    setRefineResultUrl,
+    refineResultUrls,
+    setRefineResultUrls,
     isRefining,
+    refineProgress = 0,
     onRefineSubmit,
     onApproveRefinement,
 
@@ -338,7 +340,7 @@ export function EditTab({
                         )}
                     </div>
                     <div className="p-4 md:p-8 space-y-6 md:space-y-8 flex flex-col justify-center bg-black/20">
-                        {!refineResultUrl ? (
+                        {refineResultUrls.length === 0 ? (
                             <>
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-center mb-2">
@@ -443,12 +445,21 @@ export function EditTab({
                                 </div>
 
                                 {isRefining ? (
-                                    <div className="py-12">
-                                        <LoadingIndicator
-                                            title="Refining Variation"
-                                            modelName={selectedModel}
-                                            type="edit"
-                                        />
+                                    <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                                        <LoadingIndicator />
+                                        <div className="text-center">
+                                            <p className="text-emerald-400 font-bold text-xs uppercase tracking-widest animate-pulse">
+                                                Refining variation...
+                                            </p>
+                                            {refineProgress > 0 && (
+                                                <div className="mt-4 w-48 h-1 bg-white/5 rounded-full overflow-hidden mx-auto">
+                                                    <div
+                                                        className="h-full bg-emerald-500 transition-all duration-500 ease-out"
+                                                        style={{ width: `${refineProgress}%` }}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 ) : (
                                     <button
@@ -462,49 +473,73 @@ export function EditTab({
                                     </button>
                                 )}
                             </>
+                        ) : refineResultUrls.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12">
+                                <LoadingIndicator />
+                            </div>
                         ) : (
                             <div className="space-y-6">
                                 <div className="relative group">
                                     <label className="text-xs font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2 mb-4">
                                         <Sparkles className="w-3 h-3" /> Refined Result
                                     </label>
-                                    <div className="aspect-[3/4] bg-black/40 rounded-xl overflow-hidden border-2 border-emerald-500/30 shadow-2xl shadow-emerald-500/10 relative group">
-                                        <img
-                                            src={refineResultUrl}
-                                            alt="Refined Result"
-                                            className="w-full h-full object-cover cursor-zoom-in"
-                                            onClick={() => onPreview(refineResultUrl!)}
-                                        />
-                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1">
-                                            <button
-                                                onClick={() => setRefineTarget({ url: refineResultUrl!, index: -1 })}
-                                                className="p-1 hover:bg-white/20 rounded"
-                                                title="Edit this result"
-                                            >
-                                                <Edit2 className="w-4 h-4 text-white" />
-                                            </button>
-                                            <button
-                                                onClick={() => onI2VEntry(refineResultUrl!)}
-                                                className="p-1 hover:bg-white/20 rounded"
-                                                title="Animate this result"
-                                            >
-                                                <VideoIcon className="w-4 h-4 text-white" />
-                                            </button>
-                                            <button
-                                                onClick={() => onDownload(refineResultUrl!, `willow_refined_${Date.now()}.png`)}
-                                                className="p-1 hover:bg-white/20 rounded"
-                                                title="Download"
-                                            >
-                                                <Download className="w-4 h-4 text-white" />
-                                            </button>
-                                            <button
-                                                onClick={() => onSaveToAssets(refineResultUrl!, 'image', 'Refined Variation')}
-                                                className="p-1 hover:bg-emerald-500/40 rounded"
-                                                title="Save to Assets"
-                                            >
-                                                <Save className="w-4 h-4 text-white" />
-                                            </button>
-                                        </div>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {refineResultUrls.map((url, idx) => (
+                                            <div key={idx} className="aspect-[3/4] bg-black/40 rounded-xl overflow-hidden border-2 border-emerald-500/30 shadow-2xl shadow-emerald-500/10 relative group">
+                                                <img
+                                                    src={url}
+                                                    alt={`Refined Result ${idx + 1}`}
+                                                    className="w-full h-full object-cover cursor-zoom-in"
+                                                    onClick={() => onPreview(url)}
+                                                />
+                                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1">
+                                                    <button
+                                                        onClick={() => setRefineTarget({ url: url, index: -1 })}
+                                                        className="p-1 hover:bg-white/20 rounded"
+                                                        title="Edit this result"
+                                                    >
+                                                        <Edit2 className="w-4 h-4 text-white" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onI2VEntry(url)}
+                                                        className="p-1 hover:bg-white/20 rounded"
+                                                        title="Animate this result"
+                                                    >
+                                                        <VideoIcon className="w-4 h-4 text-white" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onDownload(url, `willow_refined_${idx}_${Date.now()}.png`)}
+                                                        className="p-1 hover:bg-white/20 rounded"
+                                                        title="Download"
+                                                    >
+                                                        <Download className="w-4 h-4 text-white" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onSaveToAssets(url, 'image', `Refined Variation ${idx + 1}`)}
+                                                        className="p-1 hover:bg-emerald-500/40 rounded"
+                                                        title="Save to Assets"
+                                                    >
+                                                        <Save className="w-4 h-4 text-white" />
+                                                    </button>
+                                                </div>
+                                                {refineResultUrls.length > 1 && (
+                                                    <div className="absolute bottom-2 left-2 flex gap-1">
+                                                        <button
+                                                            onClick={() => onApproveRefinement('replace', url)}
+                                                            className="px-2 py-1 bg-emerald-600 text-[8px] font-bold text-black rounded uppercase"
+                                                        >
+                                                            Replace
+                                                        </button>
+                                                        <button
+                                                            onClick={() => onApproveRefinement('add', url)}
+                                                            className="px-2 py-1 bg-white/20 text-[8px] font-bold text-white rounded uppercase"
+                                                        >
+                                                            Add
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3">
@@ -528,10 +563,10 @@ export function EditTab({
                                     </div>
 
                                     <button
-                                        onClick={() => setRefineResultUrl(null)}
+                                        onClick={() => setRefineResultUrls([])}
                                         className="w-full py-3 text-white/40 hover:text-white transition-colors text-[10px] uppercase font-bold tracking-[0.2em] flex items-center justify-center gap-2"
                                     >
-                                        <RefreshCw className="w-3 h-3" /> Try again / Discard Result
+                                        <RefreshCw className="w-3 h-3" /> Try again / Discard All Results
                                     </button>
                                 </div>
                             </div>

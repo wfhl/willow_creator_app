@@ -1,6 +1,6 @@
 
 const DB_NAME = 'willow_creator_db';
-const DB_VERSION = 6; // Bumped for asset type index
+const DB_VERSION = 7; // Bumped for 'selected' index on assets
 
 
 export interface DBFolder {
@@ -102,6 +102,7 @@ const openDB = (): Promise<IDBDatabase> => {
                 assetStore.createIndex('folderId', 'folderId', { unique: false });
                 assetStore.createIndex('timestamp', 'timestamp', { unique: false });
                 assetStore.createIndex('type', 'type', { unique: false });
+                assetStore.createIndex('selected', 'selected', { unique: false });
             } else if (transaction) {
                 const assetStore = transaction.objectStore('assets');
                 if (!assetStore.indexNames.contains('folderId')) {
@@ -112,6 +113,9 @@ const openDB = (): Promise<IDBDatabase> => {
                 }
                 if (!assetStore.indexNames.contains('type')) {
                     assetStore.createIndex('type', 'type', { unique: false });
+                }
+                if (!assetStore.indexNames.contains('selected')) {
+                    assetStore.createIndex('selected', 'selected', { unique: false });
                 }
             }
 
@@ -226,6 +230,42 @@ export const dbService = {
         });
     },
 
+    async getSelectedAssets(): Promise<DBAsset[]> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('assets', 'readonly');
+            const store = transaction.objectStore('assets');
+            const index = store.index('selected');
+            // We store boolean true, but IndexedDB index values can be tricky.
+            // Using a cursor is safest or a specific key.
+            const request = index.getAll(IDBKeyRange.only(true));
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async findAssetByBase64(base64: string): Promise<DBAsset | undefined> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('assets', 'readonly');
+            const store = transaction.objectStore('assets');
+            const request = store.openCursor();
+            request.onsuccess = (event) => {
+                const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+                if (!cursor) {
+                    resolve(undefined);
+                    return;
+                }
+                if (cursor.value.base64 === base64) {
+                    resolve(cursor.value);
+                    return;
+                }
+                cursor.continue();
+            };
+            request.onerror = () => reject(request.error);
+        });
+    },
+
     async saveAsset(asset: DBAsset): Promise<void> {
         const db = await openDB();
         return new Promise((resolve, reject) => {
@@ -233,7 +273,7 @@ export const dbService = {
             const store = transaction.objectStore('assets');
             const request = store.put(asset);
             request.onsuccess = () => {
-                this.notify('assets', 'update', asset);
+                this.notify('assets', 'insert', asset);
                 resolve();
             };
             request.onerror = () => reject(request.error);
@@ -272,12 +312,13 @@ export const dbService = {
             const store = transaction.objectStore('posts');
             const request = store.put(post);
             request.onsuccess = () => {
-                this.notify('posts', 'update', post);
+                this.notify('posts', 'insert', post);
                 resolve();
             };
             request.onerror = () => reject(request.error);
         });
     },
+
 
     async deletePost(id: string): Promise<void> {
         const db = await openDB();
@@ -444,12 +485,51 @@ export const dbService = {
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('folders', 'readwrite');
             const store = transaction.objectStore('folders');
-            // Note: In an OS feel, we might want to recursively delete or prevent deletion of non-empty folders.
-            // For now, let's keep it simple.
             const request = store.delete(id);
             request.onsuccess = () => {
                 this.notify('folders', 'delete', { id });
                 resolve();
+            };
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async getAssetsBatch(folderId: string | null, limit: number, offset: number, sortOrder: 'prev' | 'next' = 'prev'): Promise<DBAsset[]> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('assets', 'readonly');
+            const store = transaction.objectStore('assets');
+            const index = store.index('timestamp');
+
+            const items: DBAsset[] = [];
+            let skipped = 0;
+            const request = index.openCursor(null, sortOrder);
+
+            request.onsuccess = (event) => {
+                const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+                if (!cursor) {
+                    resolve(items);
+                    return;
+                }
+
+                const asset = cursor.value as DBAsset;
+                if (asset.folderId !== folderId && !(folderId === null && !asset.folderId)) {
+                    cursor.continue();
+                    return;
+                }
+
+                if (skipped < offset) {
+                    skipped++;
+                    cursor.continue();
+                    return;
+                }
+
+                items.push(asset);
+                if (items.length < limit) {
+                    cursor.continue();
+                } else {
+                    resolve(items);
+                }
             };
             request.onerror = () => reject(request.error);
         });
@@ -461,8 +541,6 @@ export const dbService = {
             const transaction = db.transaction('assets', 'readonly');
             const store = transaction.objectStore('assets');
 
-            // IndexedDB indices do NOT support null keys. 
-            // If folderId is null, we must fetch all and filter or use a different strategy.
             if (folderId === null) {
                 const request = store.getAll();
                 request.onsuccess = () => {
@@ -509,8 +587,43 @@ export const dbService = {
             const store = transaction.objectStore('generation_history');
             const request = store.put(entry);
             request.onsuccess = () => {
-                this.notify('generation_history', 'update', entry);
+                this.notify('generation_history', 'insert', entry);
                 resolve();
+            };
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async getRecentHistoryBatch(limit: number, offset: number, sortOrder: 'prev' | 'next' = 'prev'): Promise<DBGenerationHistory[]> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('generation_history', 'readonly');
+            const store = transaction.objectStore('generation_history');
+            const index = store.index('timestamp');
+
+            const items: DBGenerationHistory[] = [];
+            let skipped = 0;
+            const request = index.openCursor(null, sortOrder);
+
+            request.onsuccess = (event) => {
+                const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+                if (!cursor) {
+                    resolve(items);
+                    return;
+                }
+
+                if (skipped < offset) {
+                    cursor.advance(offset - skipped);
+                    skipped = offset;
+                    return;
+                }
+
+                items.push(cursor.value);
+                if (items.length < limit) {
+                    cursor.continue();
+                } else {
+                    resolve(items);
+                }
             };
             request.onerror = () => reject(request.error);
         });

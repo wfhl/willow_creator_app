@@ -66,7 +66,8 @@ export default function WillowPostCreator() {
     const [refineTarget, setRefineTarget] = useState<{ url: string, index: number } | null>(null);
     const [refinePrompt, setRefinePrompt] = useState("");
     const [isRefining, setIsRefining] = useState(false);
-    const [refineResultUrl, setRefineResultUrl] = useState<string | null>(null);
+    const [refineResultUrls, setRefineResultUrls] = useState<string[]>([]);
+    const [refineProgress, setRefineProgress] = useState(0);
     const [refineAdditionalImages, setRefineAdditionalImages] = useState<Asset[]>([]);
 
     // Mutable Parameters State
@@ -126,9 +127,8 @@ export default function WillowPostCreator() {
                 else await dbService.saveConfig('caption_styles', CAPTION_TEMPLATES);
 
                 // Assets
-                const dbAssets = await dbService.getAllAssets();
-                // Only load assets that are flagged as 'selected' into the active prompt reference state
-                setAssets(dbAssets.filter(a => a.selected));
+                const selectedAssets = await dbService.getSelectedAssets();
+                setAssets(selectedAssets);
 
                 // Posts
                 const count = await dbService.getPostsCount();
@@ -450,12 +450,13 @@ export default function WillowPostCreator() {
                         return falService.generateMedia(request);
                     });
                     const results = await Promise.all(promises);
+                    const flattened = results.flat();
+                    setGeneratedMediaUrls(flattened);
+                    resultUrls = flattened;
+                } else {
+                    const results = await falService.generateMedia(request);
                     setGeneratedMediaUrls(results);
                     resultUrls = results;
-                } else {
-                    const url = await falService.generateMedia(request);
-                    setGeneratedMediaUrls([url]);
-                    resultUrls = [url];
                 }
 
             } else {
@@ -482,11 +483,11 @@ export default function WillowPostCreator() {
                     const imagePromises = taskIndexes.map(async (i) => {
                         try {
                             if (i > 0) await new Promise(r => setTimeout(r, i * 2000));
-                            const url = await geminiService.generateMedia(request);
-                            if (url) {
-                                setGeneratedMediaUrls(prev => [...prev, url]);
-                                collectedUrls.push(url);
-                                return url;
+                            const urls = await geminiService.generateMedia(request);
+                            if (urls && urls.length > 0) {
+                                setGeneratedMediaUrls(prev => [...prev, ...urls]);
+                                collectedUrls.push(...urls);
+                                return urls;
                             }
                         } catch (e) { console.error(e); }
                         return null;
@@ -494,10 +495,10 @@ export default function WillowPostCreator() {
                     await Promise.all(imagePromises);
                     resultUrls = collectedUrls;
                 } else {
-                    const result = await geminiService.generateMedia(request);
-                    if (result) {
-                        setGeneratedMediaUrls([result]);
-                        resultUrls = [result];
+                    const results = await geminiService.generateMedia(request);
+                    if (results && results.length > 0) {
+                        setGeneratedMediaUrls(results);
+                        resultUrls = results;
                     }
                 }
             }
@@ -768,6 +769,7 @@ export default function WillowPostCreator() {
             if (item.imageSize) setRefineImageSize(item.imageSize);
             if (item.numImages) setRefineNumImages(item.numImages);
             if (item.enhancePromptMode) setEnhancePromptMode(item.enhancePromptMode);
+            setRefineResultUrls([]); // Clear old results
             if (item.inputImageUrl) {
                 setRefineTarget({ url: item.inputImageUrl, index: -1 });
             }
@@ -846,7 +848,7 @@ export default function WillowPostCreator() {
         setRefineTarget({ url, index });
         setMediaType('image');
         setRefinePrompt("");
-        setRefineResultUrl(null);
+        setRefineResultUrls([]);
         setActiveTab('edit');
     };
 
@@ -871,9 +873,8 @@ export default function WillowPostCreator() {
                 });
             }
 
-            // Check if already exists
-            const allAssets = await dbService.getAllAssets();
-            const exists = allAssets.find(a => a.base64 === base64);
+            // Check if already exists (Efficiently)
+            const exists = await dbService.findAssetByBase64(base64);
             if (exists) {
                 if (!confirm("This image is already in your Asset Library. Save another copy?")) {
                     return;
@@ -957,19 +958,21 @@ export default function WillowPostCreator() {
         }
     };
 
-    const handleApproveRefinement = (action: 'replace' | 'add') => {
-        if (!refineResultUrl) return;
-        if (action === 'replace' && refineTarget) {
+    const handleApproveRefinement = (action: 'replace' | 'add', url?: string) => {
+        const targetUrl = url || (refineResultUrls.length > 0 ? refineResultUrls[0] : null);
+        if (!targetUrl) return;
+
+        if (action === 'replace' && refineTarget && refineTarget.index !== -1) {
             setGeneratedMediaUrls(prev => {
                 const next = [...prev];
-                next[refineTarget.index] = refineResultUrl;
+                next[refineTarget.index] = targetUrl;
                 return next;
             });
         } else {
-            setGeneratedMediaUrls(prev => [...prev, refineResultUrl]);
+            setGeneratedMediaUrls(prev => [...prev, targetUrl]);
         }
         setRefineTarget(null);
-        setRefineResultUrl(null);
+        setRefineResultUrls([]);
         setActiveTab('create');
     };
 
@@ -1064,7 +1067,7 @@ export default function WillowPostCreator() {
                             setIsGeneratingMedia(true);
 
                             try {
-                                let newUrl: string | null = null;
+                                let newUrl: string[] | null = null;
 
                                 if (isFalModel) {
                                     const request: FalGenerationRequest = {
@@ -1107,10 +1110,10 @@ export default function WillowPostCreator() {
                                     newUrl = await geminiService.generateMedia(request);
                                 }
 
-                                if (newUrl) {
+                                if (newUrl && newUrl.length > 0) {
                                     setGeneratedMediaUrls(prev => {
                                         const next = [...prev];
-                                        next[index] = newUrl!;
+                                        next[index] = newUrl![0]; // Take first from reroll
                                         return next;
                                     });
                                 }
@@ -1233,14 +1236,16 @@ export default function WillowPostCreator() {
                         setSelectedModel={(val) => { setEditSelectedModel(val); persistParam('editSelectedModel', val); }}
                         refineAdditionalImages={refineAdditionalImages}
                         setRefineAdditionalImages={setRefineAdditionalImages}
-                        refineResultUrl={refineResultUrl}
-                        setRefineResultUrl={setRefineResultUrl}
+                        refineResultUrls={refineResultUrls}
+                        setRefineResultUrls={setRefineResultUrls}
                         isRefining={isRefining}
+                        refineProgress={refineProgress}
                         enhancePromptMode={enhancePromptMode}
                         setEnhancePromptMode={(val) => { setEnhancePromptMode(val as "standard" | "fast"); persistParam('enhancePromptMode', val); }}
                         onRefineSubmit={async () => {
                             if (!refineTarget || !refinePrompt) return;
                             setIsRefining(true);
+                            setRefineProgress(10); // Start progress
                             try {
                                 const urlToBase64 = async (url: string) => {
                                     if (url.startsWith('data:')) return url.split(',')[1];
@@ -1253,59 +1258,50 @@ export default function WillowPostCreator() {
                                     });
                                 };
 
-                                let url = "";
+                                let urlUrls: string[] = [];
                                 const isVideo = refineTarget.url.startsWith('data:video') || refineTarget.url.match(/\.(mp4|mov|webm)$/i);
 
                                 if (isVideo) {
                                     // VIDEO EDIT FLOW
-                                    // 1. Upload Video to Fal (if data URI or local blob) to get URL, or use direct if public
-                                    // For simplicity, we'll try to treat as file upload if needed, but falService.generateMedia expects specific handling
-                                    // Let's rely on falService handling checks or upload helper
-
                                     let videoUrl = refineTarget.url;
                                     if (videoUrl.startsWith('data:') || videoUrl.startsWith('blob:')) {
                                         const blob = await (await fetch(videoUrl)).blob();
                                         videoUrl = await falService.uploadFile(blob);
                                     }
+                                    setRefineProgress(30);
 
-                                    // 2. Prepare Request
                                     const req: FalGenerationRequest = {
                                         model: editSelectedModel,
                                         prompt: refinePrompt,
                                         video_url: videoUrl,
-                                        editConfig: {
-                                            enableSafety: false
-                                        }
+                                        editConfig: { enableSafety: false }
                                     };
 
-                                    // 3. Handle Secondary Image for Move/Replace
                                     if (editSelectedModel.includes('move') || editSelectedModel.includes('replace')) {
                                         if (refineAdditionalImages.length > 0) {
-                                            // Upload secondary image
-                                            let imgUrl = refineAdditionalImages[0].base64; // Assuming base64 for now from state
+                                            let imgUrl = refineAdditionalImages[0].base64;
                                             if (imgUrl.startsWith('data:')) {
                                                 imgUrl = await falService.uploadBase64ToFal(imgUrl.split(',')[1]);
                                             }
-                                            req.image_url = imgUrl; // Fal Service maps this to 'image_url' input
+                                            req.image_url = imgUrl;
                                         } else {
                                             alert("Subject image required for this model.");
                                             setIsRefining(false);
                                             return;
                                         }
                                     }
-
-                                    url = await falService.generateMedia(req);
-
+                                    const results = await falService.generateMedia(req);
+                                    urlUrls = results;
                                 } else {
-                                    // IMAGE EDIT FLOW (Existing)
+                                    // IMAGE EDIT FLOW
                                     const base64 = await urlToBase64(refineTarget.url);
                                     const contentParts: any[] = [{ inlineData: { mimeType: "image/jpeg", data: base64 } }];
                                     refineAdditionalImages.forEach(img => {
                                         contentParts.push({ inlineData: { mimeType: "image/jpeg", data: img.base64.split(',')[1] } });
                                     });
+                                    setRefineProgress(40);
 
                                     if (editSelectedModel.includes('grok') || editSelectedModel.includes('seedream') || editSelectedModel.includes('wan') || editSelectedModel.includes('fal')) {
-                                        // Fal Service
                                         const req: FalGenerationRequest = {
                                             model: editSelectedModel,
                                             prompt: refinePrompt,
@@ -1317,9 +1313,9 @@ export default function WillowPostCreator() {
                                                 enhancePromptMode
                                             }
                                         };
-                                        url = await falService.generateMedia(req);
+                                        const results = await falService.generateMedia(req);
+                                        urlUrls = results;
                                     } else {
-                                        // Gemini Service
                                         const req: GenerationRequest = {
                                             type: 'edit',
                                             prompt: refinePrompt,
@@ -1331,21 +1327,22 @@ export default function WillowPostCreator() {
                                                 numImages: refineNumImages
                                             }
                                         };
-                                        url = await geminiService.generateMedia(req);
+                                        const results = await geminiService.generateMedia(req);
+                                        urlUrls = results;
                                     }
                                 }
 
-                                if (url) {
-                                    setRefineResultUrl(url);
-                                    // Save to History
+                                if (urlUrls.length > 0) {
+                                    setRefineResultUrls(urlUrls);
+                                    setRefineProgress(100);
                                     try {
                                         await dbService.saveGenerationHistory({
                                             id: generateUUID(),
                                             timestamp: Date.now(),
-                                            type: isVideo ? 'video' : 'image', // Record correct type
+                                            type: isVideo ? 'video' : 'image',
                                             prompt: refinePrompt,
                                             model: editSelectedModel,
-                                            mediaUrls: [url],
+                                            mediaUrls: urlUrls,
                                             service: (editSelectedModel.includes('grok') || editSelectedModel.includes('seedream') || isVideo) ? 'fal' : 'gemini',
                                             status: 'success',
                                             inputImageUrl: refineTarget?.url,
@@ -1356,9 +1353,28 @@ export default function WillowPostCreator() {
                                         });
                                     } catch (err) { console.error("Failed to save history:", err); }
                                 }
-                            } catch (e) { console.error(e); alert("Refinement failed"); } finally { setIsRefining(false); }
+                            } catch (e) {
+                                console.error(e);
+                                alert("Refinement failed");
+                            } finally {
+                                setIsRefining(false);
+                                setRefineProgress(0);
+                            }
                         }}
-                        onApproveRefinement={handleApproveRefinement}
+                        onApproveRefinement={(action, url) => {
+                            // If url provided, approve that specific one, otherwise approve all?
+                            // Standard behavior: if 1 result, just do it. If multiple, maybe we need selection.
+                            // For simplicity, let's map action to the primary result or all
+                            const itemsToApprove = url ? [url] : refineResultUrls;
+
+                            itemsToApprove.forEach(u => {
+                                if (action === 'replace') {
+                                    handleApproveRefinement('replace', u);
+                                } else {
+                                    handleApproveRefinement('add', u);
+                                }
+                            });
+                        }}
                         onExit={() => setActiveTab('create')}
                         onI2VEntry={(url) => handleI2VEntry(url, -1)}
                         presetsDropdown={
@@ -1449,7 +1465,8 @@ export default function WillowPostCreator() {
                                             enableSafety: false
                                         }
                                     };
-                                    url = await falService.generateMedia(req);
+                                    const results = await falService.generateMedia(req);
+                                    url = results[0];
                                 } else {
                                     // Gemini / Veo Service
                                     const req: GenerationRequest = {
@@ -1464,7 +1481,8 @@ export default function WillowPostCreator() {
                                         },
                                         contentParts
                                     };
-                                    url = await geminiService.generateMedia(req);
+                                    const results = await geminiService.generateMedia(req);
+                                    url = results[0];
                                 }
 
                                 if (url) {

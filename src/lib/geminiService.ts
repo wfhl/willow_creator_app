@@ -132,7 +132,7 @@ export const geminiService = {
     },
 
     // Step 3: Generate Media
-    async generateMedia(request: GenerationRequest): Promise<string> {
+    async generateMedia(request: GenerationRequest): Promise<string[]> {
         // 0. Validation for specific Gemini/Veo requirements can go here
         if (request.model?.includes('grok') || request.model?.includes('seedream') || request.model?.includes('seedance')) {
             throw new Error("Fal.ai models should be routed to falService.");
@@ -220,7 +220,7 @@ export const geminiService = {
                 }
 
                 if (foundImage) {
-                    return foundImage;
+                    return [foundImage];
                 }
 
                 throw new Error(`No image data found. Response parts: ${JSON.stringify(response.candidates?.[0]?.content?.parts || [])}`);
@@ -352,7 +352,7 @@ export const geminiService = {
                         for (let i = 0; i < bytes.byteLength; i++) {
                             binary += String.fromCharCode(bytes[i]);
                         }
-                        return `data:video/mp4;base64,${btoa(binary)}`;
+                        return [`data:video/mp4;base64,${btoa(binary)}`];
                     }
                 }
 

@@ -30,7 +30,7 @@ export interface FalGenerationRequest {
 }
 
 export const falService = {
-    async generateMedia(request: FalGenerationRequest): Promise<string> {
+    async generateMedia(request: FalGenerationRequest): Promise<string[]> {
         console.group(`[Fal.ai] Generating with ${request.model}`);
         console.log("Request:", request);
 
@@ -194,12 +194,6 @@ export const falService = {
                     input.loras = filteredLoras;
                 }
 
-
-                if (filteredLoras.length > 0) {
-                    input.loras = filteredLoras;
-                }
-
-
                 // --- WAN 2.2 IMAGE-TO-VIDEO ---
             } else if (request.model === 'fal-ai/wan/v2.2-14b/animate/move') {
                 endpoint = "fal-ai/wan/v2.2-14b/animate/move";
@@ -249,14 +243,21 @@ export const falService = {
 
             console.log("Fal Result:", result);
 
-            // 4. Extract Result URL
-            if (result.data && result.data.video && result.data.video.url) return result.data.video.url;
-            if (result.video && result.video.url) return result.video.url;
-            if (result.data && result.data.images && result.data.images.length > 0) return result.data.images[0].url;
-            if (result.images && result.images.length > 0) return result.images[0].url;
+            // 4. Extract Result URLs (Supporting multiple images/videos)
+            const mediaUrls: string[] = [];
+
+            if (result.data && result.data.video && result.data.video.url) mediaUrls.push(result.data.video.url);
+            else if (result.video && result.video.url) mediaUrls.push(result.video.url);
+
+            if (result.data && result.data.images && result.data.images.length > 0) {
+                result.data.images.forEach((img: any) => mediaUrls.push(img.url));
+            } else if (result.images && result.images.length > 0) {
+                result.images.forEach((img: any) => mediaUrls.push(img.url));
+            }
+
+            if (mediaUrls.length > 0) return mediaUrls;
 
             throw new Error("No media URL in Fal response: " + JSON.stringify(result));
-
         } catch (e: any) {
             console.error("Fal generation failed. Full Request Input:", JSON.stringify(input, null, 2));
             console.error("Error Detail:", e);
