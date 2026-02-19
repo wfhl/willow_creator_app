@@ -104,9 +104,9 @@ export const falService = {
                     prompt: request.prompt,
                     image_urls: [primaryImageUrl, ...additionalImageUrls],
                     image_size: request.editConfig?.imageSize || "auto_4K",
-                    num_images: 1,
+                    num_images: request.editConfig?.numImages || 1,
                     enable_safety_checker: request.editConfig?.enableSafety ?? false,
-                    ...(request.model.includes('v4/') ? { enhance_prompt_mode: request.editConfig?.enhancePromptMode || "standard" } : {})
+                    ...((request.model.includes('v4/') || request.model.includes('v4.5/')) ? { enhance_prompt_mode: request.editConfig?.enhancePromptMode || "standard" } : {})
                 };
             } else if (request.model.includes('seedream') && request.model.includes('text-to-image')) {
                 endpoint = request.model;

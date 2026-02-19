@@ -78,6 +78,7 @@ export interface DBGenerationHistory {
     status: 'success' | 'failed';
     errorMessage?: string;
     inputImageUrl?: string;
+    enhancePromptMode?: 'standard' | 'fast';
     tab?: string; // 'create' | 'edit' | 'animate'
 }
 

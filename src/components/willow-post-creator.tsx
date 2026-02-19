@@ -164,7 +164,7 @@ export default function WillowPostCreator() {
         loadInitialData();
 
         // Subscribe to DB changes to keep UI in sync
-        const unsubscribe = dbService.subscribe((store, type, data) => {
+        const unsubscribe = dbService.subscribe((store, type, _data) => {
             if (store === 'posts') {
                 // Reload posts for simplicity, or optimistically update
                 dbService.getRecentPostsBatch(24, 0, sortOrder).then(setSavedPosts);
@@ -745,7 +745,8 @@ export default function WillowPostCreator() {
     };
 
     const handleRecall = (item: DBGenerationHistory) => {
-        const targetTab = item.tab || (item.type === 'video' ? 'animate' : 'create');
+        const isEditModel = item.model.includes('edit') || item.model.includes('replace') || item.model.includes('move');
+        const targetTab = item.tab || (item.inputImageUrl ? (item.type === 'video' ? (isEditModel ? 'edit' : 'animate') : 'edit') : 'create');
 
         if (targetTab === 'animate') {
             setActiveTab('animate');
@@ -766,6 +767,7 @@ export default function WillowPostCreator() {
             setEditSelectedModel(item.model);
             if (item.imageSize) setRefineImageSize(item.imageSize);
             if (item.numImages) setRefineNumImages(item.numImages);
+            if (item.enhancePromptMode) setEnhancePromptMode(item.enhancePromptMode);
             if (item.inputImageUrl) {
                 setRefineTarget({ url: item.inputImageUrl, index: -1 });
             }
@@ -1268,7 +1270,7 @@ export default function WillowPostCreator() {
 
                                     // 2. Prepare Request
                                     const req: FalGenerationRequest = {
-                                        model: selectedModel,
+                                        model: editSelectedModel,
                                         prompt: refinePrompt,
                                         video_url: videoUrl,
                                         editConfig: {
@@ -1277,7 +1279,7 @@ export default function WillowPostCreator() {
                                     };
 
                                     // 3. Handle Secondary Image for Move/Replace
-                                    if (selectedModel.includes('move') || selectedModel.includes('replace')) {
+                                    if (editSelectedModel.includes('move') || editSelectedModel.includes('replace')) {
                                         if (refineAdditionalImages.length > 0) {
                                             // Upload secondary image
                                             let imgUrl = refineAdditionalImages[0].base64; // Assuming base64 for now from state
@@ -1302,7 +1304,7 @@ export default function WillowPostCreator() {
                                         contentParts.push({ inlineData: { mimeType: "image/jpeg", data: img.base64.split(',')[1] } });
                                     });
 
-                                    if (selectedModel.includes('grok') || selectedModel.includes('seedream') || selectedModel.includes('wan') || selectedModel.includes('fal')) {
+                                    if (editSelectedModel.includes('grok') || editSelectedModel.includes('seedream') || editSelectedModel.includes('wan') || editSelectedModel.includes('fal')) {
                                         // Fal Service
                                         const req: FalGenerationRequest = {
                                             model: editSelectedModel,
@@ -1344,9 +1346,12 @@ export default function WillowPostCreator() {
                                             prompt: refinePrompt,
                                             model: editSelectedModel,
                                             mediaUrls: [url],
-                                            service: (selectedModel.includes('grok') || selectedModel.includes('seedream') || isVideo) ? 'fal' : 'gemini',
+                                            service: (editSelectedModel.includes('grok') || editSelectedModel.includes('seedream') || isVideo) ? 'fal' : 'gemini',
                                             status: 'success',
                                             inputImageUrl: refineTarget?.url,
+                                            imageSize: refineImageSize,
+                                            numImages: refineNumImages,
+                                            enhancePromptMode: enhancePromptMode,
                                             tab: 'edit'
                                         });
                                     } catch (err) { console.error("Failed to save history:", err); }
@@ -1476,6 +1481,11 @@ export default function WillowPostCreator() {
                                             service: (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) ? 'fal' : 'gemini',
                                             status: 'success',
                                             inputImageUrl: i2vTarget?.url,
+                                            videoResolution: videoResolution,
+                                            videoDuration: videoDuration,
+                                            aspectRatio: i2vAspectRatio,
+                                            withAudio: withAudio,
+                                            cameraFixed: cameraFixed,
                                             tab: 'animate'
                                         });
                                     } catch (err) { console.error("Failed to save history:", err); }

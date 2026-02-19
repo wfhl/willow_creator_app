@@ -396,9 +396,9 @@ export function EditTab({
                                                 </div>
                                             )}
 
-                                            {selectedModel.includes('grok') && !isVideo && (
+                                            {(selectedModel.includes('grok') || selectedModel.includes('v4.5/')) && !isVideo && (
                                                 <div className="space-y-1 w-24 animate-in fade-in slide-in-from-left-2 duration-300">
-                                                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Images</label>
+                                                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Quantity</label>
                                                     <select
                                                         value={refineNumImages}
                                                         onChange={(e) => setRefineNumImages(Number(e.target.value))}
@@ -414,7 +414,7 @@ export function EditTab({
 
                                             {(selectedModel.includes('seedream') || selectedModel.includes('grok')) && !isVideo && (
                                                 <>
-                                                    {selectedModel.includes('seedream') && (
+                                                    {selectedModel.includes('seedream') && !selectedModel.includes('v4.5/') && (
                                                         <div className="space-y-1 w-32 animate-in fade-in slide-in-from-left-2 duration-300">
                                                             <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Enhance</label>
                                                             <select
