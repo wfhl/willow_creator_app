@@ -74,6 +74,7 @@ export function EditTab({
         { id: 'fal-ai/wan/v2.2-14b/animate/replace', name: 'Wan Replace' },
     ] : [
         { id: 'google/gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash' },
+        { id: 'nano-banana-pro-preview', name: 'Nano Banana Pro' },
         { id: 'fal-ai/bytedance/seedream/v4.5/edit', name: 'Seedream 4.5 Edit' },
         { id: 'xai/grok-imagine-image/edit', name: 'Grok Image Edit' }
     ], [isVideo]);
@@ -225,7 +226,7 @@ export function EditTab({
                         </div>
 
                         {/* Refine Actions: Reference Images */}
-                        {(selectedModel.includes('seedream') || selectedModel.includes('grok')) && !isVideo && (
+                        {(selectedModel.includes('seedream') || selectedModel.includes('grok') || selectedModel.includes('banana')) && !isVideo && (
                             <div className="mt-4">
                                 <div className="flex items-center justify-between mb-2">
                                     <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest flex items-center gap-2">
@@ -412,7 +413,7 @@ export function EditTab({
                                                 </div>
                                             )}
 
-                                            {(selectedModel.includes('seedream') || selectedModel.includes('grok')) && !isVideo && (
+                                            {(selectedModel.includes('seedream') || selectedModel.includes('grok') || selectedModel.includes('banana')) && !isVideo && (
                                                 <>
                                                     {selectedModel.includes('seedream') && !selectedModel.includes('v4.5/') && (
                                                         <div className="space-y-1 w-32 animate-in fade-in slide-in-from-left-2 duration-300">

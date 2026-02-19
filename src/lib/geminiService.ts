@@ -139,7 +139,7 @@ export const geminiService = {
         }
 
         // 1. Image Generation (Nano Banana Pro / Gemini 3 Pro)
-        if (request.type === 'image') {
+        if (request.type === 'image' || request.type === 'edit') {
             const modelId = request.model || "nano-banana-pro-preview";
             console.group(`[Real Gen] Generating image with ${modelId}`);
             console.log("Request:", JSON.stringify(request, null, 2));
