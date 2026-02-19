@@ -65,9 +65,29 @@ export function EditTab({
 }: EditTabProps) {
     const [isDragging, setIsDragging] = useState(false);
 
+    // Derived state for media type
+    const isVideo = refineTarget?.url?.startsWith('data:video') || refineTarget?.url?.match(/\.(mp4|mov|webm)$/i);
+
+    const availableModels = isVideo ? [
+        { id: 'xai/grok-imagine-video/edit-video', name: 'Grok Edit' },
+        { id: 'fal-ai/wan/v2.2-14b/animate/move', name: 'Wan Move (Ref Only)' },
+        { id: 'fal-ai/wan/v2.2-14b/animate/replace', name: 'Wan Replace' },
+    ] : [
+        { id: 'google/gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash' },
+        { id: 'fal-ai/bytedance/seedream/v4.5/edit', name: 'Seedream 4.5 Edit' },
+        { id: 'xai/grok-imagine-image/edit', name: 'Grok Image Edit' }
+    ];
+
+    // Ensure selected model is valid for current media type
+    React.useEffect(() => {
+        if (!availableModels.some(m => m.id === selectedModel)) {
+            setSelectedModel(availableModels[0].id);
+        }
+    }, [isVideo ? 'video' : 'image', selectedModel]); // Simplified dependency to avoid loop
+
     // Helper to process a file to a data URL
     const processFile = (file: File) => {
-        if (!file.type.startsWith('image/')) return;
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) return;
         const reader = new FileReader();
         reader.onload = (re) => {
             if (re.target?.result) {
@@ -164,19 +184,30 @@ export function EditTab({
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
                     <div className="p-4 md:p-8 border-b lg:border-b-0 lg:border-r border-white/5">
                         <div className="aspect-[3/4] bg-black/40 rounded-xl overflow-hidden border border-white/10 shadow-inner group relative">
-                            <img
-                                src={refineTarget.url}
-                                alt="Target"
-                                className="w-full h-full object-cover cursor-zoom-in"
-                                onClick={() => onPreview(refineTarget.url)}
-                            />
+                            {isVideo ? (
+                                <video
+                                    src={refineTarget.url}
+                                    className="w-full h-full object-cover"
+                                    controls
+                                    autoPlay
+                                    muted
+                                    loop
+                                />
+                            ) : (
+                                <img
+                                    src={refineTarget.url}
+                                    alt="Target"
+                                    className="w-full h-full object-cover cursor-zoom-in"
+                                    onClick={() => onPreview(refineTarget.url)}
+                                />
+                            )}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex flex-col items-end justify-between p-4 pointer-events-none">
                                 <label className="pointer-events-auto cursor-pointer bg-white/10 hover:bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2 transition-all shadow-lg">
                                     <ImagePlus className="w-4 h-4 text-emerald-400" />
                                     <span className="text-[10px] text-white font-bold uppercase tracking-widest">Replace</span>
                                     <input
                                         type="file"
-                                        accept="image/*"
+                                        accept="image/*,video/*"
                                         className="hidden"
                                         onChange={handleRefineImageUpload}
                                     />
@@ -186,7 +217,7 @@ export function EditTab({
                         </div>
 
                         {/* Refine Actions: Reference Images */}
-                        {(selectedModel.includes('seedream') || selectedModel.includes('grok')) && (
+                        {(selectedModel.includes('seedream') || selectedModel.includes('grok')) && !isVideo && (
                             <div className="mt-4">
                                 <div className="flex items-center justify-between mb-2">
                                     <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest flex items-center gap-2">
@@ -241,6 +272,61 @@ export function EditTab({
                                 </div>
                             </div>
                         )}
+
+                        {/* Video Edit Actions: Subject Input for Move/Replace */}
+                        {isVideo && (selectedModel.includes('move') || selectedModel.includes('replace')) && (
+                            <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest flex items-center gap-2">
+                                        <ImagePlus className="w-3 h-3" /> Subject Reference
+                                    </label>
+                                    <span className="text-[10px] text-emerald-400 font-bold">Required</span>
+                                </div>
+                                <div className="flex gap-4">
+                                    {refineAdditionalImages.length > 0 ? (
+                                        <div className="relative w-24 h-24 group">
+                                            <img src={refineAdditionalImages[0].base64} className="w-full h-full object-cover rounded-xl border border-white/10" alt="subject" />
+                                            <button
+                                                onClick={() => setRefineAdditionalImages([])}
+                                                className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                                            >
+                                                <X className="w-3 h-3 text-white" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <label className="w-24 h-24 bg-white/5 border border-white/10 border-dashed rounded-xl flex flex-col items-center justify-center hover:bg-white/10 transition-colors cursor-pointer group">
+                                            <ImagePlus className="w-6 h-6 text-white/30 group-hover:text-emerald-400 transition-colors mb-2" />
+                                            <span className="text-[9px] text-white/40 uppercase font-bold">Upload</span>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={async (e) => {
+                                                    if (e.target.files?.[0]) {
+                                                        const file = e.target.files[0];
+                                                        const reader = new FileReader();
+                                                        const base64 = await new Promise<string>((resolve) => {
+                                                            reader.onload = () => resolve(reader.result as string);
+                                                            reader.readAsDataURL(file);
+                                                        });
+                                                        setRefineAdditionalImages([{
+                                                            id: generateUUID(), name: file.name, base64, type: 'image', folderId: null, timestamp: Date.now()
+                                                        }]);
+                                                    }
+                                                }}
+                                            />
+                                        </label>
+                                    )}
+                                    <div className="flex-1">
+                                        <p className="text-xs text-white/60 leading-relaxed">
+                                            {selectedModel.includes('move')
+                                                ? "Provide an image of the character/subject you want to ANIMATE matching the video's motion."
+                                                : "Provide an image of the character/object you want to INSERT into the video scene."}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <div className="p-4 md:p-8 space-y-6 md:space-y-8 flex flex-col justify-center bg-black/20">
                         {!refineResultUrl ? (
@@ -268,10 +354,9 @@ export function EditTab({
                                                     onChange={(e) => setSelectedModel(e.target.value)}
                                                     className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none"
                                                 >
-                                                    <option value="nano-banana-pro-preview">Nano Banana (Refine)</option>
-                                                    <option value="fal-ai/bytedance/seedream/v4/edit">Seedream 4.0 Edit</option>
-                                                    <option value="fal-ai/bytedance/seedream/v4.5/edit">Seedream 4.5 Edit</option>
-                                                    <option value="xai/grok-imagine-image/edit">Grok Edit</option>
+                                                    {availableModels.map(m => (
+                                                        <option key={m.id} value={m.id}>{m.name}</option>
+                                                    ))}
                                                 </select>
                                             </div>
 
@@ -303,7 +388,7 @@ export function EditTab({
                                                 </div>
                                             )}
 
-                                            {selectedModel.includes('grok') && (
+                                            {selectedModel.includes('grok') && !isVideo && (
                                                 <div className="space-y-1 w-24 animate-in fade-in slide-in-from-left-2 duration-300">
                                                     <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Images</label>
                                                     <select
@@ -319,7 +404,7 @@ export function EditTab({
                                                 </div>
                                             )}
 
-                                            {(selectedModel.includes('seedream') || selectedModel.includes('grok')) && (
+                                            {(selectedModel.includes('seedream') || selectedModel.includes('grok')) && !isVideo && (
                                                 <>
                                                     {selectedModel.includes('seedream') && (
                                                         <div className="space-y-1 w-32 animate-in fade-in slide-in-from-left-2 duration-300">
@@ -444,7 +529,7 @@ export function EditTab({
                         )}
                     </div>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

@@ -159,6 +159,27 @@ export default function WillowPostCreator() {
             } catch (e) { console.error(e); }
         };
         loadInitialData();
+
+        // Subscribe to DB changes to keep UI in sync
+        const unsubscribe = dbService.subscribe((store, type, data) => {
+            if (store === 'posts') {
+                // Reload posts for simplicity, or optimistically update
+                dbService.getRecentPostsBatch(24, 0, sortOrder).then(setSavedPosts);
+                dbService.getPostsCount().then(setTotalSavedCount);
+            } else if (store === 'assets') {
+                if (type === 'insert' || type === 'update') {
+                    // This creates a potential issue if we are in a subfolder. 
+                    // Ideally we only reload if effective. 
+                    // For now, let's rely on AssetLibraryTab's own subscription/loading?
+                    // AssetLibraryTab is a child, it should handle its own subscriptions if needed.
+                    // But shared state 'assets' is unused? 
+                    // Actually 'assets' state at line 24 seems unused in the main view, mostly AssetLibraryTab manages its own.
+                    // Let's just fix Posts for now.
+                }
+            }
+        });
+
+        return () => { unsubscribe(); };
     }, []);
 
     // Persist Parameters Helper
@@ -1212,41 +1233,87 @@ export default function WillowPostCreator() {
                                         reader.readAsDataURL(blob);
                                     });
                                 };
-                                const base64 = await urlToBase64(refineTarget.url);
-                                const contentParts: any[] = [{ inlineData: { mimeType: "image/jpeg", data: base64 } }];
-                                refineAdditionalImages.forEach(img => {
-                                    contentParts.push({ inlineData: { mimeType: "image/jpeg", data: img.base64.split(',')[1] } });
-                                });
 
                                 let url = "";
-                                if (selectedModel.includes('grok') || selectedModel.includes('seedream')) {
-                                    // Fal Service
+                                const isVideo = refineTarget.url.startsWith('data:video') || refineTarget.url.match(/\.(mp4|mov|webm)$/i);
+
+                                if (isVideo) {
+                                    // VIDEO EDIT FLOW
+                                    // 1. Upload Video to Fal (if data URI or local blob) to get URL, or use direct if public
+                                    // For simplicity, we'll try to treat as file upload if needed, but falService.generateMedia expects specific handling
+                                    // Let's rely on falService handling checks or upload helper
+
+                                    let videoUrl = refineTarget.url;
+                                    if (videoUrl.startsWith('data:') || videoUrl.startsWith('blob:')) {
+                                        const blob = await (await fetch(videoUrl)).blob();
+                                        videoUrl = await falService.uploadFile(blob);
+                                    }
+
+                                    // 2. Prepare Request
                                     const req: FalGenerationRequest = {
                                         model: selectedModel,
                                         prompt: refinePrompt,
-                                        contentParts,
+                                        video_url: videoUrl,
                                         editConfig: {
-                                            imageSize: refineImageSize,
-                                            numImages: refineNumImages,
-                                            enableSafety: false,
-                                            enhancePromptMode
+                                            enableSafety: false
                                         }
                                     };
+
+                                    // 3. Handle Secondary Image for Move/Replace
+                                    if (selectedModel.includes('move') || selectedModel.includes('replace')) {
+                                        if (refineAdditionalImages.length > 0) {
+                                            // Upload secondary image
+                                            let imgUrl = refineAdditionalImages[0].base64; // Assuming base64 for now from state
+                                            if (imgUrl.startsWith('data:')) {
+                                                imgUrl = await falService.uploadBase64ToFal(imgUrl.split(',')[1]);
+                                            }
+                                            req.image_url = imgUrl; // Fal Service maps this to 'image_url' input
+                                        } else {
+                                            alert("Subject image required for this model.");
+                                            setIsRefining(false);
+                                            return;
+                                        }
+                                    }
+
                                     url = await falService.generateMedia(req);
+
                                 } else {
-                                    // Gemini Service
-                                    const req: GenerationRequest = {
-                                        type: 'edit',
-                                        prompt: refinePrompt,
-                                        model: selectedModel,
-                                        aspectRatio,
-                                        contentParts,
-                                        editConfig: {
-                                            imageSize: refineImageSize,
-                                            numImages: refineNumImages
-                                        }
-                                    };
-                                    url = await geminiService.generateMedia(req);
+                                    // IMAGE EDIT FLOW (Existing)
+                                    const base64 = await urlToBase64(refineTarget.url);
+                                    const contentParts: any[] = [{ inlineData: { mimeType: "image/jpeg", data: base64 } }];
+                                    refineAdditionalImages.forEach(img => {
+                                        contentParts.push({ inlineData: { mimeType: "image/jpeg", data: img.base64.split(',')[1] } });
+                                    });
+
+                                    if (selectedModel.includes('grok') || selectedModel.includes('seedream') || selectedModel.includes('wan') || selectedModel.includes('fal')) {
+                                        // Fal Service
+                                        const req: FalGenerationRequest = {
+                                            model: selectedModel,
+                                            prompt: refinePrompt,
+                                            contentParts,
+                                            editConfig: {
+                                                imageSize: refineImageSize,
+                                                numImages: refineNumImages,
+                                                enableSafety: false,
+                                                enhancePromptMode
+                                            }
+                                        };
+                                        url = await falService.generateMedia(req);
+                                    } else {
+                                        // Gemini Service
+                                        const req: GenerationRequest = {
+                                            type: 'edit',
+                                            prompt: refinePrompt,
+                                            model: selectedModel,
+                                            aspectRatio,
+                                            contentParts,
+                                            editConfig: {
+                                                imageSize: refineImageSize,
+                                                numImages: refineNumImages
+                                            }
+                                        };
+                                        url = await geminiService.generateMedia(req);
+                                    }
                                 }
 
                                 if (url) {
@@ -1256,11 +1323,11 @@ export default function WillowPostCreator() {
                                         await dbService.saveGenerationHistory({
                                             id: generateUUID(),
                                             timestamp: Date.now(),
-                                            type: 'image',
+                                            type: isVideo ? 'video' : 'image', // Record correct type
                                             prompt: refinePrompt,
                                             model: selectedModel,
                                             mediaUrls: [url],
-                                            service: (selectedModel.includes('grok') || selectedModel.includes('seedream')) ? 'fal' : 'gemini',
+                                            service: (selectedModel.includes('grok') || selectedModel.includes('seedream') || isVideo) ? 'fal' : 'gemini',
                                             status: 'success',
                                             inputImageUrl: refineTarget?.url
                                         });

@@ -11,6 +11,7 @@ export interface FalGenerationRequest {
     prompt: string;
     aspectRatio?: string;
     image_url?: string;
+    video_url?: string; // For Video Edit/Move/Replace
     image_urls?: string[]; // For Seedream Edit
     contentParts?: any[];  // For handling uploads if not already URL
     videoConfig?: {
@@ -193,6 +194,41 @@ export const falService = {
                     input.loras = filteredLoras;
                 }
 
+
+                if (filteredLoras.length > 0) {
+                    input.loras = filteredLoras;
+                }
+
+
+                // --- WAN 2.2 IMAGE-TO-VIDEO ---
+            } else if (request.model === 'fal-ai/wan/v2.2-14b/animate/move') {
+                endpoint = "fal-ai/wan/v2.2-14b/animate/move";
+                input = {
+                    video_url: request.video_url, // Main video target
+                    image_url: primaryImageUrl,   // Subject reference
+                    guidance_scale: 1,
+                    num_inference_steps: 20,
+                    enable_safety_checker: request.editConfig?.enableSafety ?? false
+                };
+
+            } else if (request.model === 'fal-ai/wan/v2.2-14b/animate/replace') {
+                endpoint = "fal-ai/wan/v2.2-14b/animate/replace";
+                input = {
+                    video_url: request.video_url, // Main video target
+                    image_url: primaryImageUrl,   // Replacement character/object
+                    guidance_scale: 1,
+                    num_inference_steps: 20,
+                    enable_safety_checker: request.editConfig?.enableSafety ?? false
+                };
+
+            } else if (request.model === 'xai/grok-imagine-video/edit-video') {
+                endpoint = "xai/grok-imagine-video/edit-video";
+                input = {
+                    prompt: request.prompt,
+                    video_url: request.video_url, // Main video target
+                    resolution: request.videoConfig?.resolution || "auto"
+                    // Grok Edit handles video url directly
+                };
 
             } else {
                 throw new Error(`Unsupported Fal model: ${request.model}`);

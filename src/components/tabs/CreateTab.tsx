@@ -1,5 +1,5 @@
 import React, { type ChangeEvent } from 'react';
-import { Layers, Edit2, ImagePlus, ChevronDown, Video as VideoIcon, Sparkles, Copy, Loader2, Dices, Image as ImageIcon, Wand2, Download, Save, X, Upload, RotateCw, Trash2 } from 'lucide-react';
+import { Layers, Edit2, ImagePlus, ChevronDown, Video as VideoIcon, Sparkles, Copy, Loader2, Dices, Wand2, Download, Save, X, Upload, RotateCw, Trash2 } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
 import type { DBAsset as Asset } from '../../lib/dbService';
 import { dbService } from '../../lib/dbService';
@@ -635,6 +635,17 @@ export function CreateTab({
                             </div>
                         ) : generatedMediaUrls.length > 0 ? (
                             <div className="w-full h-full grid grid-cols-2 gap-4">
+                                <label className="aspect-[3/4] bg-white/5 border border-white/10 border-dashed rounded-lg flex flex-col items-center justify-center hover:bg-white/10 transition-colors cursor-pointer group hover:border-emerald-500/50">
+                                    <Upload className="w-8 h-8 text-white/20 group-hover:text-emerald-400 transition-colors mb-2" />
+                                    <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest group-hover:text-emerald-400 transition-colors">Add Media</span>
+                                    <input
+                                        type="file"
+                                        multiple
+                                        accept="image/*,video/*"
+                                        className="hidden"
+                                        onChange={(e) => onUploadToPost(e.target.files)}
+                                    />
+                                </label>
                                 {generatedMediaUrls.map((url, idx) => {
                                     const isVideo = url.startsWith('data:video') || !!url.match(/\.(mp4|webm|mov)$/i);
                                     return (
@@ -709,10 +720,24 @@ export function CreateTab({
                                 })}
                             </div>
                         ) : (
-                            <div className="text-center space-y-4 opacity-40">
-                                <ImageIcon className="w-16 h-16 mx-auto stroke-1" />
-                                <p className="text-sm font-medium tracking-widest uppercase">Preview Canvas</p>
-                            </div>
+                            <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer group opacity-60 hover:opacity-100 transition-opacity">
+                                <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-4 group-hover:bg-emerald-500/10 transition-colors border border-white/5 group-hover:border-emerald-500/30">
+                                    <Upload className="w-8 h-8 text-white/40 group-hover:text-emerald-400 transition-colors" />
+                                </div>
+                                <p className="text-sm font-medium tracking-widest uppercase text-white/60 group-hover:text-emerald-400 transition-colors">
+                                    Upload Media
+                                </p>
+                                <p className="text-xs text-white/30 mt-2">
+                                    or generate using AI
+                                </p>
+                                <input
+                                    type="file"
+                                    multiple
+                                    accept="image/*,video/*"
+                                    className="hidden"
+                                    onChange={(e) => onUploadToPost(e.target.files)}
+                                />
+                            </label>
                         )}
                     </div>
 
@@ -806,8 +831,6 @@ export function CreateTab({
                         </button>
                     </div>
 
-                    <div className="h-8 w-px bg-white/10 mx-2"></div>
-
                     {/* Middle: Save/Library Actions */}
                     <div className="flex items-center gap-2">
                         <button
@@ -826,24 +849,6 @@ export function CreateTab({
                         >
                             <Save className="w-5 h-5 opacity-60" />
                         </button>
-                    </div>
-
-                    <div className="relative">
-                        <input
-                            type="file"
-                            multiple
-                            accept="image/*,video/*"
-                            className="hidden"
-                            id="upload-media-post"
-                            onChange={(e) => onUploadToPost(e.target.files)}
-                        />
-                        <label
-                            htmlFor="upload-media-post"
-                            className="p-3 bg-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 border border-white/10 hover:border-emerald-500/30 rounded-xl transition-all group active-scale cursor-pointer flex items-center justify-center"
-                            title="Upload Custom Media to Post"
-                        >
-                            <Upload className="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity" />
-                        </label>
                     </div>
 
                     {/* Right: Generate Button */}

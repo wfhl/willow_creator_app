@@ -84,7 +84,18 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
 
     useEffect(() => {
         loadContent();
-    }, [loadContent]);
+
+        // Subscribe to DB changes
+        const unsubscribe = dbService.subscribe((store, type, _data) => {
+            if (store === 'assets' || store === 'folders') {
+                loadContent();
+            } else if (store === 'generation_history') {
+                if (subTab === 'history') loadHistory();
+            }
+        });
+
+        return () => { unsubscribe(); };
+    }, [loadContent, subTab, loadHistory]);
 
     const handleNavigate = async (folder: DBFolder | null) => {
         if (!folder) {
