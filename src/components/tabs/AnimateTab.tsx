@@ -242,7 +242,7 @@ export function AnimateTab({
                                 className="w-full h-full object-cover cursor-zoom-in"
                                 onClick={() => onPreview(i2vTarget.url)}
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-end justify-between p-4 pointer-events-none">
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex flex-col items-end justify-between p-4 pointer-events-none">
                                 <label className="pointer-events-auto cursor-pointer bg-white/10 hover:bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2 transition-all shadow-lg">
                                     <ImagePlus className="w-4 h-4 text-emerald-400" />
                                     <span className="text-[10px] text-white font-bold uppercase tracking-widest">Replace</span>
