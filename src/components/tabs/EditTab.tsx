@@ -68,7 +68,7 @@ export function EditTab({
     // Derived state for media type
     const isVideo = refineTarget?.url?.startsWith('data:video') || refineTarget?.url?.match(/\.(mp4|mov|webm)$/i);
 
-    const availableModels = isVideo ? [
+    const availableModels = React.useMemo(() => isVideo ? [
         { id: 'xai/grok-imagine-video/edit-video', name: 'Grok Edit' },
         { id: 'fal-ai/wan/v2.2-14b/animate/move', name: 'Wan Move (Ref Only)' },
         { id: 'fal-ai/wan/v2.2-14b/animate/replace', name: 'Wan Replace' },
@@ -76,14 +76,22 @@ export function EditTab({
         { id: 'google/gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash' },
         { id: 'fal-ai/bytedance/seedream/v4.5/edit', name: 'Seedream 4.5 Edit' },
         { id: 'xai/grok-imagine-image/edit', name: 'Grok Image Edit' }
-    ];
+    ], [isVideo]);
 
-    // Ensure selected model is valid for current media type
+    // Ensure selected model is valid for current media type (image vs video category)
     React.useEffect(() => {
-        if (!availableModels.some(m => m.id === selectedModel)) {
-            setSelectedModel(availableModels[0].id);
+        const isSelectedVideoModel = selectedModel.includes('video') || selectedModel.includes('animate') || selectedModel.includes('wan');
+        const isCurrentMatch = isVideo ? isSelectedVideoModel : !isSelectedVideoModel;
+
+        if (!isCurrentMatch || !availableModels.some(m => m.id === selectedModel)) {
+            // Only force reset if we're in the wrong category (video model for image or vice versa)
+            // or if the specific model ID is completely unknown to this tab.
+            const modelToSet = availableModels[0].id;
+            if (selectedModel !== modelToSet) {
+                setSelectedModel(modelToSet);
+            }
         }
-    }, [isVideo ? 'video' : 'image', selectedModel]); // Simplified dependency to avoid loop
+    }, [isVideo, selectedModel, availableModels]);
 
     // Helper to process a file to a data URL
     const processFile = (file: File) => {

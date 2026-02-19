@@ -83,6 +83,7 @@ export default function WillowPostCreator() {
     const [aspectRatio, setAspectRatio] = useState<string>('3:4');
     const [createImageSize, setCreateImageSize] = useState<string>("auto_4K");
     const [createNumImages, setCreateNumImages] = useState<number>(4);
+    const [editSelectedModel, setEditSelectedModel] = useState<string>('google/gemini-2.0-flash-exp');
     const [previewContext, setPreviewContext] = useState<{ urls: string[], index: number } | null>(null);
     const previewUrl = previewContext ? previewContext.urls[previewContext.index] : null;
 
@@ -155,6 +156,8 @@ export default function WillowPostCreator() {
                     if (savedParams.selectedThemeId) setSelectedThemeId(savedParams.selectedThemeId);
                     if (savedParams.captionType) setCaptionType(savedParams.captionType);
                     if (savedParams.refineImageSize) setRefineImageSize(savedParams.refineImageSize);
+                    if (savedParams.refineNumImages) setRefineNumImages(savedParams.refineNumImages);
+                    if (savedParams.editSelectedModel) setEditSelectedModel(savedParams.editSelectedModel);
                 }
             } catch (e) { console.error(e); }
         };
@@ -205,6 +208,8 @@ export default function WillowPostCreator() {
     useEffect(() => { persistParam('selectedThemeId', selectedThemeId); }, [selectedThemeId]);
     useEffect(() => { persistParam('captionType', captionType); }, [captionType]);
     useEffect(() => { persistParam('refineImageSize', refineImageSize); }, [refineImageSize]);
+    useEffect(() => { persistParam('refineNumImages', refineNumImages); }, [refineNumImages]);
+    useEffect(() => { persistParam('editSelectedModel', editSelectedModel); }, [editSelectedModel]);
 
     // Persist Configs
     const persistThemes = (newThemes: Theme[]) => {
@@ -530,6 +535,7 @@ export default function WillowPostCreator() {
                     service: isFalModel ? 'fal' : 'gemini',
                     status: generationSucceeded ? 'success' : 'failed',
                     errorMessage: generationError || undefined,
+                    tab: activeTab
                 };
                 await dbService.saveGenerationHistory(historyEntry);
             } catch (histErr) {
@@ -739,7 +745,9 @@ export default function WillowPostCreator() {
     };
 
     const handleRecall = (item: DBGenerationHistory) => {
-        if (item.type === 'video') {
+        const targetTab = item.tab || (item.type === 'video' ? 'animate' : 'create');
+
+        if (targetTab === 'animate') {
             setActiveTab('animate');
             setI2VPrompt(item.prompt);
             setSelectedModel(item.model);
@@ -752,8 +760,17 @@ export default function WillowPostCreator() {
             if (item.inputImageUrl) {
                 setI2VTarget({ url: item.inputImageUrl, index: -1 });
             }
+        } else if (targetTab === 'edit') {
+            setActiveTab('edit');
+            setRefinePrompt(item.prompt);
+            setEditSelectedModel(item.model);
+            if (item.imageSize) setRefineImageSize(item.imageSize);
+            if (item.numImages) setRefineNumImages(item.numImages);
+            if (item.inputImageUrl) {
+                setRefineTarget({ url: item.inputImageUrl, index: -1 });
+            }
         } else {
-            // Assume Create Tab for Image Recall
+            // Default to Create Tab
             setActiveTab('create');
             setGeneratedPrompt(item.prompt);
             setSelectedModel(item.model);
@@ -1210,8 +1227,8 @@ export default function WillowPostCreator() {
                         setRefineImageSize={(val) => { setRefineImageSize(val); persistParam('refineImageSize', val); }}
                         refineNumImages={refineNumImages}
                         setRefineNumImages={(val) => { setRefineNumImages(val); persistParam('refineNumImages', val); }}
-                        selectedModel={selectedModel}
-                        setSelectedModel={(val) => { setSelectedModel(val); persistParam('selectedModel', val); }}
+                        selectedModel={editSelectedModel}
+                        setSelectedModel={(val) => { setEditSelectedModel(val); persistParam('editSelectedModel', val); }}
                         refineAdditionalImages={refineAdditionalImages}
                         setRefineAdditionalImages={setRefineAdditionalImages}
                         refineResultUrl={refineResultUrl}
@@ -1288,7 +1305,7 @@ export default function WillowPostCreator() {
                                     if (selectedModel.includes('grok') || selectedModel.includes('seedream') || selectedModel.includes('wan') || selectedModel.includes('fal')) {
                                         // Fal Service
                                         const req: FalGenerationRequest = {
-                                            model: selectedModel,
+                                            model: editSelectedModel,
                                             prompt: refinePrompt,
                                             contentParts,
                                             editConfig: {
@@ -1304,7 +1321,7 @@ export default function WillowPostCreator() {
                                         const req: GenerationRequest = {
                                             type: 'edit',
                                             prompt: refinePrompt,
-                                            model: selectedModel,
+                                            model: editSelectedModel,
                                             aspectRatio,
                                             contentParts,
                                             editConfig: {
@@ -1325,11 +1342,12 @@ export default function WillowPostCreator() {
                                             timestamp: Date.now(),
                                             type: isVideo ? 'video' : 'image', // Record correct type
                                             prompt: refinePrompt,
-                                            model: selectedModel,
+                                            model: editSelectedModel,
                                             mediaUrls: [url],
                                             service: (selectedModel.includes('grok') || selectedModel.includes('seedream') || isVideo) ? 'fal' : 'gemini',
                                             status: 'success',
-                                            inputImageUrl: refineTarget?.url
+                                            inputImageUrl: refineTarget?.url,
+                                            tab: 'edit'
                                         });
                                     } catch (err) { console.error("Failed to save history:", err); }
                                 }
@@ -1457,7 +1475,8 @@ export default function WillowPostCreator() {
                                             mediaUrls: [url],
                                             service: (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) ? 'fal' : 'gemini',
                                             status: 'success',
-                                            inputImageUrl: i2vTarget?.url
+                                            inputImageUrl: i2vTarget?.url,
+                                            tab: 'animate'
                                         });
                                     } catch (err) { console.error("Failed to save history:", err); }
                                 }

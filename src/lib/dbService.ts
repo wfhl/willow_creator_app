@@ -78,6 +78,7 @@ export interface DBGenerationHistory {
     status: 'success' | 'failed';
     errorMessage?: string;
     inputImageUrl?: string;
+    tab?: string; // 'create' | 'edit' | 'animate'
 }
 
 export interface DBConfig {
