@@ -77,6 +77,7 @@ export interface DBGenerationHistory {
     service: 'gemini' | 'fal';
     status: 'success' | 'failed';
     errorMessage?: string;
+    inputImageUrl?: string;
 }
 
 export interface DBConfig {

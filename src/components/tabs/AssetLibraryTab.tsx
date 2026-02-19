@@ -20,7 +20,8 @@ import {
     Home,
     History,
     Layers,
-    Copy
+    Copy,
+    RotateCcw
 } from 'lucide-react';
 import { dbService } from '../../lib/dbService';
 import { generateUUID } from '../../lib/uuid';
@@ -28,9 +29,10 @@ import type { DBAsset, DBFolder, DBGenerationHistory } from '../../lib/dbService
 
 interface AssetLibraryTabProps {
     onPreview: (url: string) => void;
+    onRecall?: (item: DBGenerationHistory) => void;
 }
 
-export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
+export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
     const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
     const [path, setPath] = useState<DBFolder[]>([]);
     const [folders, setFolders] = useState<DBFolder[]>([]);
@@ -556,6 +558,13 @@ export function AssetLibraryTab({ onPreview }: AssetLibraryTabProps) {
                                             className="p-2 text-white/20 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
                                         >
                                             <Trash2 className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => onRecall && onRecall(item)}
+                                            className="p-2 text-white/20 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-all"
+                                            title="Recall Settings (Edit)"
+                                        >
+                                            <RotateCcw className="w-4 h-4" />
                                         </button>
                                     </div>
 

@@ -716,6 +716,40 @@ export default function WillowPostCreator() {
             setActiveTab('create');
         };
 
+        const handleRecall = (item: DBGenerationHistory) => {
+            if (item.type === 'video') {
+                setActiveTab('animate');
+                setI2VPrompt(item.prompt);
+                setSelectedModel(item.model);
+                if (item.videoResolution) setVideoResolution(item.videoResolution);
+                if (item.videoDuration) setVideoDuration(item.videoDuration);
+                if (item.aspectRatio) setI2vAspectRatio(item.aspectRatio);
+                if (item.withAudio !== undefined) setWithAudio(item.withAudio);
+                if (item.cameraFixed !== undefined) setCameraFixed(item.cameraFixed);
+
+                if (item.inputImageUrl) {
+                    setI2VTarget({ url: item.inputImageUrl, index: -1 });
+                }
+            } else {
+                // Assume Create Tab for Image Recall
+                setActiveTab('create');
+                setGeneratedPrompt(item.prompt);
+                setSelectedModel(item.model);
+                if (item.aspectRatio) setAspectRatio(item.aspectRatio);
+                if (item.imageSize) setCreateImageSize(item.imageSize);
+                if (item.numImages) setCreateNumImages(item.numImages);
+                if (item.themeId) setSelectedThemeId(item.themeId);
+
+                if (item.topic) setTopic(item.topic);
+                if (item.visuals) setSpecificVisuals(item.visuals);
+                if (item.outfit) setSpecificOutfit(item.outfit);
+
+                if (item.prompt) {
+                    ignoreNextPromptUpdate.current = true;
+                }
+            }
+        };
+
         const handleImportReferences = async () => {
             if (!confirm("Import 'GenReference' images into Post Library?")) return;
             try {
@@ -1142,11 +1176,7 @@ export default function WillowPostCreator() {
                         />
                     )}
 
-                    {activeTab === 'assets' && (
-                        <AssetLibraryTab
-                            onPreview={(url) => handleOpenPreview(url)}
-                        />
-                    )}
+
 
                     {activeTab === 'edit' && (
                         <EditTab
@@ -1230,7 +1260,8 @@ export default function WillowPostCreator() {
                                                 model: selectedModel,
                                                 mediaUrls: [url],
                                                 service: (selectedModel.includes('grok') || selectedModel.includes('seedream')) ? 'fal' : 'gemini',
-                                                status: 'success'
+                                                status: 'success',
+                                                inputImageUrl: refineTarget?.url
                                             });
                                         } catch (err) { console.error("Failed to save history:", err); }
                                     }
@@ -1357,7 +1388,8 @@ export default function WillowPostCreator() {
                                                 model: selectedModel,
                                                 mediaUrls: [url],
                                                 service: (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) ? 'fal' : 'gemini',
-                                                status: 'success'
+                                                status: 'success',
+                                                inputImageUrl: i2vTarget?.url
                                             });
                                         } catch (err) { console.error("Failed to save history:", err); }
                                     }
@@ -1406,6 +1438,13 @@ export default function WillowPostCreator() {
                             captionStyles={captionStyles}
                             setCaptionStyles={persistCaptionStyles}
                             onExit={() => setActiveTab('create')}
+                        />
+                    )}
+
+                    {activeTab === 'assets' && (
+                        <AssetLibraryTab
+                            onPreview={(url) => handleOpenPreview(url)}
+                            onRecall={handleRecall}
                         />
                     )}
                 </div>

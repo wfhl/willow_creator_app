@@ -106,16 +106,15 @@ export const syncService = {
         let payload = this.mapToCloud(store, data);
         payload.user_id = this.user.id;
 
+        // --- ASSETS LOGIC ---
         if (store === 'assets') {
-            // Special handling for assets: Upload to Storage first
             if (data.base64) {
                 try {
                     const { publicUrl, storagePath } = await this.uploadAssetToStorage(data);
                     payload.public_url = publicUrl;
                     payload.storage_path = storagePath;
-                    payload.width = 0; // potentially extract from img?
+                    payload.width = 0;
                     payload.height = 0;
-                    // Remove base64 from payload to DB
                     delete payload.base64;
                 } catch (e) {
                     console.error("Failed to upload asset to storage", e);
@@ -123,8 +122,80 @@ export const syncService = {
                 }
             } else {
                 console.warn("Asset missing base64, skipping upload", data.id);
-                // If cloud has it, we just update metadata.
                 delete payload.base64;
+            }
+        }
+
+        // --- POSTS & HISTORY LOGIC ---
+        if (store === 'posts' || store === 'generation_history') {
+            // Check for base64 in media_urls
+            if (payload.media_urls && Array.isArray(payload.media_urls)) {
+                try {
+                    const updatedUrls = await Promise.all(payload.media_urls.map(async (url: string, index: number) => {
+                        if (url.startsWith('data:')) {
+                            // Upload base64 post/history media
+                            const fileExt = url.startsWith('data:video') ? 'mp4' : 'jpeg';
+                            const folder = store === 'posts' ? 'posts' : 'history';
+                            const fileName = `${folder}/${this.user!.id}/${data.id}_${index}_${Date.now()}.${fileExt}`;
+
+                            // Convert base64 to Blob
+                            const res = await fetch(url);
+                            const blob = await res.blob();
+
+                            const { error: uploadError } = await supabase.storage
+                                .from('user-library')
+                                .upload(fileName, blob, {
+                                    contentType: blob.type,
+                                    upsert: true
+                                });
+
+                            if (uploadError) throw uploadError;
+
+                            const { data: { publicUrl } } = supabase.storage
+                                .from('user-library')
+                                .getPublicUrl(fileName);
+
+                            return publicUrl;
+                        }
+                        return url; // Already a URL
+                    }));
+                    payload.media_urls = updatedUrls;
+                } catch (e) {
+                    console.error(`[Sync] Failed to upload ${store} media`, e);
+                    throw e;
+                }
+            }
+
+            // Also check for input_image_url in generation_history
+            if (store === 'generation_history' && payload.input_image_url && payload.input_image_url.startsWith('data:')) {
+                try {
+                    const url = payload.input_image_url;
+                    const fileExt = url.startsWith('data:video') ? 'mp4' : 'jpeg';
+                    const fileName = `history/${this.user!.id}/${data.id}_input_${Date.now()}.${fileExt}`;
+
+                    const res = await fetch(url);
+                    const blob = await res.blob();
+
+                    const { error: uploadError } = await supabase.storage
+                        .from('user-library')
+                        .upload(fileName, blob, {
+                            contentType: blob.type,
+                            upsert: true
+                        });
+
+                    if (uploadError) throw uploadError;
+
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('user-library')
+                        .getPublicUrl(fileName);
+
+                    payload.input_image_url = publicUrl;
+                } catch (e) {
+                    console.error("[Sync] Failed to upload history input image", e);
+                    // Don't throw, just let it fail silently or nullify? If we let it pass, DB might reject validation?
+                    // Safe to strip it if upload fails to prevent sync block?
+                    delete payload.input_image_url;
+                }
             }
         }
 
@@ -280,6 +351,10 @@ export const syncService = {
             mapped.aspect_ratio = data.aspectRatio;
             delete mapped.aspectRatio;
         }
+        if (data.inputImageUrl !== undefined) {
+            mapped.input_image_url = data.inputImageUrl;
+            delete mapped.inputImageUrl;
+        }
 
         return mapped;
     },
@@ -373,6 +448,10 @@ export const syncService = {
         if (data.aspect_ratio !== undefined) {
             mapped.aspectRatio = data.aspect_ratio;
             delete mapped.aspect_ratio;
+        }
+        if (data.input_image_url !== undefined) {
+            mapped.inputImageUrl = data.input_image_url;
+            delete mapped.input_image_url;
         }
 
         delete mapped.user_id; // Don't store user_id locally
