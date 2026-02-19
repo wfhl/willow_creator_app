@@ -235,7 +235,7 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
     };
 
     return (
-        <div className="max-w-[1600px] mx-auto w-full p-4 md:p-8 pb-32 flex flex-col h-full bg-[#050505] min-h-0">
+        <div className="max-w-[1600px] mx-auto w-full p-4 md:p-8 pb-20 flex flex-col h-full bg-[#050505] min-h-0">
             {/* Header / Toolbar */}
             <div className="flex flex-col gap-4 mb-6">
                 <div className="flex justify-between items-center gap-4">
@@ -553,6 +553,16 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
                                                 {item.aspectRatio && <span>Aspect: {item.aspectRatio}</span>}
                                             </div>
                                         </div>
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(item.prompt);
+                                                alert("Prompt copied!");
+                                            }}
+                                            className="p-2 text-white/20 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                                            title="Copy Prompt"
+                                        >
+                                            <Copy className="w-4 h-4" />
+                                        </button>
                                         <button
                                             onClick={() => handleDeleteHistory(item.id)}
                                             className="p-2 text-white/20 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
