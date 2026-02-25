@@ -51,7 +51,7 @@ export function PresetsDropdown({
 
     // Update the onSavePost type in props potentially or just cast
     // But since onSavePost is typed as `(data: any) => ...` in interface, we should update interface first or assume it accepts extra args if it was flexible. 
-    // In willow-post-creator it will be updated.
+    // In simple-creator it will be updated.
 
     return (
         <div ref={dropdownRef} className="relative">

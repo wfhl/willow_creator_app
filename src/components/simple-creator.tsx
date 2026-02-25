@@ -133,9 +133,9 @@ export default function SimpleCreator() {
                 if (savedStyles) setCaptionStyles(savedStyles);
                 else await dbService.saveConfig('caption_styles', CAPTION_TEMPLATES);
 
-                const savedProfile = await dbService.getConfig<CreatorProfile>('willow_profile');
+                const savedProfile = await dbService.getConfig<CreatorProfile>('creator_profile');
                 if (savedProfile) setProfile(savedProfile);
-                else await dbService.saveConfig('willow_profile', SIMPLE_PROFILE);
+                else await dbService.saveConfig('creator_profile', SIMPLE_PROFILE);
 
                 // Assets
                 const selectedAssets = await dbService.getSelectedAssets();
@@ -241,7 +241,7 @@ export default function SimpleCreator() {
 
     const persistProfile = (newProfile: CreatorProfile) => {
         setProfile(newProfile);
-        dbService.saveConfig('willow_profile', newProfile).catch(console.error);
+        dbService.saveConfig('creator_profile', newProfile).catch(console.error);
     };
 
     const handleUpdateApiKeys = async (newKeys: { gemini: string, fal: string }) => {
@@ -425,6 +425,7 @@ export default function SimpleCreator() {
     };
 
     const handleGenerateMedia = async (promptOverride?: string) => {
+        if (isGeneratingMedia) return;
         const finalPromptToUse = promptOverride || generatedPrompt;
         if (!finalPromptToUse) return;
         setIsGeneratingMedia(true);
@@ -580,7 +581,7 @@ export default function SimpleCreator() {
         try {
             const template = captionStyles.find(c => c.id === (overrides?.captionType || captionType));
             const systemInstruction = `
-            You are Willow Wisdom.
+            You are the Simple Creator.
             CORE PERSONA: ${profile.subject}
             CONTEXT: Theme: ${(overrides?.theme || currentTheme).name}, Visuals: ${overrides?.visuals || specificVisuals}, Outfit: ${overrides?.outfit || specificOutfit}
             TASK: Write a caption for Topic: "${t}". Style: ${template?.prompt}
@@ -645,7 +646,7 @@ export default function SimpleCreator() {
             caption: generatedCaption,
             captionType,
             mediaUrls: generatedMediaUrls,
-            mediaType: generatedMediaUrls.some(url => url.startsWith('data:video') || url.match(/\.(mp4|webm|mov)$/i)) ? 'video' : 'image',
+            mediaType: generatedMediaUrls.some(url => url.startsWith('data:video') || !!url.match(/\.(mp4|webm|mov|m4v|ogv|webm)($|\?)/i)) ? 'video' : 'image',
             themeId: selectedThemeId,
             visuals: specificVisuals,
             outfit: specificOutfit,
@@ -954,9 +955,9 @@ export default function SimpleCreator() {
         }
     };
 
-    const handleDownload = async (url: string, prefix: string = 'willow') => {
+    const handleDownload = async (url: string, prefix: string = 'simple') => {
         try {
-            const isVideo = url.startsWith('data:video') || url.match(/\.(mp4|webm|mov)$/i);
+            const isVideo = url.startsWith('data:video') || !!url.match(/\.(mp4|webm|mov|m4v|ogv|webm)($|\?)/i);
             const extension = isVideo ? 'mp4' : 'png';
             const filename = `${prefix}_${Date.now()}.${extension}`;
 
@@ -1005,7 +1006,7 @@ export default function SimpleCreator() {
             // Universal fallback
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'willow_media';
+            a.download = 'simple_media';
             a.target = "_blank";
             a.click();
         }
@@ -1706,7 +1707,7 @@ export default function SimpleCreator() {
                         onClick={e => e.stopPropagation()}
                     >
                         <div className="flex-1 flex items-center justify-center min-h-0 w-full relative">
-                            {previewUrl.startsWith('data:video') || previewUrl.match(/\.(mp4|webm|mov)$/i) ? (
+                            {previewUrl.startsWith('data:video') || !!previewUrl.match(/\.(mp4|webm|mov|m4v|ogv|webm)($|\?)/i) ? (
                                 <video
                                     src={previewUrl}
                                     controls
@@ -1754,7 +1755,7 @@ export default function SimpleCreator() {
                             )}
 
                             <button
-                                onClick={() => handleDownload(previewUrl!, 'willow_preview')}
+                                onClick={() => handleDownload(previewUrl!, 'simple_preview')}
                                 className="px-4 md:px-6 py-2 bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/50 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-black transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
@@ -1762,7 +1763,7 @@ export default function SimpleCreator() {
                             </button>
 
                             <button
-                                onClick={() => handleSaveToAssets(previewUrl, previewUrl.startsWith('data:video') || previewUrl.match(/\.(mp4|webm|mov)$/i) ? 'video' : 'image')}
+                                onClick={() => handleSaveToAssets(previewUrl, previewUrl.startsWith('data:video') || !!previewUrl.match(/\.(mp4|webm|mov|m4v|ogv|webm)($|\?)/i) ? 'video' : 'image')}
                                 className="px-4 md:px-6 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-emerald-400 transition-all flex items-center gap-2"
                             >
                                 <Archive className="w-3 md:w-4 h-3 md:h-4" />

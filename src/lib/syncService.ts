@@ -4,6 +4,7 @@ import type { User } from '@supabase/supabase-js';
 
 export const syncService = {
     user: null as User | null,
+    recentlyDeleted: new Set<string>(),
 
     init(user: User) {
         this.user = user;
@@ -15,9 +16,16 @@ export const syncService = {
 
             try {
                 if (type === 'delete') {
+                    if (data.id === 'ALL') {
+                        // Handle clear all logic if needed, but for now just clear cloud?
+                        return;
+                    }
+                    this.recentlyDeleted.add(data.id);
                     await this.removeFromCloud(store, data.id);
                 } else {
                     await this.syncToCloud(store, data);
+                    // Remove from recently deleted if it was re-added
+                    this.recentlyDeleted.delete(data.id);
                 }
             } catch (e) {
                 console.error(`[Sync] Failed to sync ${store} ${type}:`, e);
@@ -77,6 +85,10 @@ export const syncService = {
 
         // Pull cloud-only to local
         for (const cloud of cloudItems) {
+            if (this.recentlyDeleted.has(cloud.id)) {
+                console.log(`[Sync] Skipping pull for recently deleted ${store}: ${cloud.id}`);
+                continue;
+            }
             const existsLocally = localItems.some(l => l.id === cloud.id);
             if (!existsLocally) {
                 console.log(`[Sync] Pulling cloud-only ${store}: ${cloud.id}`);
@@ -265,7 +277,11 @@ export const syncService = {
             .eq('id', id)
             .eq('user_id', this.user.id);
 
-        if (error) throw error;
+        if (error) {
+            console.error(`[Sync] Failed to remove ${id} from cloud ${table}:`, error);
+            throw error;
+        }
+        console.log(`[Sync] Successfully removed ${id} from cloud ${table}`);
     },
 
     // --- MAPPING UTILS ---

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Download, ImagePlus, Search, Loader2, X, ChevronLeft, ChevronRight, Image as ImageIcon, RotateCcw } from 'lucide-react';
 import type { DBSavedPost as SavedPost } from '../../lib/dbService';
-import { WILLOW_THEMES } from '../willow-presets';
+import { SIMPLE_THEMES } from '../creator-presets';
 import JSZip from 'jszip'; // For download logic if we move it here, or pass handler
 // We will pass handlers for simplicity and keeping logic centralized in parent for now,
 // but for a true refactor, download logic *should* be here.
@@ -92,7 +92,7 @@ export function PostsTab({
             const zip = new JSZip();
 
             // Create metadata text file
-            const themeName = WILLOW_THEMES.find(t => t.id === post.themeId)?.name || "Unknown Theme";
+            const themeName = SIMPLE_THEMES.find(t => t.id === post.themeId)?.name || "Unknown Theme";
             const postDate = new Date(post.timestamp).toLocaleString();
 
             const metadata = `POST METADATA
@@ -128,7 +128,7 @@ Total Media Items: ${post.mediaUrls.length}
 
             for (let i = 0; i < post.mediaUrls.length; i++) {
                 const url = post.mediaUrls[i];
-                const isVideo = url.startsWith('data:video') || url.match(/\.(mp4|webm|mov)$/i);
+                const isVideo = url.startsWith('data:video') || !!url.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
 
                 try {
                     let blob: Blob;
@@ -146,7 +146,7 @@ Total Media Items: ${post.mediaUrls.length}
                         zip.file(`video_${videoCount}.mp4`, blob);
                     } else {
                         imageCount++;
-                        const ext = url.match(/\.(png|jpg|jpeg|webp|gif)$/i)?.[1] || 'png';
+                        const ext = url.match(/\.(png|jpg|jpeg|webp|gif)($|\?)/i)?.[1] || 'png';
                         zip.file(`image_${imageCount}.${ext}`, blob);
                     }
                 } catch (err) {
@@ -264,11 +264,11 @@ Total Media Items: ${post.mediaUrls.length}
                     }
 
                     const renderPost = (post: SavedPost) => {
-                        const themeName = post.themeId === "CUSTOM" ? "Custom/Manual" : (WILLOW_THEMES.find(t => t.id === post.themeId)?.name || "Unknown Theme");
+                        const themeName = post.themeId === "CUSTOM" ? "Custom/Manual" : (SIMPLE_THEMES.find(t => t.id === post.themeId)?.name || "Unknown Theme");
                         const mediaUrls = post.mediaUrls || [];
                         const currentIndex = carouselIndexes[post.id] || 0;
                         const currentMedia = mediaUrls[currentIndex] || mediaUrls[0];
-                        const isVideo = currentMedia && (currentMedia.startsWith('data:video') || !!currentMedia.match(/\.(mp4|webm|mov)$/i));
+                        const isVideo = currentMedia && (currentMedia.startsWith('data:video') || !!currentMedia.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i));
                         const hasMultipleMedia = mediaUrls.length > 1;
 
                         return (
@@ -371,8 +371,8 @@ Total Media Items: ${post.mediaUrls.length}
 
                                     <div className="absolute top-2 left-2 px-2 py-1 bg-black/50 backdrop-blur-sm rounded text-[10px] uppercase tracking-wider text-white/70 font-bold border border-white/10 flex gap-2">
                                         {(() => {
-                                            const imgCount = mediaUrls.filter(u => !u.match(/\.(mp4|webm|mov)$/i) && !u.startsWith('data:video')).length;
-                                            const vidCount = mediaUrls.filter(u => !!u.match(/\.(mp4|webm|mov)$/i) || u.startsWith('data:video')).length;
+                                            const imgCount = mediaUrls.filter(u => !u.startsWith('data:video') && !u.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i)).length;
+                                            const vidCount = mediaUrls.filter(u => u.startsWith('data:video') || !!u.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i)).length;
 
                                             const parts = [];
                                             if (imgCount > 0) parts.push(`${imgCount} Image${imgCount !== 1 ? 's' : ''}`);

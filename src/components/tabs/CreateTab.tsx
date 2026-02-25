@@ -658,7 +658,7 @@ export function CreateTab({
                                     />
                                 </label>
                                 {generatedMediaUrls.map((url, idx) => {
-                                    const isVideo = url.startsWith('data:video') || !!url.match(/\.(mp4|webm|mov)$/i);
+                                    const isVideo = url.startsWith('data:video') || !!url.match(/\.(mp4|webm|mov|m4v|ogv|webm)($|\?)/i);
                                     return (
                                         <div key={idx} className="relative group aspect-[3/4]">
                                             {isVideo ? (
@@ -697,7 +697,7 @@ export function CreateTab({
                                                     </button>
                                                 )}
                                                 <button
-                                                    onClick={() => onDownload(url, `willow_generated_${idx}`)}
+                                                    onClick={() => onDownload(url, `simple_generated_${idx}`)}
                                                     className="p-1 hover:bg-white/20 rounded"
                                                     title="Download"
                                                 >

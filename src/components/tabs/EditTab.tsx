@@ -508,7 +508,7 @@ export function EditTab({
                                                         <VideoIcon className="w-4 h-4 text-white" />
                                                     </button>
                                                     <button
-                                                        onClick={() => onDownload(url, `willow_refined_${idx}_${Date.now()}.png`)}
+                                                        onClick={() => onDownload(url, `simple_refined_${idx}_${Date.now()}.png`)}
                                                         className="p-1 hover:bg-white/20 rounded"
                                                         title="Download"
                                                     >

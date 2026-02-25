@@ -1,5 +1,5 @@
 
-const DB_NAME = 'willow_creator_db';
+const DB_NAME = 'simple_creator_db';
 const DB_VERSION = 7; // Bumped for 'selected' index on assets
 
 
@@ -482,6 +482,18 @@ export const dbService = {
 
     async deleteFolder(id: string): Promise<void> {
         const db = await openDB();
+
+        // 1. Get all assets and subfolders in this folder to delete them recursively
+        const assets = await this.getAssetsByFolder(id);
+        const subfolders = await this.getFoldersByParent(id);
+
+        for (const asset of assets) {
+            await this.deleteAsset(asset.id);
+        }
+        for (const sub of subfolders) {
+            await this.deleteFolder(sub.id);
+        }
+
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('folders', 'readwrite');
             const store = transaction.objectStore('folders');
@@ -657,7 +669,10 @@ export const dbService = {
             const transaction = db.transaction('generation_history', 'readwrite');
             const store = transaction.objectStore('generation_history');
             const request = store.delete(id);
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.notify('generation_history', 'delete', { id });
+                resolve();
+            };
             request.onerror = () => reject(request.error);
         });
     },
@@ -668,7 +683,10 @@ export const dbService = {
             const transaction = db.transaction('generation_history', 'readwrite');
             const store = transaction.objectStore('generation_history');
             const request = store.clear();
-            request.onsuccess = () => resolve();
+            request.onsuccess = () => {
+                this.notify('generation_history', 'delete', { id: 'ALL' });
+                resolve();
+            };
             request.onerror = () => reject(request.error);
         });
     },

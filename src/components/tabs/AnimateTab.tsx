@@ -633,7 +633,7 @@ export function AnimateTab({
                                         />
                                         <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1">
                                             <button
-                                                onClick={() => onDownload(generatedI2VUrl!, `willow_animated_${Date.now()}.mp4`)}
+                                                onClick={() => onDownload(generatedI2VUrl!, `simple_animated_${Date.now()}.mp4`)}
                                                 className="p-1 hover:bg-white/20 rounded"
                                                 title="Download"
                                             >
