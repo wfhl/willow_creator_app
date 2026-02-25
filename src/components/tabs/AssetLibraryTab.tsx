@@ -65,8 +65,11 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
     const FOLDER_COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1'];
     const FOLDER_ICONS = ['folder', 'star', 'heart', 'camera', 'video', 'music', 'briefcase', 'home'];
 
+    const isLoadingRef = useRef(false);
+
     const loadContent = useCallback(async (isLoadMore = false) => {
-        if (isLoadingMore) return;
+        if (isLoadingRef.current) return;
+        isLoadingRef.current = true;
         setIsLoadingMore(true);
         try {
             if (!isLoadMore) {
@@ -92,12 +95,14 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
         } catch (err) {
             console.error("Failed to load library content:", err);
         } finally {
+            isLoadingRef.current = false;
             setIsLoadingMore(false);
         }
-    }, [currentFolderId, assetsOffset, isLoadingMore]);
+    }, [currentFolderId, assetsOffset]);
 
     const loadHistory = useCallback(async (isLoadMore = false) => {
-        if (isLoadingMore) return;
+        if (isLoadingRef.current) return;
+        isLoadingRef.current = true;
         setIsLoadingMore(true);
         try {
             const offset = isLoadMore ? historyOffset : 0;
@@ -115,9 +120,10 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
         } catch (err) {
             console.error("Failed to load history:", err);
         } finally {
+            isLoadingRef.current = false;
             setIsLoadingMore(false);
         }
-    }, [historyOffset, isLoadingMore]);
+    }, [historyOffset]);
 
     useEffect(() => {
         loadContent(false);
@@ -126,6 +132,8 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
     useEffect(() => {
         if (subTab === 'history' && history.length === 0) {
             loadHistory(false);
+        } else if (subTab === 'saved') {
+            loadContent(false);
         }
     }, [subTab]);
 
@@ -156,11 +164,24 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
                     loadContent(false);
                 }
             } else if (store === 'generation_history') {
-                if (subTab === 'history') loadHistory(false);
+                if (subTab === 'history' || history.length === 0) loadHistory(false);
             }
         });
         return () => { unsubscribe(); };
-    }, [subTab, loadContent, loadHistory]);
+    }, [subTab, loadContent, loadHistory, history.length]);
+
+    // Derived filtered states for search
+    const filteredFolders = folders.filter(f =>
+        f.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    const filteredAssets = assets.filter(a =>
+        a.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    const filteredHistory = history.filter(h =>
+        h.prompt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (h.topic && h.topic.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        h.model.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     const handleNavigate = async (folder: DBFolder | null) => {
         if (!folder) {
@@ -397,14 +418,16 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
 
             {subTab === 'saved' ? (
                 <div className="flex-1 overflow-y-auto min-h-0">
-                    {folders.length === 0 && assets.length === 0 ? (
+                    {filteredFolders.length === 0 && filteredAssets.length === 0 ? (
                         <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
                             <ImageIcon className="w-12 h-12 mb-4 opacity-10" />
-                            <p className="font-serif italic text-white/40">This folder is empty</p>
+                            <p className="font-serif italic text-white/40">
+                                {searchQuery ? 'No assets match your search' : (currentFolderId ? 'This folder is empty' : 'Your library is empty')}
+                            </p>
                         </div>
                     ) : (
                         <div className={viewMode === 'grid' ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4" : "flex flex-col gap-1"}>
-                            {folders.map(folder => (
+                            {filteredFolders.map(folder => (
                                 <div
                                     key={folder.id}
                                     onClick={() => handleNavigate(folder)}
@@ -434,7 +457,7 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
                                     </div>
                                 </div>
                             ))}
-                            {assets.map(asset => (
+                            {filteredAssets.map(asset => (
                                 <div key={asset.id} draggable onDragStart={(e) => handleDragStart(e, asset.id)} className={viewMode === 'grid' ? "group relative aspect-square bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden hover:border-emerald-500/30 transition-all cursor-grab active:cursor-grabbing" : "group flex items-center gap-4 p-2 bg-white/[0.02] border-b border-white/5 hover:bg-white/5 transition-all cursor-grab"}>
                                     {viewMode === 'grid' ? (
                                         <>
@@ -475,13 +498,13 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
             ) : (
                 <div className="flex-1 overflow-y-auto min-h-0">
                     <div className="grid grid-cols-1 gap-6 pb-20">
-                        {history.length === 0 ? (
+                        {filteredHistory.length === 0 ? (
                             <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
                                 <History className="w-12 h-12 mb-4 opacity-10" />
-                                <p className="font-serif italic text-white/40">No history yet</p>
+                                <p className="font-serif italic text-white/40">{searchQuery ? 'No history matches your search' : 'No history yet'}</p>
                             </div>
                         ) : (
-                            history.map(item => (
+                            filteredHistory.map(item => (
                                 <div key={item.id} className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-all">
                                     <div className="flex items-start justify-between gap-4 mb-4">
                                         <div className="flex-1 min-w-0">
