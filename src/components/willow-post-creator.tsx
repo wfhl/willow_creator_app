@@ -38,6 +38,11 @@ export default function WillowPostCreator() {
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const ignoreNextPromptUpdate = useRef(false);
 
+    // --- Textarea Refs for Cursor-Aware Insertion ---
+    const createPromptRef = useRef<HTMLTextAreaElement>(null);
+    const editPromptRef = useRef<HTMLTextAreaElement>(null);
+    const animatePromptRef = useRef<HTMLTextAreaElement>(null);
+
     // --- Preset State ---
     const [presets, setPresets] = useState<DBPromptPreset[]>([]);
     const [isPresetsOpen, setIsPresetsOpen] = useState(false);
@@ -436,7 +441,7 @@ export default function WillowPostCreator() {
                     } : undefined,
                     editConfig: {
                         imageSize: createImageSize,
-                        numImages: createNumImages,
+                        numImages: 1, // WillowPostCreator handles the loop with delays
                         enableSafety,
                         enhancePromptMode
                     },
@@ -473,7 +478,7 @@ export default function WillowPostCreator() {
                     } : undefined,
                     editConfig: {
                         imageSize: createImageSize,
-                        numImages: createNumImages
+                        numImages: 1 // WillowPostCreator handles the loop with delays to avoid rate limits
                     }
                 };
 
@@ -692,18 +697,44 @@ export default function WillowPostCreator() {
         if (preset.videoDuration) setVideoDuration(preset.videoDuration);
         if (preset.videoResolution) setVideoResolution(preset.videoResolution);
 
+        const insertAtCursor = (textarea: HTMLTextAreaElement | null, text: string, currentVal: string, setter: (val: string) => void) => {
+            if (!textarea) {
+                setter(text);
+                return;
+            }
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+
+            // Smart spacing
+            const prefix = (start > 0 && currentVal[start - 1] !== ' ' && currentVal[start - 1] !== '\n') ? ' ' : '';
+            const suffix = (end < currentVal.length && currentVal[end] !== ' ' && currentVal[end] !== '\n') ? ' ' : '';
+
+            const textToInsert = prefix + text + suffix;
+            const newValue = currentVal.substring(0, start) + textToInsert + currentVal.substring(end);
+            setter(newValue);
+
+            // Refocus and set cursor
+            setTimeout(() => {
+                textarea.focus();
+                textarea.selectionStart = textarea.selectionEnd = start + textToInsert.length;
+            }, 0);
+        };
+
         if (activeTab === 'create') {
             if (preset.aspectRatio) setAspectRatio(preset.aspectRatio);
             if (preset.basePrompt) {
                 ignoreNextPromptUpdate.current = true;
-                setGeneratedPrompt(preset.basePrompt);
+                insertAtCursor(createPromptRef.current, preset.basePrompt, generatedPrompt, setGeneratedPrompt);
             }
         } else if (activeTab === 'edit') {
-            if (preset.basePrompt) setRefinePrompt(preset.basePrompt);
+            if (preset.basePrompt) {
+                insertAtCursor(editPromptRef.current, preset.basePrompt, refinePrompt, setRefinePrompt);
+            }
         } else if (activeTab === 'animate') {
-            if (preset.basePrompt) setI2VPrompt(preset.basePrompt);
+            if (preset.basePrompt) {
+                insertAtCursor(animatePromptRef.current, preset.basePrompt, i2vPrompt, setI2VPrompt);
+            }
             if (preset.aspectRatio && preset.aspectRatio !== 'auto') {
-                // Approximate mapping or direct set if compatible
                 setI2vAspectRatio(preset.aspectRatio);
             }
         }
@@ -989,6 +1020,7 @@ export default function WillowPostCreator() {
             <div className="flex-1 overflow-y-auto pt-16 md:pt-20 pb-32 md:pb-10 scroll-smooth">
                 {activeTab === 'create' && (
                     <CreateTab
+                        promptRef={createPromptRef}
                         themes={themes}
                         captionStyles={captionStyles}
                         selectedThemeId={selectedThemeId}
@@ -1224,6 +1256,7 @@ export default function WillowPostCreator() {
 
                 {activeTab === 'edit' && (
                     <EditTab
+                        promptRef={editPromptRef}
                         refineTarget={refineTarget}
                         setRefineTarget={setRefineTarget}
                         refinePrompt={refinePrompt}
@@ -1400,6 +1433,7 @@ export default function WillowPostCreator() {
 
                 {activeTab === 'animate' && (
                     <AnimateTab
+                        promptRef={animatePromptRef}
                         i2vTarget={i2vTarget}
                         setI2VTarget={setI2VTarget}
                         i2vPrompt={i2vPrompt}

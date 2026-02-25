@@ -172,58 +172,63 @@ export const geminiService = {
                 // Map aspect ratio "3:4" -> "3:4" (User uses 3:4 common for social)
                 // Gemini supports: "1:1","2:3","3:2","3:4","4:3","4:5","5:4","9:16","16:9","21:9"
                 const supportedRatios = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
-                const aspectRatio = supportedRatios.includes(request.aspectRatio) ? request.aspectRatio : "3:4";
+                let aspectRatio = supportedRatios.includes(request.aspectRatio) ? request.aspectRatio : "3:4";
 
-                const response = await ai.models.generateContent({
-                    model: modelId,
-                    contents: [
-                        { // Content object
-                            parts: parts
+                // If this is an edit request, honor the refineImageSize selection overrides 
+                // since they are passed in editConfig.imageSize
+                if (request.editConfig?.imageSize && supportedRatios.includes(request.editConfig.imageSize)) {
+                    aspectRatio = request.editConfig.imageSize;
+                }
+                const numImages = request.editConfig?.numImages || 1;
+
+                const generateSingle = async () => {
+                    const response = await ai.models.generateContent({
+                        model: modelId,
+                        contents: [
+                            { // Content object
+                                parts: parts
+                            }
+                        ],
+                        config: {
+                            // For pure image models, strict modality reduces "yapping" and executable code blocks
+                            responseModalities: (modelId.includes("image") || modelId.includes("banana")) ? ["IMAGE"] : ["TEXT", "IMAGE"],
+                            imageConfig: {
+                                aspectRatio: aspectRatio,
+                                imageSize: "2K"
+                            },
+                            safetySettings: [
+                                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+                                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+                                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+                                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }
+                            ]
                         }
-                    ],
-                    config: {
-                        // For pure image models, strict modality reduces "yapping" and executable code blocks
-                        responseModalities: (modelId.includes("image") || modelId.includes("banana")) ? ["IMAGE"] : ["TEXT", "IMAGE"],
-                        imageConfig: {
-                            aspectRatio: aspectRatio,
-                            imageSize: "2K"
-                        },
-                        safetySettings: [
-                            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-                            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-                            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-                            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }
-                        ]
-                    }
-                });
+                    });
 
-                console.log(`[${modelId}] Raw Response:`, JSON.stringify(response, null, 2));
+                    console.log(`[${modelId}] Raw Response:`, JSON.stringify(response, null, 2));
 
-                // Parse response for image data
-                // Gemini 3 Pro might return thoughts (TEXT) + detailed images (thoughts) + final image
-                // We want the last image or just any image found.
-                let foundImage = null;
-
-                if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
-                    for (const part of response.candidates[0].content.parts) {
-                        if (part.inlineData) {
-                            foundImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                            // Don't break immediately, in case there's a "final" image later? 
-                            // Actually, standard behavior usually puts the final result at the end, 
-                            // but thoughts might also have images.
-                            // For now, let's take the LAST one found, or the first one?
-                            // The docs say "The last image within Thinking is also the final rendered image."
-                            // But usually the final response part is the actual generation.
-                            // Let's iterate all and keep updating foundImage.
+                    let foundImage = null;
+                    if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
+                        for (const part of response.candidates[0].content.parts) {
+                            if (part.inlineData) {
+                                foundImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                            }
                         }
                     }
+
+                    if (foundImage) {
+                        return foundImage;
+                    }
+                    throw new Error(`No image data found. Response parts: ${JSON.stringify(response.candidates?.[0]?.content?.parts || [])}`);
+                };
+
+                const generationPromises = [];
+                for (let i = 0; i < numImages; i++) {
+                    generationPromises.push(generateSingle());
                 }
 
-                if (foundImage) {
-                    return [foundImage];
-                }
-
-                throw new Error(`No image data found. Response parts: ${JSON.stringify(response.candidates?.[0]?.content?.parts || [])}`);
+                const results = await Promise.all(generationPromises);
+                return results;
 
             } catch (e: any) {
                 console.error(`Media generation failed (${modelId}):`, e);

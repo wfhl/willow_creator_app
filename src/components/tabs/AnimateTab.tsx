@@ -39,6 +39,7 @@ interface AnimateTabProps {
     loras: Array<{ path: string; scale: number }>;
     setLoras: (loras: Array<{ path: string; scale: number }>) => void;
     onLoRAUpload: (file: File) => Promise<void>;
+    promptRef?: React.RefObject<HTMLTextAreaElement | null>;
 }
 
 export function AnimateTab({
@@ -70,7 +71,8 @@ export function AnimateTab({
     setCameraFixed,
     loras,
     setLoras,
-    onLoRAUpload
+    onLoRAUpload,
+    promptRef
 }: AnimateTabProps) {
     const [isDragging, setIsDragging] = useState(false);
 
@@ -268,6 +270,7 @@ export function AnimateTab({
                                         {presetsDropdown}
                                     </div>
                                     <textarea
+                                        ref={promptRef}
                                         value={i2vPrompt}
                                         onChange={(e) => setI2VPrompt(e.target.value)}
                                         placeholder="Describe the motion... (e.g., camera pans slowly right, hair blowing in wind, blinking eyes)"

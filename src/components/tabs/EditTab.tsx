@@ -34,6 +34,7 @@ interface EditTabProps {
     // New Props
     enhancePromptMode?: "standard" | "fast";
     setEnhancePromptMode?: (val: "standard" | "fast") => void;
+    promptRef?: React.RefObject<HTMLTextAreaElement | null>;
 }
 
 export function EditTab({
@@ -63,7 +64,8 @@ export function EditTab({
     onPreview,
     onDownload,
     enhancePromptMode,
-    setEnhancePromptMode
+    setEnhancePromptMode,
+    promptRef
 }: EditTabProps) {
     const [isDragging, setIsDragging] = useState(false);
 
@@ -350,6 +352,7 @@ export function EditTab({
                                         {presetsDropdown}
                                     </div>
                                     <textarea
+                                        ref={promptRef}
                                         value={refinePrompt}
                                         onChange={(e) => setRefinePrompt(e.target.value)}
                                         placeholder="E.g., change eye color to deep blue, add more freckles, make the background a sunset forest, adjust lighting to be warmer..."
@@ -372,7 +375,7 @@ export function EditTab({
                                             </div>
 
                                             {/* Dynamic Parameters for Models */}
-                                            {selectedModel.includes('seedream') && (
+                                            {(selectedModel.includes('seedream') || selectedModel.includes('banana')) && (
                                                 <div className="space-y-1 w-32 animate-in fade-in slide-in-from-left-2 duration-300">
                                                     <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Size</label>
                                                     <select
@@ -380,7 +383,13 @@ export function EditTab({
                                                         onChange={(e) => setRefineImageSize(e.target.value)}
                                                         className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none cursor-pointer hover:bg-white/5 transition-colors"
                                                     >
-                                                        {selectedModel.includes('v4.5') ? (
+                                                        {selectedModel.includes('banana') ? (
+                                                            <>
+                                                                <option value="1:1">1:1 Square</option>
+                                                                <option value="4:3">4:3 Landscape(ish)</option>
+                                                                <option value="16:9">16:9 Landscape</option>
+                                                            </>
+                                                        ) : selectedModel.includes('v4.5') ? (
                                                             <>
                                                                 <option value="auto_4K">Auto 4K (Default)</option>
                                                                 <option value="square_hd">Square 2K</option>
@@ -399,7 +408,7 @@ export function EditTab({
                                                 </div>
                                             )}
 
-                                            {(selectedModel.includes('grok') || selectedModel.includes('v4.5/')) && !isVideo && (
+                                            {!isVideo && (
                                                 <div className="space-y-1 w-24 animate-in fade-in slide-in-from-left-2 duration-300">
                                                     <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Quantity</label>
                                                     <select
@@ -417,7 +426,7 @@ export function EditTab({
 
                                             {(selectedModel.includes('seedream') || selectedModel.includes('grok') || selectedModel.includes('banana')) && !isVideo && (
                                                 <>
-                                                    {selectedModel.includes('seedream') && !selectedModel.includes('v4.5/') && (
+                                                    {((selectedModel.includes('seedream') && !selectedModel.includes('v4.5/')) || selectedModel.includes('banana')) && (
                                                         <div className="space-y-1 w-32 animate-in fade-in slide-in-from-left-2 duration-300">
                                                             <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Enhance</label>
                                                             <select

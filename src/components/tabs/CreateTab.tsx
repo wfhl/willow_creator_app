@@ -71,6 +71,7 @@ interface CreateTabProps {
     loras: Array<{ path: string; scale: number }>;
     setLoras: (loras: Array<{ path: string; scale: number }>) => void;
     onLoRAUpload: (file: File) => Promise<void>;
+    promptRef?: React.RefObject<HTMLTextAreaElement | null>;
 }
 
 export function CreateTab({
@@ -135,7 +136,8 @@ export function CreateTab({
     onRerollMedia,
     loras,
     setLoras,
-    onLoRAUpload
+    onLoRAUpload,
+    promptRef
 }: CreateTabProps) {
 
     const currentTheme = selectedThemeId === 'CUSTOM'
@@ -446,6 +448,7 @@ export function CreateTab({
                                 </div>
                             </div>
                             <textarea
+                                ref={promptRef}
                                 value={generatedPrompt}
                                 onChange={(e) => setGeneratedPrompt(e.target.value)}
                                 className="w-full p-3 bg-black/60 border border-white/10 rounded-lg text-base md:text-[10px] text-white/60 font-mono leading-relaxed focus:outline-none focus:border-emerald-500/50 transition-colors min-h-[100px]"
