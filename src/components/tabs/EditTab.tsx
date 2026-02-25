@@ -68,7 +68,12 @@ export function EditTab({
     const [isDragging, setIsDragging] = useState(false);
 
     // Derived state for media type
-    const isVideo = refineTarget?.url?.startsWith('data:video') || refineTarget?.url?.match(/\.(mp4|mov|webm)$/i);
+    const isVideo = React.useMemo(() => {
+        if (!refineTarget?.url) return false;
+        if (refineTarget.url.startsWith('data:video')) return true;
+        const clean = refineTarget.url.split('?')[0].split('#')[0];
+        return !!clean.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+    }, [refineTarget?.url]);
 
     const availableModels = React.useMemo(() => isVideo ? [
         { id: 'xai/grok-imagine-video/edit-video', name: 'Grok Edit' },

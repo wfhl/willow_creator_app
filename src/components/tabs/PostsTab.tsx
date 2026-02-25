@@ -128,7 +128,8 @@ Total Media Items: ${post.mediaUrls.length}
 
             for (let i = 0; i < post.mediaUrls.length; i++) {
                 const url = post.mediaUrls[i];
-                const isVideo = url.startsWith('data:video') || !!url.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+                const cleanUrl = url.split('?')[0].split('#')[0];
+                const isVideo = url.startsWith('data:video') || !!cleanUrl.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
 
                 try {
                     let blob: Blob;
@@ -268,7 +269,8 @@ Total Media Items: ${post.mediaUrls.length}
                         const mediaUrls = post.mediaUrls || [];
                         const currentIndex = carouselIndexes[post.id] || 0;
                         const currentMedia = mediaUrls[currentIndex] || mediaUrls[0];
-                        const isVideo = currentMedia && (currentMedia.startsWith('data:video') || !!currentMedia.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i));
+                        const cleanMediaUrl = currentMedia ? currentMedia.split('?')[0].split('#')[0] : '';
+                        const isVideo = currentMedia && (currentMedia.startsWith('data:video') || !!cleanMediaUrl.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i));
                         const hasMultipleMedia = mediaUrls.length > 1;
 
                         return (
@@ -371,8 +373,11 @@ Total Media Items: ${post.mediaUrls.length}
 
                                     <div className="absolute top-2 left-2 px-2 py-1 bg-black/50 backdrop-blur-sm rounded text-[10px] uppercase tracking-wider text-white/70 font-bold border border-white/10 flex gap-2">
                                         {(() => {
-                                            const imgCount = mediaUrls.filter(u => !u.startsWith('data:video') && !u.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i)).length;
-                                            const vidCount = mediaUrls.filter(u => u.startsWith('data:video') || !!u.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i)).length;
+                                            const vidCount = mediaUrls.filter(u => {
+                                                const clean = u.split('?')[0].split('#')[0];
+                                                return u.startsWith('data:video') || !!clean.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+                                            }).length;
+                                            const imgCount = mediaUrls.length - vidCount;
 
                                             const parts = [];
                                             if (imgCount > 0) parts.push(`${imgCount} Image${imgCount !== 1 ? 's' : ''}`);

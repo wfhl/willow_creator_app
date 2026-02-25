@@ -658,7 +658,8 @@ export function CreateTab({
                                     />
                                 </label>
                                 {generatedMediaUrls.map((url, idx) => {
-                                    const isVideo = url.startsWith('data:video') || !!url.match(/\.(mp4|webm|mov|m4v|ogv|webm)($|\?)/i);
+                                    const clean = url.split('?')[0].split('#')[0];
+                                    const isVideo = url.startsWith('data:video') || !!clean.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
                                     return (
                                         <div key={idx} className="relative group aspect-[3/4]">
                                             {isVideo ? (

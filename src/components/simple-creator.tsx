@@ -646,7 +646,10 @@ export default function SimpleCreator() {
             caption: generatedCaption,
             captionType,
             mediaUrls: generatedMediaUrls,
-            mediaType: generatedMediaUrls.some(url => url.startsWith('data:video') || !!url.match(/\.(mp4|webm|mov|m4v|ogv|webm)($|\?)/i)) ? 'video' : 'image',
+            mediaType: generatedMediaUrls.some(url => {
+                const clean = url.split('?')[0].split('#')[0];
+                return url.startsWith('data:video') || !!clean.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+            }) ? 'video' : 'image',
             themeId: selectedThemeId,
             visuals: specificVisuals,
             outfit: specificOutfit,
@@ -957,7 +960,8 @@ export default function SimpleCreator() {
 
     const handleDownload = async (url: string, prefix: string = 'simple') => {
         try {
-            const isVideo = url.startsWith('data:video') || !!url.match(/\.(mp4|webm|mov|m4v|ogv|webm)($|\?)/i);
+            const clean = url.split('?')[0].split('#')[0];
+            const isVideo = url.startsWith('data:video') || !!clean.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
             const extension = isVideo ? 'mp4' : 'png';
             const filename = `${prefix}_${Date.now()}.${extension}`;
 
@@ -1313,7 +1317,8 @@ export default function SimpleCreator() {
                                 };
 
                                 let urlUrls: string[] = [];
-                                const isVideo = refineTarget.url.startsWith('data:video') || refineTarget.url.match(/\.(mp4|mov|webm)$/i);
+                                const cleanUrl = refineTarget?.url?.split('?')[0].split('#')[0];
+                                const isVideo = refineTarget?.url?.startsWith('data:video') || !!cleanUrl?.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
 
                                 if (isVideo) {
                                     // VIDEO EDIT FLOW
@@ -1707,7 +1712,7 @@ export default function SimpleCreator() {
                         onClick={e => e.stopPropagation()}
                     >
                         <div className="flex-1 flex items-center justify-center min-h-0 w-full relative">
-                            {previewUrl.startsWith('data:video') || !!previewUrl.match(/\.(mp4|webm|mov|m4v|ogv|webm)($|\?)/i) ? (
+                            {previewUrl.startsWith('data:video') || !!previewUrl.split('?')[0].split('#')[0].match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i) ? (
                                 <video
                                     src={previewUrl}
                                     controls
@@ -1763,7 +1768,11 @@ export default function SimpleCreator() {
                             </button>
 
                             <button
-                                onClick={() => handleSaveToAssets(previewUrl, previewUrl.startsWith('data:video') || !!previewUrl.match(/\.(mp4|webm|mov|m4v|ogv|webm)($|\?)/i) ? 'video' : 'image')}
+                                onClick={() => {
+                                    const clean = previewUrl.split('?')[0].split('#')[0];
+                                    const isVideo = previewUrl.startsWith('data:video') || !!clean.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+                                    handleSaveToAssets(previewUrl, isVideo ? 'video' : 'image');
+                                }}
                                 className="px-4 md:px-6 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-emerald-400 transition-all flex items-center gap-2"
                             >
                                 <Archive className="w-3 md:w-4 h-3 md:h-4" />
