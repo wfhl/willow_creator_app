@@ -647,8 +647,9 @@ export default function SimpleCreator() {
             captionType,
             mediaUrls: generatedMediaUrls,
             mediaType: generatedMediaUrls.some(url => {
-                const clean = url.split('?')[0].split('#')[0];
-                return url.startsWith('data:video') || !!clean.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+                if (url.startsWith('data:video')) return true;
+                const clean = url.split('?')[0].split('#')[0].toLowerCase();
+                return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
             }) ? 'video' : 'image',
             themeId: selectedThemeId,
             visuals: specificVisuals,
@@ -960,8 +961,10 @@ export default function SimpleCreator() {
 
     const handleDownload = async (url: string, prefix: string = 'simple') => {
         try {
-            const clean = url.split('?')[0].split('#')[0];
-            const isVideo = url.startsWith('data:video') || !!clean.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+            const isVideo = url.startsWith('data:video') || (() => {
+                const clean = url.split('?')[0].split('#')[0].toLowerCase();
+                return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+            })();
             const extension = isVideo ? 'mp4' : 'png';
             const filename = `${prefix}_${Date.now()}.${extension}`;
 
@@ -1044,7 +1047,7 @@ export default function SimpleCreator() {
                 savedCount={totalSavedCount}
             />
 
-            <div className="flex-1 overflow-y-auto pt-16 md:pt-20 pb-32 md:pb-10 scroll-smooth">
+            <div className="flex-1 overflow-y-auto pt-16 md:pt-20 pb-48 md:pb-10 scroll-smooth">
                 {activeTab === 'create' && (
                     <CreateTab
                         promptRef={createPromptRef}
@@ -1317,8 +1320,12 @@ export default function SimpleCreator() {
                                 };
 
                                 let urlUrls: string[] = [];
-                                const cleanUrl = refineTarget?.url?.split('?')[0].split('#')[0];
-                                const isVideo = refineTarget?.url?.startsWith('data:video') || !!cleanUrl?.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+                                const isVideo = (() => {
+                                    const url = refineTarget?.url || '';
+                                    if (url.startsWith('data:video')) return true;
+                                    const clean = url.split('?')[0].split('#')[0].toLowerCase();
+                                    return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+                                })();
 
                                 if (isVideo) {
                                     // VIDEO EDIT FLOW
@@ -1712,7 +1719,11 @@ export default function SimpleCreator() {
                         onClick={e => e.stopPropagation()}
                     >
                         <div className="flex-1 flex items-center justify-center min-h-0 w-full relative">
-                            {previewUrl.startsWith('data:video') || !!previewUrl.split('?')[0].split('#')[0].match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i) ? (
+                            {(() => {
+                                if (previewUrl.startsWith('data:video')) return true;
+                                const clean = previewUrl.split('?')[0].split('#')[0].toLowerCase();
+                                return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+                            })() ? (
                                 <video
                                     src={previewUrl}
                                     controls
@@ -1769,8 +1780,10 @@ export default function SimpleCreator() {
 
                             <button
                                 onClick={() => {
-                                    const clean = previewUrl.split('?')[0].split('#')[0];
-                                    const isVideo = previewUrl.startsWith('data:video') || !!clean.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+                                    const isVideo = previewUrl.startsWith('data:video') || (() => {
+                                        const clean = previewUrl.split('?')[0].split('#')[0].toLowerCase();
+                                        return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+                                    })();
                                     handleSaveToAssets(previewUrl, isVideo ? 'video' : 'image');
                                 }}
                                 className="px-4 md:px-6 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-emerald-400 transition-all flex items-center gap-2"

@@ -128,8 +128,9 @@ Total Media Items: ${post.mediaUrls.length}
 
             for (let i = 0; i < post.mediaUrls.length; i++) {
                 const url = post.mediaUrls[i];
-                const cleanUrl = url.split('?')[0].split('#')[0];
-                const isVideo = url.startsWith('data:video') || !!cleanUrl.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+                const cleanPath = (url.split('?')[0] || '').split('#')[0].toLowerCase();
+                const isVideo = url.startsWith('data:video') ||
+                    ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => cleanPath.endsWith(ext));
 
                 try {
                     let blob: Blob;
@@ -269,8 +270,13 @@ Total Media Items: ${post.mediaUrls.length}
                         const mediaUrls = post.mediaUrls || [];
                         const currentIndex = carouselIndexes[post.id] || 0;
                         const currentMedia = mediaUrls[currentIndex] || mediaUrls[0];
-                        const cleanMediaUrl = currentMedia ? currentMedia.split('?')[0].split('#')[0] : '';
-                        const isVideo = currentMedia && (currentMedia.startsWith('data:video') || !!cleanMediaUrl.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i));
+
+                        const isVideo = (() => {
+                            if (!currentMedia) return false;
+                            if (currentMedia.startsWith('data:video')) return true;
+                            const clean = currentMedia.split('?')[0].split('#')[0].toLowerCase();
+                            return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+                        })();
                         const hasMultipleMedia = mediaUrls.length > 1;
 
                         return (
@@ -374,8 +380,9 @@ Total Media Items: ${post.mediaUrls.length}
                                     <div className="absolute top-2 left-2 px-2 py-1 bg-black/50 backdrop-blur-sm rounded text-[10px] uppercase tracking-wider text-white/70 font-bold border border-white/10 flex gap-2">
                                         {(() => {
                                             const vidCount = mediaUrls.filter(u => {
-                                                const clean = u.split('?')[0].split('#')[0];
-                                                return u.startsWith('data:video') || !!clean.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+                                                if (u.startsWith('data:video')) return true;
+                                                const clean = u.split('?')[0].split('#')[0].toLowerCase();
+                                                return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
                                             }).length;
                                             const imgCount = mediaUrls.length - vidCount;
 

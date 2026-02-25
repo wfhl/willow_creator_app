@@ -23,8 +23,8 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
             <div className="fixed top-0 left-0 right-0 z-[100] bg-black/90 backdrop-blur-xl border-b border-white/5 px-3 md:px-6 pt-[calc(0.25rem+env(safe-area-inset-top))] pb-2 flex items-center justify-between h-14 md:h-16 shadow-lg shadow-black/50">
 
                 <div className="flex items-center gap-2 md:gap-3 shrink-0">
-                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/10 shrink-0 border border-white/10">
-                        <span className="font-serif font-bold text-black text-sm md:text-base">S</span>
+                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full overflow-hidden flex items-center justify-center shadow-lg shadow-emerald-500/10 shrink-0 border border-white/10">
+                        <img src="/icon-512.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
                     <div className="hidden sm:block leading-tight">
                         <h1 className="text-xs font-bold text-white tracking-widest uppercase truncate">Simple-Creator</h1>
@@ -120,9 +120,19 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
                             className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-black uppercase tracking-widest rounded-full transition-all shadow-lg shadow-emerald-500/30 active:scale-95 border border-emerald-400/50"
                         >
                             <UserIcon className="w-3 h-3" />
-                            <span>Login</span>
+                            <span className="hidden min-[380px]:inline">Login</span>
                         </button>
                     )}
+
+                    <button
+                        onClick={() => setActiveTab('settings')}
+                        className={`md:hidden p-2 rounded-full border transition-all ${activeTab === 'settings'
+                            ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                            : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10'
+                            }`}
+                    >
+                        <Settings className="w-4 h-4" />
+                    </button>
                 </div>
             </div>
 

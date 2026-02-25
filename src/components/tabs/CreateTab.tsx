@@ -658,8 +658,10 @@ export function CreateTab({
                                     />
                                 </label>
                                 {generatedMediaUrls.map((url, idx) => {
-                                    const clean = url.split('?')[0].split('#')[0];
-                                    const isVideo = url.startsWith('data:video') || !!clean.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+                                    const isVideo = url.startsWith('data:video') || (() => {
+                                        const clean = url.split('?')[0].split('#')[0].toLowerCase();
+                                        return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+                                    })();
                                     return (
                                         <div key={idx} className="relative group aspect-[3/4]">
                                             {isVideo ? (
@@ -818,7 +820,7 @@ export function CreateTab({
             </div>
 
             {/* === ACTION BAR === */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black via-black/95 to-transparent z-50 pointer-events-none flex justify-center">
+            <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 pb-[calc(1rem+4rem+env(safe-area-inset-bottom))] md:pb-6 bg-gradient-to-t from-black via-black/95 to-transparent z-50 pointer-events-none flex justify-center">
                 <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl p-1.5 md:p-2 flex flex-wrap md:flex-nowrap items-center justify-center gap-2 md:gap-4 pointer-events-auto backdrop-blur-xl ring-1 ring-white/5 max-w-full overflow-hidden">
 
                     {/* Left: Mode Toggle */}
@@ -864,19 +866,16 @@ export function CreateTab({
                     </div>
 
                     {/* Right: Generate Button */}
-                    <div className="relative group/gen">
-                        {!apiKeys.fal && (
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-64 p-3 bg-red-500/90 backdrop-blur-md border border-red-400/50 rounded-xl shadow-2xl opacity-0 group-hover/gen:opacity-100 transition-opacity pointer-events-none z-[100]">
-                                <p className="text-[10px] font-bold text-white uppercase tracking-widest mb-1">Fal.ai Key Missing</p>
-                                <p className="text-[10px] text-white/90 leading-relaxed font-medium">Add your API key in Settings &gt; Credentials to enable generation.</p>
-                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-red-500/90" />
-                            </div>
-                        )}
+                    <div className="flex flex-col items-center gap-2">
                         <button
                             onClick={handleGenerateContent}
-                            disabled={isGeneratingMedia || isGeneratingCaption || !apiKeys.fal}
+                            disabled={
+                                isGeneratingMedia ||
+                                isGeneratingCaption ||
+                                (selectedModel.match(/grok|seedream|seedance|wan|flux/i) ? !apiKeys.fal : !apiKeys.gemini)
+                            }
                             className={`
-                                    h-10 md-h-12 px-4 md:px-8 rounded-xl font-bold uppercase tracking-widest text-[10px] md:text-sm
+                                    h-10 md:h-12 px-4 md:px-8 rounded-xl font-bold uppercase tracking-widest text-[10px] md:text-sm
                                     bg-gradient-to-r from-emerald-600 to-emerald-500 
                                     hover:from-emerald-500 hover:to-emerald-400 
                                     text-black shadow-lg shadow-emerald-500/20 
@@ -888,6 +887,29 @@ export function CreateTab({
                             {(isGeneratingMedia || isGeneratingCaption) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-purple-300" />}
                             {(isGeneratingMedia || isGeneratingCaption) ? "Working..." : "Generate"}
                         </button>
+
+                        {/* API Key Warning */}
+                        {(() => {
+                            const needsFal = !!selectedModel.match(/grok|seedream|seedance|wan|flux/i);
+                            const missingFal = needsFal && !apiKeys.fal;
+                            const missingGemini = !needsFal && !apiKeys.gemini;
+
+                            if (missingFal) {
+                                return (
+                                    <p className="text-[9px] font-bold text-red-400 uppercase tracking-tighter animate-pulse">
+                                        Fal.ai Key Required
+                                    </p>
+                                );
+                            }
+                            if (missingGemini) {
+                                return (
+                                    <p className="text-[9px] font-bold text-red-400 uppercase tracking-tighter animate-pulse">
+                                        Gemini Key Required
+                                    </p>
+                                );
+                            }
+                            return null;
+                        })()}
                     </div>
                 </div>
             </div>

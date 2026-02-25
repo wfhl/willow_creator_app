@@ -71,8 +71,8 @@ export function EditTab({
     const isVideo = React.useMemo(() => {
         if (!refineTarget?.url) return false;
         if (refineTarget.url.startsWith('data:video')) return true;
-        const clean = refineTarget.url.split('?')[0].split('#')[0];
-        return !!clean.match(/\.(mp4|mov|webm|m4v|ogv)($|\?)/i);
+        const clean = refineTarget.url.split('?')[0].split('#')[0].toLowerCase();
+        return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
     }, [refineTarget?.url]);
 
     const availableModels = React.useMemo(() => isVideo ? [
@@ -458,23 +458,27 @@ export function EditTab({
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="relative group/gen">
-                                        {!apiKeys.fal && (
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-64 p-3 bg-red-500/90 backdrop-blur-md border border-red-400/50 rounded-xl shadow-2xl opacity-0 group-hover/gen:opacity-100 transition-opacity pointer-events-none z-[100]">
-                                                <p className="text-[10px] font-bold text-white uppercase tracking-widest mb-1">Fal.ai Key Missing</p>
-                                                <p className="text-[10px] text-white/90 leading-relaxed font-medium">Add your API key in Settings &gt; Credentials to enable generation.</p>
-                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-red-500/90" />
-                                            </div>
-                                        )}
+                                    <div className="flex flex-col items-center gap-2">
                                         <button
                                             onClick={onRefineSubmit}
-                                            disabled={isRefining || !refinePrompt || !apiKeys.fal}
-                                            className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all active-scale ${isRefining || !refinePrompt || !apiKeys.fal ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
+                                            disabled={isRefining || !refinePrompt || (selectedModel.toLowerCase().match(/grok|seedream|wan|fal/i) ? !apiKeys.fal : !apiKeys.gemini)}
+                                            className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all active-scale ${isRefining || !refinePrompt || (selectedModel.toLowerCase().match(/grok|seedream|wan|fal/i) ? !apiKeys.fal : !apiKeys.gemini) ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
                                                 }`}
                                         >
                                             <Sparkles className="w-5 h-5" />
                                             GENERATE REFINED VERSION
                                         </button>
+
+                                        {/* API Key Warning */}
+                                        {(() => {
+                                            const needsFal = !!selectedModel.toLowerCase().match(/grok|seedream|wan|fal/i);
+                                            const missingFal = needsFal && !apiKeys.fal;
+                                            const missingGemini = !needsFal && !apiKeys.gemini;
+
+                                            if (missingFal) return <p className="text-[9px] font-bold text-red-400 uppercase tracking-tighter animate-pulse">Fal.ai Key Required</p>;
+                                            if (missingGemini) return <p className="text-[9px] font-bold text-red-400 uppercase tracking-tighter animate-pulse">Gemini Key Required</p>;
+                                            return null;
+                                        })()}
                                     </div>
                                 )}
                             </>
