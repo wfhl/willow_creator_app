@@ -1,10 +1,10 @@
-export const WILLOW_PROFILE = {
+export const SIMPLE_PROFILE = {
     subject: "Sultry female model, 28 years old, long red hair, blue-green eyes with an anime vibe, porcelain skin with freckles. Her charm is adorable with a slightly mischievous smile. Slender but curvaceous/fit. evocative clothing. High-fashion stature.",
     negativePrompt: "--no cartoon, anime, illustration, 3d render, distorted hands, bad anatomy, crossed eyes, extra fingers, text, watermark, signature, blurred face, low resolution, plastic skin, oversaturated.",
     defaultParams: "",
 };
 
-export const WILLOW_THEMES = [
+export const SIMPLE_THEMES = [
     {
         id: "A",
         name: "The Philosophy of Beauty (Sage/Muse)",
@@ -56,7 +56,7 @@ export const CAPTION_TEMPLATES = [
     {
         id: "inspirational",
         label: "Inspirational / Motivational",
-        prompt: "Write an inspirational Instagram caption in Willow Wisdom's poetic style. Open with a metaphor that relates to user input. Maintain a hopeful, empowering tone. End with an uplifting takeaway."
+        prompt: "Write an inspirational Instagram caption in the Simple Creator's poetic style. Open with a metaphor that relates to user input. Maintain a hopeful, empowering tone. End with an uplifting takeaway."
     },
     {
         id: "reflective",
@@ -66,7 +66,7 @@ export const CAPTION_TEMPLATES = [
     {
         id: "engagement",
         label: "Engagement / Question",
-        prompt: "Draft an engagement-focused caption. Start with a relatable statement about the topic. Share Willow's perspective with a metaphor. Close with a warm question to readers."
+        prompt: "Draft an engagement-focused caption. Start with a relatable statement about the topic. Share your perspective with a metaphor. Close with a warm question to readers."
     },
     {
         id: "soft-sell",

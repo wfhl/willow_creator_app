@@ -24,10 +24,10 @@ export function CreatorHeader({ activeTab, setActiveTab, savedCount }: CreatorHe
 
                 <div className="flex items-center gap-2 md:gap-3 shrink-0">
                     <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/10 shrink-0 border border-white/10">
-                        <span className="font-serif font-bold text-black text-sm md:text-base">W</span>
+                        <span className="font-serif font-bold text-black text-sm md:text-base">S</span>
                     </div>
                     <div className="hidden sm:block leading-tight">
-                        <h1 className="text-xs font-bold text-white tracking-widest uppercase truncate">Willow</h1>
+                        <h1 className="text-xs font-bold text-white tracking-widest uppercase truncate">Simple-Creator</h1>
                         <p className="text-[8px] text-white/30 font-mono tracking-wider">STUDIO V2.2</p>
                     </div>
                 </div>

@@ -36,7 +36,7 @@ export function Login() {
         <div className="flex flex-col items-center justify-center w-full text-white p-4 md:p-8">
             <div className="w-full space-y-6">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-serif font-bold mb-2">Willow Creator</h1>
+                    <h1 className="text-3xl font-serif font-bold mb-2">Simple-Creator</h1>
                     <p className="text-white/40 text-sm">Sign in to manage your assets and creations.</p>
                 </div>
 

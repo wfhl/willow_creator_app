@@ -15,7 +15,7 @@ export interface Theme {
     defaultAction?: string;
 }
 
-export interface WillowProfile {
+export interface CreatorProfile {
     subject: string;
     negativePrompt: string;
     defaultParams: string;
@@ -32,8 +32,8 @@ interface SettingsTabProps {
     setThemes: (themes: Theme[]) => void;
     captionStyles: CaptionStyle[];
     setCaptionStyles: (styles: CaptionStyle[]) => void;
-    profile: WillowProfile;
-    setProfile: (profile: WillowProfile) => void;
+    profile: CreatorProfile;
+    setProfile: (profile: CreatorProfile) => void;
     apiKeys: { gemini: string; fal: string };
     onUpdateApiKeys: (keys: { gemini: string; fal: string }) => void;
     onExit: () => void;

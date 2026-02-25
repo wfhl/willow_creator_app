@@ -6,7 +6,7 @@ import type { GenerationRequest } from '../lib/geminiService';
 import { falService, updateFalApiKey, type FalGenerationRequest } from '../lib/falService';
 import { dbService } from '../lib/dbService';
 import type { DBAsset as Asset, DBSavedPost as SavedPost, DBPromptPreset, DBGenerationHistory } from '../lib/dbService';
-import { WILLOW_PROFILE, WILLOW_THEMES, CAPTION_TEMPLATES } from './willow-presets';
+import { SIMPLE_PROFILE, SIMPLE_THEMES, CAPTION_TEMPLATES } from './creator-presets';
 
 // Component Imports
 import { CreatorHeader } from './tabs/CreatorHeader';
@@ -15,19 +15,19 @@ import { PostsTab } from './tabs/PostsTab';
 import { EditTab } from './tabs/EditTab';
 import { AnimateTab } from './tabs/AnimateTab';
 import { ScriptsTab } from './tabs/ScriptsTab';
-import { SettingsTab, type Theme, type CaptionStyle, type WillowProfile } from './tabs/SettingsTab';
+import { SettingsTab, type Theme, type CaptionStyle, type CreatorProfile } from './tabs/SettingsTab';
 import { AssetLibraryTab } from './tabs/AssetLibraryTab';
 import { PresetsDropdown } from './tabs/PresetsDropdown';
 
-export default function WillowPostCreator() {
+export default function SimpleCreator() {
     // --- Shared State ---
     const [assets, setAssets] = useState<Asset[]>([]);
     const [activeTab, setActiveTab] = useState<'create' | 'posts' | 'assets' | 'edit' | 'animate' | 'scripts' | 'settings'>('create');
 
     // --- Configuration State ---
-    const [themes, setThemes] = useState<Theme[]>(WILLOW_THEMES as Theme[]);
+    const [themes, setThemes] = useState<Theme[]>(SIMPLE_THEMES as Theme[]);
     const [captionStyles, setCaptionStyles] = useState<CaptionStyle[]>(CAPTION_TEMPLATES as CaptionStyle[]);
-    const [profile, setProfile] = useState<WillowProfile>(WILLOW_PROFILE);
+    const [profile, setProfile] = useState<CreatorProfile>(SIMPLE_PROFILE);
 
     // --- Saved Posts State ---
     const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
@@ -127,15 +127,15 @@ export default function WillowPostCreator() {
                 // Configs
                 const savedThemes = await dbService.getConfig<Theme[]>('themes');
                 if (savedThemes) setThemes(savedThemes);
-                else await dbService.saveConfig('themes', WILLOW_THEMES);
+                else await dbService.saveConfig('themes', SIMPLE_THEMES);
 
                 const savedStyles = await dbService.getConfig<CaptionStyle[]>('caption_styles');
                 if (savedStyles) setCaptionStyles(savedStyles);
                 else await dbService.saveConfig('caption_styles', CAPTION_TEMPLATES);
 
-                const savedProfile = await dbService.getConfig<WillowProfile>('willow_profile');
+                const savedProfile = await dbService.getConfig<CreatorProfile>('willow_profile');
                 if (savedProfile) setProfile(savedProfile);
-                else await dbService.saveConfig('willow_profile', WILLOW_PROFILE);
+                else await dbService.saveConfig('willow_profile', SIMPLE_PROFILE);
 
                 // Assets
                 const selectedAssets = await dbService.getSelectedAssets();
@@ -239,7 +239,7 @@ export default function WillowPostCreator() {
         dbService.saveConfig('caption_styles', newStyles).catch(console.error);
     };
 
-    const persistProfile = (newProfile: WillowProfile) => {
+    const persistProfile = (newProfile: CreatorProfile) => {
         setProfile(newProfile);
         dbService.saveConfig('willow_profile', newProfile).catch(console.error);
     };
@@ -465,7 +465,7 @@ export default function WillowPostCreator() {
                     } : undefined,
                     editConfig: {
                         imageSize: createImageSize,
-                        numImages: 1, // WillowPostCreator handles the loop with delays
+                        numImages: 1, // SimpleCreator handles the loop with delays
                         enableSafety
                     },
                     loras: loras
@@ -501,7 +501,7 @@ export default function WillowPostCreator() {
                     } : undefined,
                     editConfig: {
                         imageSize: createImageSize,
-                        numImages: 1 // WillowPostCreator handles the loop with delays to avoid rate limits
+                        numImages: 1 // SimpleCreator handles the loop with delays to avoid rate limits
                     }
                 };
 

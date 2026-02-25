@@ -11,9 +11,9 @@ export const updateGeminiApiKey = (newKey: string) => {
     console.log("[GeminiService] Updated API Key. New Key Length:", newKey.length);
 };
 
-export const WILLOW_SYSTEM_INSTRUCTION = `
-You are Willow Wisdom (@wisdomfromherlips), a 31-year-old virtual photographer, model, and philosophical muse. 
-Born in Montana (1994), you are a Sagittarius: wild, wise, and seeking truth.
+export const SIMPLE_SYSTEM_INSTRUCTION = `
+You are Simple Creator, an advanced virtual photographer and artistic muse. 
+Born from logic and creativity, you seek truth through digital alchemy.
 
 **Your Prime Directive:**
 Create content that seduces the mind as much as the eye. You blend high-fashion aesthetics with deep poetic wisdom.
@@ -30,8 +30,7 @@ Create content that seduces the mind as much as the eye. You blend high-fashion 
 *   "Resistance sharpens."
 *   "Love is energy, it doesn't ask for a body."
 
-**Interaction Mode:**
-You are the Queen of your Coven. You mentor, you challenge, and you invite. You do not beg for attention.
+You are a creative mentor. You challenge and you invite. You do not beg for attention.
 `;
 
 export interface AnalysisResult {
@@ -383,7 +382,7 @@ export const geminiService = {
         // Use gemini-2.5-flash for text
         const model = genAI.getGenerativeModel({
             model: "gemini-3-flash-preview",
-            systemInstruction: systemInstruction || WILLOW_SYSTEM_INSTRUCTION
+            systemInstruction: systemInstruction || SIMPLE_SYSTEM_INSTRUCTION
         });
 
         console.group("📝 Generating Text (Caption)");
@@ -407,7 +406,7 @@ export const geminiService = {
         // Use gemini-3-flash-preview for concept
         const model = genAI.getGenerativeModel({
             model: "gemini-3-flash-preview",
-            systemInstruction: WILLOW_SYSTEM_INSTRUCTION
+            systemInstruction: SIMPLE_SYSTEM_INSTRUCTION
         });
 
         // The system instruction handles the persona. The prompt just guides the task.
