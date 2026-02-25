@@ -40,7 +40,7 @@ interface SettingsTabProps {
 }
 
 export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles, profile, setProfile, apiKeys, onUpdateApiKeys, onExit }: SettingsTabProps) {
-    const [activeSection, setActiveSection] = useState<'themes' | 'captions' | 'persona' | 'sync' | 'credentials'>('themes');
+    const [activeSection, setActiveSection] = useState<'themes' | 'captions' | 'persona' | 'sync' | 'credentials'>('credentials');
     const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
     const [editingStyleId, setEditingStyleId] = useState<string | null>(null);
     const [migrationStatus, setMigrationStatus] = useState<string>('');
@@ -166,6 +166,24 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                 {/* Sidebar / Tabs */}
                 <div className="flex md:flex-col gap-2 p-1 bg-white/5 rounded-xl border border-white/5 md:bg-transparent md:border-0 md:p-0 md:w-64 shrink-0 overflow-x-auto no-scrollbar scroll-smooth snap-x">
                     <button
+                        onClick={() => setActiveSection('credentials')}
+                        className={`flex-1 md:flex-none shrink-0 whitespace-nowrap snap-center text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'credentials'
+                            ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
+                            : 'text-white/40 hover:bg-white/5 hover:text-white'
+                            }`}
+                    >
+                        Credentials
+                    </button>
+                    <button
+                        onClick={() => setActiveSection('persona')}
+                        className={`flex-1 md:flex-none shrink-0 whitespace-nowrap snap-center text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'persona'
+                            ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
+                            : 'text-white/40 hover:bg-white/5 hover:text-white'
+                            }`}
+                    >
+                        Persona
+                    </button>
+                    <button
                         onClick={() => setActiveSection('themes')}
                         className={`flex-1 md:flex-none shrink-0 whitespace-nowrap snap-center text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'themes'
                             ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
@@ -184,15 +202,6 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                         Styles
                     </button>
                     <button
-                        onClick={() => setActiveSection('persona')}
-                        className={`flex-1 md:flex-none shrink-0 whitespace-nowrap snap-center text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'persona'
-                            ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
-                            : 'text-white/40 hover:bg-white/5 hover:text-white'
-                            }`}
-                    >
-                        Persona
-                    </button>
-                    <button
                         onClick={() => setActiveSection('sync')}
                         className={`flex-1 md:flex-none shrink-0 whitespace-nowrap snap-center text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'sync'
                             ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
@@ -200,15 +209,6 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                             }`}
                     >
                         Data Sync
-                    </button>
-                    <button
-                        onClick={() => setActiveSection('credentials')}
-                        className={`flex-1 md:flex-none shrink-0 whitespace-nowrap snap-center text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'credentials'
-                            ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
-                            : 'text-white/40 hover:bg-white/5 hover:text-white'
-                            }`}
-                    >
-                        Credentials
                     </button>
                 </div>
 
