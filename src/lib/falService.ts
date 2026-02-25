@@ -1,10 +1,16 @@
 
 import { fal } from "@fal-ai/client";
 
-// Initialize Fal with credentials
 fal.config({
     credentials: import.meta.env.VITE_FAL_KEY
 });
+
+export const updateFalApiKey = (newKey: string) => {
+    fal.config({
+        credentials: newKey
+    });
+    console.log("[FalService] Updated API Key. New Key Present?", !!newKey);
+};
 
 export interface FalGenerationRequest {
     model: string;

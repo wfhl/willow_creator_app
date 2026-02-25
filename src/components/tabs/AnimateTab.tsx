@@ -40,6 +40,7 @@ interface AnimateTabProps {
     setLoras: (loras: Array<{ path: string; scale: number }>) => void;
     onLoRAUpload: (file: File) => Promise<void>;
     promptRef?: React.RefObject<HTMLTextAreaElement | null>;
+    apiKeys: { gemini: string; fal: string };
 }
 
 export function AnimateTab({
@@ -72,7 +73,8 @@ export function AnimateTab({
     loras,
     setLoras,
     onLoRAUpload,
-    promptRef
+    promptRef,
+    apiKeys
 }: AnimateTabProps) {
     const [isDragging, setIsDragging] = useState(false);
 
@@ -587,15 +589,24 @@ export function AnimateTab({
                                         />
                                     </div>
                                 ) : (
-                                    <button
-                                        onClick={onGenerateI2V}
-                                        disabled={isGeneratingI2V || !i2vPrompt}
-                                        className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all active-scale ${isGeneratingI2V || !i2vPrompt ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
-                                            }`}
-                                    >
-                                        <VideoIcon className="w-5 h-5" />
-                                        GENERATE VIDEO
-                                    </button>
+                                    <div className="relative group/gen">
+                                        {!apiKeys.fal && (
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-64 p-3 bg-red-500/90 backdrop-blur-md border border-red-400/50 rounded-xl shadow-2xl opacity-0 group-hover/gen:opacity-100 transition-opacity pointer-events-none z-[100]">
+                                                <p className="text-[10px] font-bold text-white uppercase tracking-widest mb-1">Fal.ai Key Missing</p>
+                                                <p className="text-[10px] text-white/90 leading-relaxed font-medium">Add your API key in Settings &gt; Credentials to enable generation.</p>
+                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-red-500/90" />
+                                            </div>
+                                        )}
+                                        <button
+                                            onClick={onGenerateI2V}
+                                            disabled={isGeneratingI2V || !i2vPrompt || !apiKeys.fal}
+                                            className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all active-scale ${isGeneratingI2V || !i2vPrompt || !apiKeys.fal ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
+                                                }`}
+                                        >
+                                            <VideoIcon className="w-5 h-5" />
+                                            GENERATE VIDEO
+                                        </button>
+                                    </div>
                                 )}
                             </>
                         ) : (

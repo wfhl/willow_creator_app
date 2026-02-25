@@ -61,6 +61,7 @@ interface CreateTabProps {
     showSaveForm: boolean;
     setShowSaveForm: (val: boolean) => void;
     presetsDropdown: React.ReactNode;
+    apiKeys: { gemini: string; fal: string };
     onGenerateCaptionOnly: () => void;
     onSaveToAssets: (url: string, type: 'image' | 'video', name?: string) => void;
     onPreview: (url: string) => void;
@@ -137,7 +138,8 @@ export function CreateTab({
     loras,
     setLoras,
     onLoRAUpload,
-    promptRef
+    promptRef,
+    apiKeys
 }: CreateTabProps) {
 
     const currentTheme = selectedThemeId === 'CUSTOM'
@@ -190,7 +192,7 @@ export function CreateTab({
                             </div>
                             <button
                                 onClick={handleDreamConcept}
-                                disabled={isDreaming}
+                                disabled={isDreaming || !apiKeys.gemini}
                                 className="text-[10px] flex items-center gap-1 text-emerald-400 hover:text-emerald-300 disabled:opacity-50 transition-colors"
                             >
                                 {isDreaming ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
@@ -455,9 +457,10 @@ export function CreateTab({
                             />
 
                             {/* Settings Bar */}
-                            <div className="flex gap-2 bg-black/40 p-2 rounded-lg border border-white/10">
-                                <div className="flex-1 min-w-0">
-                                    <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Model</label>
+                            <div className="flex flex-col gap-3 bg-black/40 p-3 rounded-lg border border-white/10">
+                                {/* Row 1: Model Selection */}
+                                <div className="w-full">
+                                    <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">AI Model Engine</label>
                                     <div className="relative">
                                         <select
                                             value={selectedModel}
@@ -484,135 +487,140 @@ export function CreateTab({
                                         <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
                                     </div>
                                 </div>
-                                <div className="w-24">
-                                    <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Ratio</label>
-                                    <div className="relative">
-                                        <select
-                                            value={selectedModel.includes('v4.5') ? createImageSize : aspectRatio}
-                                            onChange={(e) => {
-                                                if (selectedModel.includes('v4.5') || selectedModel.includes('seedream/v4')) {
-                                                    setCreateImageSize(e.target.value);
-                                                    // Also sync aspect ratio to keep other logic happy if needed
-                                                    if (e.target.value.includes('portrait')) setAspectRatio('3:4');
-                                                    if (e.target.value.includes('landscape')) setAspectRatio('4:3');
-                                                    if (e.target.value.includes('square')) setAspectRatio('1:1');
-                                                } else {
-                                                    setAspectRatio(e.target.value);
-                                                }
-                                            }}
-                                            className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-base md:text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
-                                        >
-                                            {selectedModel.includes('v4.5') ? (
-                                                <>
-                                                    <option value="auto_4K">Auto 4K</option>
-                                                    <option value="square_hd">Square 2K</option>
-                                                    <option value="portrait_4_3">Portrait 4:3</option>
-                                                    <option value="landscape_16_9">Landscape 16:9</option>
-                                                </>
-                                            ) : selectedModel.includes('seedream/v4') ? (
-                                                <>
-                                                    <option value="square_hd">Square 2K</option>
-                                                    <option value="square">Square 1K</option>
-                                                    <option value="portrait_hd">Portrait 2K</option>
-                                                    <option value="landscape_hd">Landscape 2K</option>
-                                                </>
-                                            ) : selectedModel.includes('xai') || selectedModel.includes('nano') ? (
-                                                <>
-                                                    <option value="1:1">1:1 Square</option>
-                                                    <option value="4:3">4:3 Landscape(ish)</option>
-                                                    <option value="16:9">16:9 Landscape</option>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <option value="1:1">1:1</option>
-                                                    <option value="3:4">3:4</option>
-                                                    <option value="4:3">4:3</option>
-                                                    <option value="9:16">9:16</option>
-                                                    <option value="16:9">16:9</option>
-                                                </>
-                                            )}
-                                        </select>
-                                        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
-                                    </div>
-                                </div>
-                                {/* Video Duration - Only for Video */}
-                                {mediaType === 'video' && (
-                                    <div className="w-24">
-                                        <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Duration</label>
+
+                                {/* Row 2: Parameters */}
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-1">
+                                        <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Aspect Ratio</label>
                                         <div className="relative">
                                             <select
-                                                value={videoDuration}
-                                                onChange={(e) => setVideoDuration(e.target.value)}
+                                                value={selectedModel.includes('v4.5') ? createImageSize : aspectRatio}
+                                                onChange={(e) => {
+                                                    if (selectedModel.includes('v4.5') || selectedModel.includes('seedream/v4')) {
+                                                        setCreateImageSize(e.target.value);
+                                                        // Also sync aspect ratio to keep other logic happy if needed
+                                                        if (e.target.value.includes('portrait')) setAspectRatio('3:4');
+                                                        if (e.target.value.includes('landscape')) setAspectRatio('4:3');
+                                                        if (e.target.value.includes('square')) setAspectRatio('1:1');
+                                                    } else {
+                                                        setAspectRatio(e.target.value);
+                                                    }
+                                                }}
                                                 className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-base md:text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
                                             >
-                                                {selectedModel.includes('veo-3') ? (
-                                                    videoResolution === '1080p' ? (
-                                                        <option value="8s">8s</option>
+                                                {selectedModel.includes('v4.5') ? (
+                                                    <>
+                                                        <option value="auto_4K">Auto 4K</option>
+                                                        <option value="square_hd">Square 2K</option>
+                                                        <option value="portrait_4_3">Portrait 4:3</option>
+                                                        <option value="landscape_16_9">Landscape 16:9</option>
+                                                    </>
+                                                ) : selectedModel.includes('seedream/v4') ? (
+                                                    <>
+                                                        <option value="square_hd">Square 2K</option>
+                                                        <option value="square">Square 1K</option>
+                                                        <option value="portrait_hd">Portrait 2K</option>
+                                                        <option value="landscape_hd">Landscape 2K</option>
+                                                    </>
+                                                ) : selectedModel.includes('xai') || selectedModel.includes('nano') ? (
+                                                    <>
+                                                        <option value="1:1">1:1 Square</option>
+                                                        <option value="4:3">4:3 Landscape(ish)</option>
+                                                        <option value="16:9">16:9 Landscape</option>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <option value="1:1">1:1</option>
+                                                        <option value="3:4">3:4</option>
+                                                        <option value="4:3">4:3</option>
+                                                        <option value="9:16">9:16</option>
+                                                        <option value="16:9">16:9</option>
+                                                    </>
+                                                )}
+                                            </select>
+                                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
+                                        </div>
+                                    </div>
+
+                                    {/* Video Duration - Only for Video */}
+                                    {mediaType === 'video' && (
+                                        <div className="w-24">
+                                            <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Duration</label>
+                                            <div className="relative">
+                                                <select
+                                                    value={videoDuration}
+                                                    onChange={(e) => setVideoDuration(e.target.value)}
+                                                    className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-base md:text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                                >
+                                                    {selectedModel.includes('veo-3') ? (
+                                                        videoResolution === '1080p' ? (
+                                                            <option value="8s">8s</option>
+                                                        ) : (
+                                                            <>
+                                                                <option value="4s">4s</option>
+                                                                <option value="6s">6s</option>
+                                                                <option value="8s">8s</option>
+                                                            </>
+                                                        )
                                                     ) : (
                                                         <>
-                                                            <option value="4s">4s</option>
-                                                            <option value="6s">6s</option>
+                                                            <option value="5s">5s</option>
                                                             <option value="8s">8s</option>
                                                         </>
-                                                    )
-                                                ) : (
-                                                    <>
-                                                        <option value="5s">5s</option>
-                                                        <option value="8s">8s</option>
-                                                    </>
-                                                )}
-                                            </select>
-                                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
+                                                    )}
+                                                </select>
+                                                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {/* Video Resolution - Only for Video */}
-                                {mediaType === 'video' && (
-                                    <div className="w-24">
-                                        <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Quality</label>
-                                        <div className="relative">
-                                            <select
-                                                value={videoResolution}
-                                                onChange={(e) => setVideoResolution(e.target.value)}
-                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-base md:text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
-                                            >
-                                                {selectedModel.includes('veo-3') ? (
-                                                    <>
-                                                        <option value="1080p">1080p</option>
-                                                        <option value="720p">720p</option>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <option value="1080p">1080p</option>
-                                                        <option value="720p">720p</option>
-                                                    </>
-                                                )}
-                                            </select>
-                                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
+                                    {/* Video Resolution - Only for Video */}
+                                    {mediaType === 'video' && (
+                                        <div className="w-24">
+                                            <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Quality</label>
+                                            <div className="relative">
+                                                <select
+                                                    value={videoResolution}
+                                                    onChange={(e) => setVideoResolution(e.target.value)}
+                                                    className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-base md:text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                                >
+                                                    {selectedModel.includes('veo-3') ? (
+                                                        <>
+                                                            <option value="1080p">1080p</option>
+                                                            <option value="720p">720p</option>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <option value="1080p">1080p</option>
+                                                            <option value="720p">720p</option>
+                                                        </>
+                                                    )}
+                                                </select>
+                                                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {/* Count Selector - Only for Image */}
-                                {mediaType === 'image' && (
-                                    <div className="w-16">
-                                        <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Count</label>
-                                        <div className="relative">
-                                            <select
-                                                value={createNumImages}
-                                                onChange={(e) => setCreateNumImages(Number(e.target.value))}
-                                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-base md:text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
-                                            >
-                                                <option value={1}>1</option>
-                                                <option value={2}>2</option>
-                                                <option value={3}>3</option>
-                                                <option value={4}>4</option>
-                                            </select>
-                                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
+                                    {/* Count Selector - Only for Image */}
+                                    {mediaType === 'image' && (
+                                        <div className="w-24">
+                                            <label className="text-[10px] text-white/40 uppercase tracking-widest block mb-1">Batch Count</label>
+                                            <div className="relative">
+                                                <select
+                                                    value={createNumImages}
+                                                    onChange={(e) => setCreateNumImages(Number(e.target.value))}
+                                                    className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-base md:text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
+                                                >
+                                                    <option value={1}>1 Image</option>
+                                                    <option value={2}>2 Images</option>
+                                                    <option value={3}>3 Images</option>
+                                                    <option value={4}>4 Images</option>
+                                                </select>
+                                                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -855,22 +863,31 @@ export function CreateTab({
                     </div>
 
                     {/* Right: Generate Button */}
-                    <button
-                        onClick={handleGenerateContent}
-                        disabled={isGeneratingMedia || isGeneratingCaption}
-                        className={`
-                                h-10 md-h-12 px-4 md:px-8 rounded-xl font-bold uppercase tracking-widest text-[10px] md:text-sm
-                                bg-gradient-to-r from-emerald-600 to-emerald-500 
-                                hover:from-emerald-500 hover:to-emerald-400 
-                                text-black shadow-lg shadow-emerald-500/20 
-                                hover:shadow-emerald-500/40 hover:-translate-y-0.5
-                                disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0
-                                transition-all flex items-center gap-2 shrink-0
-                            `}
-                    >
-                        {(isGeneratingMedia || isGeneratingCaption) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-purple-300" />}
-                        {(isGeneratingMedia || isGeneratingCaption) ? "Working..." : "Generate"}
-                    </button>
+                    <div className="relative group/gen">
+                        {!apiKeys.fal && (
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-64 p-3 bg-red-500/90 backdrop-blur-md border border-red-400/50 rounded-xl shadow-2xl opacity-0 group-hover/gen:opacity-100 transition-opacity pointer-events-none z-[100]">
+                                <p className="text-[10px] font-bold text-white uppercase tracking-widest mb-1">Fal.ai Key Missing</p>
+                                <p className="text-[10px] text-white/90 leading-relaxed font-medium">Add your API key in Settings &gt; Credentials to enable generation.</p>
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-red-500/90" />
+                            </div>
+                        )}
+                        <button
+                            onClick={handleGenerateContent}
+                            disabled={isGeneratingMedia || isGeneratingCaption || !apiKeys.fal}
+                            className={`
+                                    h-10 md-h-12 px-4 md:px-8 rounded-xl font-bold uppercase tracking-widest text-[10px] md:text-sm
+                                    bg-gradient-to-r from-emerald-600 to-emerald-500 
+                                    hover:from-emerald-500 hover:to-emerald-400 
+                                    text-black shadow-lg shadow-emerald-500/20 
+                                    hover:shadow-emerald-500/40 hover:-translate-y-0.5
+                                    disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0
+                                    transition-all flex items-center gap-2 shrink-0
+                                `}
+                        >
+                            {(isGeneratingMedia || isGeneratingCaption) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-purple-300" />}
+                            {(isGeneratingMedia || isGeneratingCaption) ? "Working..." : "Generate"}
+                        </button>
+                    </div>
                 </div>
             </div>
 

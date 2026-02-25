@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Edit2, Play, PenTool, Archive, Folder } from 'lucide-react';
 import { generateUUID } from '../lib/uuid';
-import { geminiService } from '../lib/geminiService';
+import { geminiService, updateGeminiApiKey } from '../lib/geminiService';
 import type { GenerationRequest } from '../lib/geminiService';
-import { falService, type FalGenerationRequest } from '../lib/falService';
+import { falService, updateFalApiKey, type FalGenerationRequest } from '../lib/falService';
 import { dbService } from '../lib/dbService';
 import type { DBAsset as Asset, DBSavedPost as SavedPost, DBPromptPreset, DBGenerationHistory } from '../lib/dbService';
 import { WILLOW_PROFILE, WILLOW_THEMES, CAPTION_TEMPLATES } from './willow-presets';
@@ -15,7 +15,7 @@ import { PostsTab } from './tabs/PostsTab';
 import { EditTab } from './tabs/EditTab';
 import { AnimateTab } from './tabs/AnimateTab';
 import { ScriptsTab } from './tabs/ScriptsTab';
-import { SettingsTab, type Theme, type CaptionStyle } from './tabs/SettingsTab';
+import { SettingsTab, type Theme, type CaptionStyle, type WillowProfile } from './tabs/SettingsTab';
 import { AssetLibraryTab } from './tabs/AssetLibraryTab';
 import { PresetsDropdown } from './tabs/PresetsDropdown';
 
@@ -27,6 +27,7 @@ export default function WillowPostCreator() {
     // --- Configuration State ---
     const [themes, setThemes] = useState<Theme[]>(WILLOW_THEMES as Theme[]);
     const [captionStyles, setCaptionStyles] = useState<CaptionStyle[]>(CAPTION_TEMPLATES as CaptionStyle[]);
+    const [profile, setProfile] = useState<WillowProfile>(WILLOW_PROFILE);
 
     // --- Saved Posts State ---
     const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
@@ -106,10 +107,11 @@ export default function WillowPostCreator() {
     const [withAudio, setWithAudio] = useState(true);
     const [cameraFixed, setCameraFixed] = useState(false);
 
-    // Advanced Edit Config
     const [enableSafety, setEnableSafety] = useState(false);
-    const [enhancePromptMode, setEnhancePromptMode] = useState<"standard" | "fast">("standard");
     const [loras, setLoras] = useState<Array<{ path: string; scale: number }>>([]);
+
+    // API Keys State
+    const [apiKeys, setApiKeys] = useState<{ gemini: string; fal: string }>({ gemini: '', fal: '' });
 
     // --- INITIALIZATION EFFECTS ---
 
@@ -130,6 +132,10 @@ export default function WillowPostCreator() {
                 const savedStyles = await dbService.getConfig<CaptionStyle[]>('caption_styles');
                 if (savedStyles) setCaptionStyles(savedStyles);
                 else await dbService.saveConfig('caption_styles', CAPTION_TEMPLATES);
+
+                const savedProfile = await dbService.getConfig<WillowProfile>('willow_profile');
+                if (savedProfile) setProfile(savedProfile);
+                else await dbService.saveConfig('willow_profile', WILLOW_PROFILE);
 
                 // Assets
                 const selectedAssets = await dbService.getSelectedAssets();
@@ -156,13 +162,20 @@ export default function WillowPostCreator() {
                     if (savedParams.withAudio !== undefined) setWithAudio(savedParams.withAudio);
                     if (savedParams.cameraFixed !== undefined) setCameraFixed(savedParams.cameraFixed);
                     if (savedParams.enableSafety !== undefined) setEnableSafety(savedParams.enableSafety);
-                    if (savedParams.enhancePromptMode) setEnhancePromptMode(savedParams.enhancePromptMode);
                     if (savedParams.mediaType) setMediaType(savedParams.mediaType);
                     if (savedParams.selectedThemeId) setSelectedThemeId(savedParams.selectedThemeId);
                     if (savedParams.captionType) setCaptionType(savedParams.captionType);
                     if (savedParams.refineImageSize) setRefineImageSize(savedParams.refineImageSize);
                     if (savedParams.refineNumImages) setRefineNumImages(savedParams.refineNumImages);
                     if (savedParams.editSelectedModel) setEditSelectedModel(savedParams.editSelectedModel);
+                }
+
+                // API Keys
+                const savedKeys = await dbService.getConfig('api_keys');
+                if (savedKeys) {
+                    setApiKeys(savedKeys);
+                    if (savedKeys.gemini) updateGeminiApiKey(savedKeys.gemini);
+                    if (savedKeys.fal) updateFalApiKey(savedKeys.fal);
                 }
             } catch (e) { console.error(e); }
         };
@@ -208,7 +221,6 @@ export default function WillowPostCreator() {
     useEffect(() => { persistParam('withAudio', withAudio); }, [withAudio]);
     useEffect(() => { persistParam('cameraFixed', cameraFixed); }, [cameraFixed]);
     useEffect(() => { persistParam('enableSafety', enableSafety); }, [enableSafety]);
-    useEffect(() => { persistParam('enhancePromptMode', enhancePromptMode); }, [enhancePromptMode]);
     useEffect(() => { persistParam('mediaType', mediaType); }, [mediaType]);
     useEffect(() => { persistParam('selectedThemeId', selectedThemeId); }, [selectedThemeId]);
     useEffect(() => { persistParam('captionType', captionType); }, [captionType]);
@@ -225,6 +237,18 @@ export default function WillowPostCreator() {
     const persistCaptionStyles = (newStyles: CaptionStyle[]) => {
         setCaptionStyles(newStyles);
         dbService.saveConfig('caption_styles', newStyles).catch(console.error);
+    };
+
+    const persistProfile = (newProfile: WillowProfile) => {
+        setProfile(newProfile);
+        dbService.saveConfig('willow_profile', newProfile).catch(console.error);
+    };
+
+    const handleUpdateApiKeys = async (newKeys: { gemini: string, fal: string }) => {
+        setApiKeys(newKeys);
+        if (newKeys.gemini) updateGeminiApiKey(newKeys.gemini);
+        if (newKeys.fal) updateFalApiKey(newKeys.fal);
+        await dbService.saveConfig('api_keys', newKeys);
     };
 
     // Reload posts on sort/search
@@ -304,7 +328,7 @@ export default function WillowPostCreator() {
     }, [previewContext]);
 
     const constructPrompt = () => {
-        let prompt = `SUBJECT: ${WILLOW_PROFILE.subject} `;
+        let prompt = `SUBJECT: ${profile.subject} `;
 
         if (selectedThemeId === 'CUSTOM') {
             prompt += ` ${specificVisuals || "A creative, artistic portrait."}`;
@@ -325,7 +349,7 @@ export default function WillowPostCreator() {
             prompt += base;
         }
 
-        prompt += ` ${WILLOW_PROFILE.defaultParams} ${WILLOW_PROFILE.negativePrompt}`;
+        prompt += ` ${profile.defaultParams} ${profile.negativePrompt}`;
         setGeneratedPrompt(prompt);
     };
 
@@ -335,7 +359,7 @@ export default function WillowPostCreator() {
             return;
         }
         constructPrompt();
-    }, [selectedThemeId, specificVisuals, specificOutfit]);
+    }, [selectedThemeId, specificVisuals, specificOutfit, profile]);
 
 
     const handleInputImageUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'visuals' | 'outfit') => {
@@ -442,8 +466,7 @@ export default function WillowPostCreator() {
                     editConfig: {
                         imageSize: createImageSize,
                         numImages: 1, // WillowPostCreator handles the loop with delays
-                        enableSafety,
-                        enhancePromptMode
+                        enableSafety
                     },
                     loras: loras
                 };
@@ -558,7 +581,7 @@ export default function WillowPostCreator() {
             const template = captionStyles.find(c => c.id === (overrides?.captionType || captionType));
             const systemInstruction = `
             You are Willow Wisdom.
-            CORE PERSONA: ${WILLOW_PROFILE.subject}
+            CORE PERSONA: ${profile.subject}
             CONTEXT: Theme: ${(overrides?.theme || currentTheme).name}, Visuals: ${overrides?.visuals || specificVisuals}, Outfit: ${overrides?.outfit || specificOutfit}
             TASK: Write a caption for Topic: "${t}". Style: ${template?.prompt}
             `;
@@ -590,14 +613,14 @@ export default function WillowPostCreator() {
             setSpecificVisuals(concept.setting);
             setSpecificOutfit(concept.outfit);
 
-            let prompt = randomTheme.basePrompt.replace("[Subject Definition]", WILLOW_PROFILE.subject)
+            let prompt = randomTheme.basePrompt.replace("[Subject Definition]", profile.subject)
                 .replace("[Outfit]", concept.outfit || randomTheme.defaultOutfit);
 
             if (randomTheme.id === 'B') prompt = prompt.replace("[Visuals]", concept.setting || randomTheme.defaultVisuals || "");
             else if (['C', 'D', 'E'].includes(randomTheme.id)) prompt = prompt.replace("[Action]", concept.setting || randomTheme.defaultAction || "");
             else prompt = prompt.replace("[Setting]", concept.setting || randomTheme.defaultSetting || "");
 
-            prompt += ` ${WILLOW_PROFILE.defaultParams}`;
+            prompt += ` ${profile.defaultParams}`;
             setGeneratedPrompt(prompt);
 
             handleGenerateMedia(prompt);
@@ -677,7 +700,7 @@ export default function WillowPostCreator() {
             action: "",
             model: selectedModel,
             aspectRatio: aspectRatio,
-            negativePrompt: WILLOW_PROFILE.negativePrompt,
+            negativePrompt: profile.negativePrompt,
             videoDuration,
             videoResolution,
             tab: activeTab,
@@ -799,7 +822,6 @@ export default function WillowPostCreator() {
             setEditSelectedModel(item.model);
             if (item.imageSize) setRefineImageSize(item.imageSize);
             if (item.numImages) setRefineNumImages(item.numImages);
-            if (item.enhancePromptMode) setEnhancePromptMode(item.enhancePromptMode);
             setRefineResultUrls([]); // Clear old results
             if (item.inputImageUrl) {
                 setRefineTarget({ url: item.inputImageUrl, index: -1 });
@@ -1116,8 +1138,7 @@ export default function WillowPostCreator() {
                                         editConfig: {
                                             imageSize: createImageSize,
                                             numImages: 1, // Force 1 for reroll
-                                            enableSafety,
-                                            enhancePromptMode
+                                            enableSafety
                                         }
                                     };
                                     newUrl = await falService.generateMedia(request);
@@ -1203,6 +1224,7 @@ export default function WillowPostCreator() {
                                 reader.readAsDataURL(file);
                             });
                         }}
+                        apiKeys={apiKeys}
                     />
                 )}
 
@@ -1273,8 +1295,6 @@ export default function WillowPostCreator() {
                         setRefineResultUrls={setRefineResultUrls}
                         isRefining={isRefining}
                         refineProgress={refineProgress}
-                        enhancePromptMode={enhancePromptMode}
-                        setEnhancePromptMode={(val) => { setEnhancePromptMode(val as "standard" | "fast"); persistParam('enhancePromptMode', val); }}
                         onRefineSubmit={async () => {
                             if (!refineTarget || !refinePrompt) return;
                             setIsRefining(true);
@@ -1342,8 +1362,7 @@ export default function WillowPostCreator() {
                                             editConfig: {
                                                 imageSize: refineImageSize,
                                                 numImages: refineNumImages,
-                                                enableSafety: false,
-                                                enhancePromptMode
+                                                enableSafety: false
                                             }
                                         };
                                         const results = await falService.generateMedia(req);
@@ -1381,7 +1400,6 @@ export default function WillowPostCreator() {
                                             inputImageUrl: refineTarget?.url,
                                             imageSize: refineImageSize,
                                             numImages: refineNumImages,
-                                            enhancePromptMode: enhancePromptMode,
                                             tab: 'edit'
                                         });
                                     } catch (err) { console.error("Failed to save history:", err); }
@@ -1410,6 +1428,7 @@ export default function WillowPostCreator() {
                         }}
                         onExit={() => setActiveTab('create')}
                         onI2VEntry={(url) => handleI2VEntry(url, -1)}
+                        apiKeys={apiKeys}
                         presetsDropdown={
                             <PresetsDropdown
                                 isOpen={isPresetsOpen}
@@ -1576,6 +1595,7 @@ export default function WillowPostCreator() {
                         onSaveToAssets={handleSaveToAssets}
                         onPreview={(url) => handleOpenPreview(url)}
                         onDownload={handleDownload}
+                        apiKeys={apiKeys}
                     />
                 )}
 
@@ -1586,6 +1606,10 @@ export default function WillowPostCreator() {
                         setThemes={persistThemes}
                         captionStyles={captionStyles}
                         setCaptionStyles={persistCaptionStyles}
+                        profile={profile}
+                        setProfile={persistProfile}
+                        apiKeys={apiKeys}
+                        onUpdateApiKeys={handleUpdateApiKeys}
                         onExit={() => setActiveTab('create')}
                     />
                 )}

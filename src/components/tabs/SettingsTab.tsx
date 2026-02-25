@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Plus, Trash2, Save, X, ChevronDown, ChevronUp, Cloud, Database } from 'lucide-react';
+import { Settings, Plus, Trash2, Save, X, ChevronDown, ChevronUp, Cloud, Database, Key, Eye, EyeOff } from 'lucide-react';
 import { migrationService } from '../../lib/migrationService';
 import { generateUUID } from '../../lib/uuid';
 
@@ -15,6 +15,12 @@ export interface Theme {
     defaultAction?: string;
 }
 
+export interface WillowProfile {
+    subject: string;
+    negativePrompt: string;
+    defaultParams: string;
+}
+
 export interface CaptionStyle {
     id: string;
     label: string;
@@ -26,15 +32,27 @@ interface SettingsTabProps {
     setThemes: (themes: Theme[]) => void;
     captionStyles: CaptionStyle[];
     setCaptionStyles: (styles: CaptionStyle[]) => void;
+    profile: WillowProfile;
+    setProfile: (profile: WillowProfile) => void;
+    apiKeys: { gemini: string; fal: string };
+    onUpdateApiKeys: (keys: { gemini: string; fal: string }) => void;
     onExit: () => void;
 }
 
-export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles, onExit }: SettingsTabProps) {
-    const [activeSection, setActiveSection] = useState<'themes' | 'captions' | 'sync'>('themes');
+export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles, profile, setProfile, apiKeys, onUpdateApiKeys, onExit }: SettingsTabProps) {
+    const [activeSection, setActiveSection] = useState<'themes' | 'captions' | 'persona' | 'sync' | 'credentials'>('themes');
     const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
     const [editingStyleId, setEditingStyleId] = useState<string | null>(null);
     const [migrationStatus, setMigrationStatus] = useState<string>('');
     const [isMigrating, setIsMigrating] = useState(false);
+
+    // API Keys Local State for editing
+    const [localKeys, setLocalKeys] = useState(apiKeys);
+    const [showGemini, setShowGemini] = useState(false);
+    const [showFal, setShowFal] = useState(false);
+
+    // Profile Local State
+    const [localProfile, setLocalProfile] = useState(profile);
 
     // Temporary state for editing
     const [tempTheme, setTempTheme] = useState<Theme | null>(null);
@@ -166,6 +184,15 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                         Styles
                     </button>
                     <button
+                        onClick={() => setActiveSection('persona')}
+                        className={`flex-1 md:flex-none text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'persona'
+                            ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
+                            : 'text-white/40 hover:bg-white/5 hover:text-white'
+                            }`}
+                    >
+                        Persona
+                    </button>
+                    <button
                         onClick={() => setActiveSection('sync')}
                         className={`flex-1 md:flex-none text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'sync'
                             ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
@@ -173,6 +200,15 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                             }`}
                     >
                         Data Sync
+                    </button>
+                    <button
+                        onClick={() => setActiveSection('credentials')}
+                        className={`flex-1 md:flex-none text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'credentials'
+                            ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
+                            : 'text-white/40 hover:bg-white/5 hover:text-white'
+                            }`}
+                    >
+                        Credentials
                     </button>
                 </div>
 
@@ -460,6 +496,60 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                         </div>
                     )}
 
+                    {activeSection === 'persona' && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-lg font-bold text-white">Core Persona & Identity</h3>
+                            </div>
+
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Base Subject Definition</label>
+                                    <textarea
+                                        value={localProfile.subject}
+                                        onChange={e => setLocalProfile({ ...localProfile, subject: e.target.value })}
+                                        rows={4}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500/50 outline-none transition-all font-serif italic"
+                                        placeholder="Describe the core persona (face, age, hair, mood)..."
+                                    />
+                                    <p className="text-[10px] text-white/30 italic">This is the [Subject Definition] used in all automated prompts.</p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Global Negative Prompt</label>
+                                    <textarea
+                                        value={localProfile.negativePrompt}
+                                        onChange={e => setLocalProfile({ ...localProfile, negativePrompt: e.target.value })}
+                                        rows={3}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500/50 outline-none transition-all font-mono text-xs"
+                                        placeholder="Enter negative prompts to avoid..."
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Default Parameters</label>
+                                    <input
+                                        type="text"
+                                        value={localProfile.defaultParams}
+                                        onChange={e => setLocalProfile({ ...localProfile, defaultParams: e.target.value })}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500/50 outline-none transition-all"
+                                        placeholder="e.g. --v 6.0 --stylize 250"
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        setProfile(localProfile);
+                                        alert("Persona settings saved!");
+                                    }}
+                                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                                >
+                                    <Save className="w-4 h-4" /> Save Persona
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {activeSection === 'sync' && (
                         <div className="space-y-6">
                             <div className="flex justify-between items-center">
@@ -489,6 +579,92 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                                         )}
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeSection === 'credentials' && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-lg font-bold text-white">API Credentials</h3>
+                            </div>
+
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-8">
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                                            <Key className="w-4 h-4 text-purple-400" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-white text-sm">Google Gemini API</h4>
+                                            <p className="text-[10px] text-white/40 uppercase tracking-widest">Required for logic and captioning</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="relative group">
+                                        <input
+                                            type={showGemini ? "text" : "password"}
+                                            value={localKeys.gemini}
+                                            onChange={e => setLocalKeys({ ...localKeys, gemini: e.target.value })}
+                                            placeholder="Enter your Gemini API Key..."
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500/50 outline-none transition-all pr-12"
+                                        />
+                                        <button
+                                            onClick={() => setShowGemini(!showGemini)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-white/20 hover:text-white/60 transition-colors"
+                                        >
+                                            {showGemini ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-white/30 italic">Get your key from the <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">Google AI Studio</a>.</p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="p-2 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                                            <Key className="w-4 h-4 text-orange-400" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-white text-sm">Fal.ai API</h4>
+                                            <p className="text-[10px] text-white/40 uppercase tracking-widest">Required for image and video generation</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="relative group">
+                                        <input
+                                            type={showFal ? "text" : "password"}
+                                            value={localKeys.fal}
+                                            onChange={e => setLocalKeys({ ...localKeys, fal: e.target.value })}
+                                            placeholder="Enter your Fal.ai API Key..."
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-orange-500/50 outline-none transition-all pr-12"
+                                        />
+                                        <button
+                                            onClick={() => setShowFal(!showFal)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-white/20 hover:text-white/60 transition-colors"
+                                        >
+                                            {showFal ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-white/30 italic">Get your key from the <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:underline">Fal.ai Dashboard</a>.</p>
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        onUpdateApiKeys(localKeys);
+                                        alert("API Keys saved successfully!");
+                                    }}
+                                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                                >
+                                    <Save className="w-4 h-4" /> Save Credentials
+                                </button>
+                            </div>
+
+                            <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-2">
+                                <h4 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Security Note</h4>
+                                <p className="text-[10px] text-white/30 leading-relaxed">
+                                    Keys are stored locally in your browser's IndexedDB. They are never sent to our servers or included in cloud sync.
+                                    However, anyone with access to your browser profile may be able to retrieve them.
+                                </p>
                             </div>
                         </div>
                     )}

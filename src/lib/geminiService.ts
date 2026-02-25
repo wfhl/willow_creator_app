@@ -4,7 +4,12 @@ const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
 console.log("[GeminiService] Initializing with Key Length:", apiKey.length);
 console.log("[GeminiService] Key Present?", !!apiKey);
 
-const genAI = new GoogleGenerativeAI(apiKey);
+let genAI = new GoogleGenerativeAI(apiKey);
+
+export const updateGeminiApiKey = (newKey: string) => {
+    genAI = new GoogleGenerativeAI(newKey);
+    console.log("[GeminiService] Updated API Key. New Key Length:", newKey.length);
+};
 
 export const WILLOW_SYSTEM_INSTRUCTION = `
 You are Willow Wisdom (@wisdomfromherlips), a 31-year-old virtual photographer, model, and philosophical muse. 

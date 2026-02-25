@@ -32,9 +32,8 @@ interface EditTabProps {
     onDownload: (url: string, prefix?: string) => void;
 
     // New Props
-    enhancePromptMode?: "standard" | "fast";
-    setEnhancePromptMode?: (val: "standard" | "fast") => void;
     promptRef?: React.RefObject<HTMLTextAreaElement | null>;
+    apiKeys: { gemini: string; fal: string };
 }
 
 export function EditTab({
@@ -63,9 +62,8 @@ export function EditTab({
     onSaveToAssets,
     onPreview,
     onDownload,
-    enhancePromptMode,
-    setEnhancePromptMode,
-    promptRef
+    promptRef,
+    apiKeys
 }: EditTabProps) {
     const [isDragging, setIsDragging] = useState(false);
 
@@ -359,25 +357,27 @@ export function EditTab({
                                         className="w-full h-[250px] p-6 bg-black/40 border border-white/10 rounded-xl text-base md:text-sm text-white focus:border-emerald-500/50 focus:outline-none transition-all resize-none font-serif leading-relaxed"
                                     />
                                     {/* Model Selector & Parameters Bar */}
-                                    <div className="flex items-center justify-between gap-4 p-2">
-                                        <div className="flex items-center gap-4 flex-1">
-                                            <div className="space-y-1 flex-1">
-                                                <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">AI Model</label>
-                                                <select
-                                                    value={selectedModel}
-                                                    onChange={(e) => setSelectedModel(e.target.value)}
-                                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none"
-                                                >
-                                                    {availableModels.map(m => (
-                                                        <option key={m.id} value={m.id}>{m.name}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
+                                    <div className="flex flex-col gap-4 p-4 bg-black/40 rounded-xl border border-white/10">
+                                        {/* Row 1: Model Selection */}
+                                        <div className="space-y-1 w-full">
+                                            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">AI Model Engine</label>
+                                            <select
+                                                value={selectedModel}
+                                                onChange={(e) => setSelectedModel(e.target.value)}
+                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none"
+                                            >
+                                                {availableModels.map(m => (
+                                                    <option key={m.id} value={m.id}>{m.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
 
+                                        {/* Row 2: Parameters */}
+                                        <div className="flex items-center gap-4">
                                             {/* Dynamic Parameters for Models */}
                                             {(selectedModel.includes('seedream') || selectedModel.includes('banana')) && (
-                                                <div className="space-y-1 w-32 animate-in fade-in slide-in-from-left-2 duration-300">
-                                                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Size</label>
+                                                <div className="space-y-1 flex-1 animate-in fade-in slide-in-from-left-2 duration-300">
+                                                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Size / Ratio</label>
                                                     <select
                                                         value={refineImageSize}
                                                         onChange={(e) => setRefineImageSize(e.target.value)}
@@ -409,8 +409,8 @@ export function EditTab({
                                             )}
 
                                             {!isVideo && (
-                                                <div className="space-y-1 w-24 animate-in fade-in slide-in-from-left-2 duration-300">
-                                                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Quantity</label>
+                                                <div className="space-y-1 w-32 animate-in fade-in slide-in-from-left-2 duration-300">
+                                                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Batch Quantity</label>
                                                     <select
                                                         value={refineNumImages}
                                                         onChange={(e) => setRefineNumImages(Number(e.target.value))}
@@ -422,24 +422,6 @@ export function EditTab({
                                                         <option value={4}>4 Images</option>
                                                     </select>
                                                 </div>
-                                            )}
-
-                                            {(selectedModel.includes('seedream') || selectedModel.includes('grok') || selectedModel.includes('banana')) && !isVideo && (
-                                                <>
-                                                    {((selectedModel.includes('seedream') && !selectedModel.includes('v4.5/')) || selectedModel.includes('banana')) && (
-                                                        <div className="space-y-1 w-32 animate-in fade-in slide-in-from-left-2 duration-300">
-                                                            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Enhance</label>
-                                                            <select
-                                                                value={enhancePromptMode || "standard"}
-                                                                onChange={(e) => setEnhancePromptMode && setEnhancePromptMode(e.target.value as "standard" | "fast")}
-                                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-xs text-white focus:border-emerald-500/50 outline-none cursor-pointer hover:bg-white/5 transition-colors"
-                                                            >
-                                                                <option value="standard">Standard</option>
-                                                                <option value="fast">Fast</option>
-                                                            </select>
-                                                        </div>
-                                                    )}
-                                                </>
                                             )}
                                         </div>
                                     </div>
@@ -471,15 +453,24 @@ export function EditTab({
                                         </div>
                                     </div>
                                 ) : (
-                                    <button
-                                        onClick={onRefineSubmit}
-                                        disabled={isRefining || !refinePrompt}
-                                        className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all active-scale ${isRefining || !refinePrompt ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
-                                            }`}
-                                    >
-                                        <Sparkles className="w-5 h-5" />
-                                        GENERATE REFINED VERSION
-                                    </button>
+                                    <div className="relative group/gen">
+                                        {!apiKeys.fal && (
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-64 p-3 bg-red-500/90 backdrop-blur-md border border-red-400/50 rounded-xl shadow-2xl opacity-0 group-hover/gen:opacity-100 transition-opacity pointer-events-none z-[100]">
+                                                <p className="text-[10px] font-bold text-white uppercase tracking-widest mb-1">Fal.ai Key Missing</p>
+                                                <p className="text-[10px] text-white/90 leading-relaxed font-medium">Add your API key in Settings &gt; Credentials to enable generation.</p>
+                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-red-500/90" />
+                                            </div>
+                                        )}
+                                        <button
+                                            onClick={onRefineSubmit}
+                                            disabled={isRefining || !refinePrompt || !apiKeys.fal}
+                                            className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all active-scale ${isRefining || !refinePrompt || !apiKeys.fal ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
+                                                }`}
+                                        >
+                                            <Sparkles className="w-5 h-5" />
+                                            GENERATE REFINED VERSION
+                                        </button>
+                                    </div>
                                 )}
                             </>
                         ) : refineResultUrls.length === 0 ? (
