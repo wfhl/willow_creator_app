@@ -36,6 +36,15 @@ export const syncService = {
         this.fullSync();
     },
 
+    async saveUserConfig(id: string, data: any) {
+        if (!this.user) return;
+        const { error } = await supabase.auth.updateUser({
+            data: { [id]: data }
+        });
+        if (error) throw error;
+        console.log(`[Sync] Updated user_metadata for ${id}`);
+    },
+
     async fullSync() {
         if (!this.user) return;
         console.group("[Sync] Full background sync session");

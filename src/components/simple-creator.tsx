@@ -18,8 +18,11 @@ import { ScriptsTab } from './tabs/ScriptsTab';
 import { SettingsTab, type Theme, type CaptionStyle, type CreatorProfile } from './tabs/SettingsTab';
 import { AssetLibraryTab } from './tabs/AssetLibraryTab';
 import { PresetsDropdown } from './tabs/PresetsDropdown';
+import { useAuth } from '../components/AuthProvider';
+import { syncService } from '../lib/syncService';
 
 export default function SimpleCreator() {
+    const { user } = useAuth();
     // --- Shared State ---
     const [assets, setAssets] = useState<Asset[]>([]);
     const [activeTab, setActiveTab] = useState<'create' | 'posts' | 'assets' | 'edit' | 'animate' | 'scripts' | 'settings'>('create');
@@ -171,11 +174,32 @@ export default function SimpleCreator() {
                 }
 
                 // API Keys
-                const savedKeys = await dbService.getConfig('api_keys');
+                let savedKeys = await dbService.getConfig('api_keys');
+
+                // If logged in, cloud metadata takes precedence for cross-device sync
+                if (user?.user_metadata?.api_keys) {
+                    savedKeys = user.user_metadata.api_keys;
+                    await dbService.saveConfig('api_keys', savedKeys);
+                }
+
                 if (savedKeys) {
                     setApiKeys(savedKeys);
                     if (savedKeys.gemini) updateGeminiApiKey(savedKeys.gemini);
                     if (savedKeys.fal) updateFalApiKey(savedKeys.fal);
+                }
+
+                // Cloud-sync other configs if they exist in metadata
+                if (user?.user_metadata?.themes) {
+                    setThemes(user.user_metadata.themes);
+                    await dbService.saveConfig('themes', user.user_metadata.themes);
+                }
+                if (user?.user_metadata?.caption_styles) {
+                    setCaptionStyles(user.user_metadata.caption_styles);
+                    await dbService.saveConfig('caption_styles', user.user_metadata.caption_styles);
+                }
+                if (user?.user_metadata?.creator_profile) {
+                    setProfile(user.user_metadata.creator_profile);
+                    await dbService.saveConfig('creator_profile', user.user_metadata.creator_profile);
                 }
             } catch (e) { console.error(e); }
         };
@@ -232,16 +256,19 @@ export default function SimpleCreator() {
     const persistThemes = (newThemes: Theme[]) => {
         setThemes(newThemes);
         dbService.saveConfig('themes', newThemes).catch(console.error);
+        if (user) syncService.saveUserConfig('themes', newThemes).catch(console.error);
     };
 
     const persistCaptionStyles = (newStyles: CaptionStyle[]) => {
         setCaptionStyles(newStyles);
         dbService.saveConfig('caption_styles', newStyles).catch(console.error);
+        if (user) syncService.saveUserConfig('caption_styles', newStyles).catch(console.error);
     };
 
     const persistProfile = (newProfile: CreatorProfile) => {
         setProfile(newProfile);
         dbService.saveConfig('creator_profile', newProfile).catch(console.error);
+        if (user) syncService.saveUserConfig('creator_profile', newProfile).catch(console.error);
     };
 
     const handleUpdateApiKeys = async (newKeys: { gemini: string, fal: string }) => {
@@ -249,6 +276,7 @@ export default function SimpleCreator() {
         if (newKeys.gemini) updateGeminiApiKey(newKeys.gemini);
         if (newKeys.fal) updateFalApiKey(newKeys.fal);
         await dbService.saveConfig('api_keys', newKeys);
+        if (user) await syncService.saveUserConfig('api_keys', newKeys);
     };
 
     // Reload posts on sort/search

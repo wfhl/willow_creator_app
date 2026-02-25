@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Settings, Plus, Trash2, Save, X, ChevronDown, ChevronUp, Cloud, Database, Key, Eye, EyeOff } from 'lucide-react';
 import { migrationService } from '../../lib/migrationService';
 import { generateUUID } from '../../lib/uuid';
+import { useAuth } from '../AuthProvider';
 
 export interface Theme {
     id: string;
@@ -40,6 +41,7 @@ interface SettingsTabProps {
 }
 
 export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles, profile, setProfile, apiKeys, onUpdateApiKeys, onExit }: SettingsTabProps) {
+    const { user } = useAuth();
     const [activeSection, setActiveSection] = useState<'themes' | 'captions' | 'persona' | 'sync' | 'credentials'>('credentials');
     const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
     const [editingStyleId, setEditingStyleId] = useState<string | null>(null);
@@ -651,7 +653,10 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                                 <button
                                     onClick={() => {
                                         onUpdateApiKeys(localKeys);
-                                        alert("API Credentials Saved Securely!\n\nYour keys are now encrypted within your browser's private IndexedDB storage. To maintain your privacy, these keys are never sent to our servers and are strictly excluded from all cloud synchronization.");
+                                        const msg = user
+                                            ? "API Credentials Saved!\n\nYour keys are stored securely and synced across your devices via your Cloud account. They are only accessible to you when logged in."
+                                            : "API Credentials Saved Securely!\n\nYour keys are currently stored in your browser's private local storage. Log in to sync them cross-device.";
+                                        alert(msg);
                                     }}
                                     className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
                                 >
@@ -662,9 +667,12 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                             <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-2">
                                 <h4 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Security & Privacy Architecture</h4>
                                 <p className="text-[10px] text-white/30 leading-relaxed">
-                                    Your API credentials are stored using **Local-Only Persistence**. They are saved exclusively in your browser's private IndexedDB instance.
+                                    Your API credentials utilize **Hybrid Persistence**.
                                     <br /><br />
-                                    Unlike your themes or assets, **API keys are never uploaded to our cloud servers** and are automatically skipped during Data Sync operations. This ensures that even if you use Cloud Sync, your sensitive keys stay physically on your device.
+                                    {user
+                                        ? "Because you are logged in, your keys are securely synced to your private Cloud metadata. This allows you to jump between devices (e.g., Mobile and Desktop) without re-entering your credentials."
+                                        : "You are currently in **Local-Only Mode**. Your keys are saved exclusively in your browser's private IndexedDB instance. Login to enable Cross-Device synchronization."
+                                    }
                                 </p>
                             </div>
                         </div>
