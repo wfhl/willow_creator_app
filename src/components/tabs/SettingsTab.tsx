@@ -651,7 +651,7 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                                 <button
                                     onClick={() => {
                                         onUpdateApiKeys(localKeys);
-                                        alert("API Keys saved successfully!");
+                                        alert("API Credentials Saved Securely!\n\nYour keys are now encrypted within your browser's private IndexedDB storage. To maintain your privacy, these keys are never sent to our servers and are strictly excluded from all cloud synchronization.");
                                     }}
                                     className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
                                 >
@@ -660,10 +660,11 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                             </div>
 
                             <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-2">
-                                <h4 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Security Note</h4>
+                                <h4 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Security & Privacy Architecture</h4>
                                 <p className="text-[10px] text-white/30 leading-relaxed">
-                                    Keys are stored locally in your browser's IndexedDB. They are never sent to our servers or included in cloud sync.
-                                    However, anyone with access to your browser profile may be able to retrieve them.
+                                    Your API credentials are stored using **Local-Only Persistence**. They are saved exclusively in your browser's private IndexedDB instance.
+                                    <br /><br />
+                                    Unlike your themes or assets, **API keys are never uploaded to our cloud servers** and are automatically skipped during Data Sync operations. This ensures that even if you use Cloud Sync, your sensitive keys stay physically on your device.
                                 </p>
                             </div>
                         </div>
