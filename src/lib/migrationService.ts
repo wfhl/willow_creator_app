@@ -2,7 +2,7 @@
 import { supabase } from './supabaseClient';
 import { dbService } from './dbService';
 import { generateUUID } from './uuid';
-import type { Theme, CaptionStyle } from '../components/tabs/SettingsTab';
+// import type { Theme, CaptionStyle } from '../components/tabs/SettingsTab'; // Unused now
 
 export const migrationService = {
     async migrateAll(onProgress?: (msg: string) => void) {
@@ -45,30 +45,32 @@ export const migrationService = {
         // 1. Migrate Folders
         log("📁 Migrating folders...");
         const folders = await dbService.getAllFolders();
-        const folderMap = new Map<string, string>();
 
         const rootFolders = folders.filter((f) => !f.parentId);
         for (const f of rootFolders) {
-            const { data, error } = await supabase.from('folders').insert({
+            const { error } = await supabase.from('folders').upsert({
+                id: f.id,
                 user_id: userId,
-                name: f.name
-            }).select().single();
+                name: f.name,
+                color: f.color,
+                icon: f.icon,
+                timestamp: new Date(f.timestamp).toISOString()
+            });
             if (error) console.error("Error migrating folder", f.name, error);
-            else if (data) folderMap.set(f.id, data.id);
         }
 
         const childFolders = folders.filter((f) => f.parentId);
         for (const f of childFolders) {
-            const remoteParentId = f.parentId ? folderMap.get(f.parentId) : null;
-            if (remoteParentId) {
-                const { data, error } = await supabase.from('folders').insert({
-                    user_id: userId,
-                    name: f.name,
-                    parent_id: remoteParentId
-                }).select().single();
-                if (error) console.error("Error migrating child folder", f.name, error);
-                else if (data) folderMap.set(f.id, data.id);
-            }
+            const { error } = await supabase.from('folders').upsert({
+                id: f.id,
+                user_id: userId,
+                name: f.name,
+                parent_id: f.parentId,
+                color: f.color,
+                icon: f.icon,
+                timestamp: new Date(f.timestamp).toISOString()
+            });
+            if (error) console.error("Error migrating child folder", f.name, error);
         }
 
         // 2. Migrate Assets (Smart Routing)
@@ -84,18 +86,19 @@ export const migrationService = {
             try {
                 const mediaType = (a.type === 'video') ? 'video' : 'image';
                 const publicUrl = await uploadMedia(a.base64, mediaType, targetBucket);
-                const remoteFolderId = a.folderId ? folderMap.get(a.folderId) : null;
 
-                await supabase.from('assets').insert({
+                await supabase.from('assets').upsert({
+                    id: a.id,
                     user_id: userId,
-                    folder_id: remoteFolderId,
+                    folder_id: a.folderId,
                     name: a.name,
                     type: a.type,
                     storage_path: publicUrl.split(`/${targetBucket}/`)[1] || 'external',
                     public_url: publicUrl,
                     bucket_id: targetBucket,
-                    width: 0,
-                    height: 0
+                    width: a.width || 0,
+                    height: a.height || 0,
+                    timestamp: new Date(a.timestamp).toISOString()
                 });
             } catch (e) { console.error("Asset Migration Failed", a.name, e); }
         }
@@ -108,7 +111,8 @@ export const migrationService = {
             if (i % 5 === 0) log(`Posts: ${i}/${posts.length}...`);
             try {
                 const uploadedUrls = await Promise.all(p.mediaUrls.map(url => uploadMedia(url, p.mediaType, 'generated-media')));
-                await supabase.from('posts').insert({
+                await supabase.from('posts').upsert({
+                    id: p.id,
                     user_id: userId,
                     timestamp: new Date(p.timestamp).toISOString(),
                     topic: p.topic,
@@ -129,7 +133,8 @@ export const migrationService = {
         log("⚙️ Migrating Presets...");
         const presets = await dbService.getAllPresets();
         for (const pr of presets) {
-            await supabase.from('presets').insert({
+            await supabase.from('presets').upsert({
+                id: pr.id,
                 user_id: userId,
                 name: pr.name,
                 description: pr.description,
@@ -156,7 +161,8 @@ export const migrationService = {
             if (i % 10 === 0) log(`History: ${i}/${history.length}...`);
             try {
                 const uploadedUrls = await Promise.all(h.mediaUrls.map(url => uploadMedia(url, h.type, 'generated-media')));
-                await supabase.from('generation_history').insert({
+                await supabase.from('generation_history').upsert({
+                    id: h.id,
                     user_id: userId,
                     timestamp: new Date(h.timestamp).toISOString(),
                     type: h.type,
@@ -168,6 +174,8 @@ export const migrationService = {
                     num_images: h.numImages,
                     video_resolution: h.videoResolution,
                     video_duration: h.videoDuration,
+                    with_audio: h.withAudio,
+                    camera_fixed: h.cameraFixed,
                     service: h.service,
                     status: h.status,
                     error_message: h.errorMessage,
@@ -175,37 +183,22 @@ export const migrationService = {
                     theme_name: h.themeName,
                     topic: h.topic,
                     visuals: h.visuals,
-                    outfit: h.outfit
+                    outfit: h.outfit,
+                    tab: h.tab
                 });
             } catch (e) { console.error("History Migration Failed", h.id, e); }
         }
 
-        // 6. Migrate Themes & Styles
-        log("🎨 Migrating UI Themes & Styles...");
+        // 6. Migrate Themes & Styles (into user_metadata for syncService compatibility)
+        log("🎨 Migrating UI Themes & Styles to Profile...");
         const configs = await dbService.getConfigs();
-        if (configs.themes.length > 0) {
-            for (const t of configs.themes) {
-                const theme = t as Theme;
-                await supabase.from('themes').insert({
-                    user_id: userId,
-                    name: theme.name,
-                    description: theme.description,
-                    base_prompt: theme.basePrompt,
-                    default_outfit: theme.defaultOutfit,
-                    default_setting: theme.defaultSetting,
-                    default_visuals: theme.defaultVisuals
-                });
-            }
-        }
-        if (configs.captionStyles.length > 0) {
-            for (const s of configs.captionStyles) {
-                const style = s as CaptionStyle;
-                await supabase.from('caption_styles').insert({
-                    user_id: userId,
-                    label: style.label,
-                    prompt: style.prompt
-                });
-            }
+        if (configs.themes.length > 0 || configs.captionStyles.length > 0) {
+            await supabase.auth.updateUser({
+                data: {
+                    themes: configs.themes,
+                    caption_styles: configs.captionStyles
+                }
+            });
         }
 
         log("✅ MIGRATION COMPLETE! Your creator studio is now 100% Cloud-Powered.");

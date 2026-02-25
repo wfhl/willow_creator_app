@@ -20,6 +20,8 @@ export interface DBAsset {
     folderId: string | null;
     timestamp: number;
     selected?: boolean;
+    width?: number;
+    height?: number;
 }
 
 export interface DBSavedPost {
@@ -136,15 +138,34 @@ const openDB = (): Promise<IDBDatabase> => {
 
             if (!db.objectStoreNames.contains('presets')) {
                 db.createObjectStore('presets', { keyPath: 'id' });
+            } else if (transaction) {
+                const presetStore = transaction.objectStore('presets');
+                // Persist any future preset indexes here
+                if (presetStore.indexNames.contains('timestamp')) {
+                    // example
+                }
             }
+
             if (!db.objectStoreNames.contains('configs')) {
                 db.createObjectStore('configs', { keyPath: 'id' });
             }
+
             if (!db.objectStoreNames.contains('generation_history')) {
                 const historyStore = db.createObjectStore('generation_history', { keyPath: 'id' });
                 historyStore.createIndex('timestamp', 'timestamp', { unique: false });
                 historyStore.createIndex('type', 'type', { unique: false });
                 historyStore.createIndex('model', 'model', { unique: false });
+            } else if (transaction) {
+                const historyStore = transaction.objectStore('generation_history');
+                if (!historyStore.indexNames.contains('timestamp')) {
+                    historyStore.createIndex('timestamp', 'timestamp', { unique: false });
+                }
+                if (!historyStore.indexNames.contains('type')) {
+                    historyStore.createIndex('type', 'type', { unique: false });
+                }
+                if (!historyStore.indexNames.contains('model')) {
+                    historyStore.createIndex('model', 'model', { unique: false });
+                }
             }
         };
     });

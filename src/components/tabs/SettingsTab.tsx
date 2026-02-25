@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Settings, Plus, Trash2, Save, X, ChevronDown, ChevronUp, Cloud, Database, Key, Eye, EyeOff } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, Plus, Trash2, Save, X, ChevronDown, ChevronUp, Cloud, RefreshCw, Key, Eye, EyeOff } from 'lucide-react';
 import { migrationService } from '../../lib/migrationService';
+import { syncService } from '../../lib/syncService';
 import { generateUUID } from '../../lib/uuid';
 import { useAuth } from '../AuthProvider';
 
@@ -59,6 +60,15 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
     // Temporary state for editing
     const [tempTheme, setTempTheme] = useState<Theme | null>(null);
     const [tempStyle, setTempStyle] = useState<CaptionStyle | null>(null);
+
+    // Sync local state with props (important for async loading)
+    useEffect(() => {
+        setLocalKeys(apiKeys);
+    }, [apiKeys]);
+
+    useEffect(() => {
+        setLocalProfile(profile);
+    }, [profile]);
 
     const handleSaveTheme = () => {
         if (!tempTheme) return;
@@ -559,28 +569,68 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                             </div>
 
                             <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
-                                <div className="flex items-start gap-4">
-                                    <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20 shrink-0">
-                                        <Cloud className="w-6 h-6 text-blue-400" />
+                                <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl flex items-start gap-4">
+                                    <div className="p-2 bg-emerald-500/10 rounded-xl">
+                                        <Cloud className="w-5 h-5 text-emerald-400" />
                                     </div>
-                                    <div>
-                                        <h4 className="font-bold text-white mb-1">Migrate Local to Cloud</h4>
-                                        <p className="text-xs text-white/60 mb-4">
-                                            Move all your locally stored Assets, Strategies, and Themes to your Supabase cloud account.
-                                            This allows you to access your data from any device.
+                                    <div className="flex-1">
+                                        <h4 className="text-sm font-bold text-white pr-1">Cloud Sync Status</h4>
+                                        <p className="text-[10px] text-white/40 uppercase tracking-widest mt-0.5">
+                                            {user ? `Logged in as ${user.email}` : "Not logged in"}
                                         </p>
-                                        <button
-                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-widest rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            onClick={handleMigration}
-                                            disabled={isMigrating}
-                                        >
-                                            <Database className="w-3 h-3" /> {isMigrating ? 'Migrating...' : 'Start Migration'}
-                                        </button>
-                                        {migrationStatus && (
-                                            <p className="text-[10px] text-blue-400 mt-2 font-mono">{migrationStatus}</p>
-                                        )}
                                     </div>
                                 </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <button
+                                        onClick={handleMigration}
+                                        disabled={!user || isMigrating}
+                                        className="flex flex-col items-center justify-center gap-3 p-6 bg-white/[0.03] hover:bg-white/[0.05] border border-white/10 rounded-3xl transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <Cloud className="w-6 h-6 text-emerald-400" />
+                                        </div>
+                                        <div className="text-center">
+                                            <span className="block text-xs font-bold uppercase tracking-widest text-white/90">Push to Cloud</span>
+                                            <span className="block text-[9px] text-white/40 uppercase tracking-tighter mt-1 whitespace-nowrap">Local &rarr; Supabase</span>
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        onClick={async () => {
+                                            if (!user) return;
+                                            setMigrationStatus("Syncing...");
+                                            await syncService.fullSync();
+                                            setMigrationStatus("Sync Completed");
+                                            alert("Cloud data synchronized!");
+                                        }}
+                                        disabled={!user || isMigrating}
+                                        className="flex flex-col items-center justify-center gap-3 p-6 bg-white/[0.03] hover:bg-white/[0.05] border border-white/10 rounded-3xl transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <RefreshCw className="w-6 h-6 text-blue-400" />
+                                        </div>
+                                        <div className="text-center">
+                                            <span className="block text-xs font-bold uppercase tracking-widest text-white/90">Force Full Sync</span>
+                                            <span className="block text-[9px] text-white/40 uppercase tracking-tighter mt-1 whitespace-nowrap">Bi-directional Reconciliation</span>
+                                        </div>
+                                    </button>
+                                </div>
+
+                                {migrationStatus && (
+                                    <div className="p-4 bg-black/40 border border-white/5 rounded-2xl">
+                                        <p className="text-[10px] font-mono uppercase tracking-widest text-white/40 mb-2">Progress Status</p>
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-1.5 flex-1 bg-white/5 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full bg-emerald-500 transition-all duration-500 ${isMigrating ? 'animate-pulse' : ''}`}
+                                                    style={{ width: migrationStatus.includes('Complete') ? '100%' : '50%' }}
+                                                />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-emerald-400 uppercase">{migrationStatus}</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

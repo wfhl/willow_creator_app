@@ -125,7 +125,7 @@ export default function SimpleCreator() {
 
     // Load Assets & Posts (Persistence)
     useEffect(() => {
-        const loadInitialData = async () => {
+        const loadInitialLocalData = async () => {
             try {
                 // Configs
                 const savedThemes = await dbService.getConfig<Theme[]>('themes');
@@ -139,6 +139,14 @@ export default function SimpleCreator() {
                 const savedProfile = await dbService.getConfig<CreatorProfile>('creator_profile');
                 if (savedProfile) setProfile(savedProfile);
                 else await dbService.saveConfig('creator_profile', SIMPLE_PROFILE);
+
+                // API Keys (Local)
+                const savedKeys = await dbService.getConfig('api_keys');
+                if (savedKeys) {
+                    setApiKeys(savedKeys);
+                    if (savedKeys.gemini) updateGeminiApiKey(savedKeys.gemini);
+                    if (savedKeys.fal) updateFalApiKey(savedKeys.fal);
+                }
 
                 // Assets
                 const selectedAssets = await dbService.getSelectedAssets();
@@ -172,38 +180,9 @@ export default function SimpleCreator() {
                     if (savedParams.refineNumImages) setRefineNumImages(savedParams.refineNumImages);
                     if (savedParams.editSelectedModel) setEditSelectedModel(savedParams.editSelectedModel);
                 }
-
-                // API Keys
-                let savedKeys = await dbService.getConfig('api_keys');
-
-                // If logged in, cloud metadata takes precedence for cross-device sync
-                if (user?.user_metadata?.api_keys) {
-                    savedKeys = user.user_metadata.api_keys;
-                    await dbService.saveConfig('api_keys', savedKeys);
-                }
-
-                if (savedKeys) {
-                    setApiKeys(savedKeys);
-                    if (savedKeys.gemini) updateGeminiApiKey(savedKeys.gemini);
-                    if (savedKeys.fal) updateFalApiKey(savedKeys.fal);
-                }
-
-                // Cloud-sync other configs if they exist in metadata
-                if (user?.user_metadata?.themes) {
-                    setThemes(user.user_metadata.themes);
-                    await dbService.saveConfig('themes', user.user_metadata.themes);
-                }
-                if (user?.user_metadata?.caption_styles) {
-                    setCaptionStyles(user.user_metadata.caption_styles);
-                    await dbService.saveConfig('caption_styles', user.user_metadata.caption_styles);
-                }
-                if (user?.user_metadata?.creator_profile) {
-                    setProfile(user.user_metadata.creator_profile);
-                    await dbService.saveConfig('creator_profile', user.user_metadata.creator_profile);
-                }
             } catch (e) { console.error(e); }
         };
-        loadInitialData();
+        loadInitialLocalData();
 
         // Subscribe to DB changes to keep UI in sync
         const unsubscribe = dbService.subscribe((store, type, _data) => {
@@ -226,6 +205,44 @@ export default function SimpleCreator() {
 
         return () => { unsubscribe(); };
     }, []);
+
+    // Cloud Metadata Sync Effect
+    useEffect(() => {
+        if (!user) return;
+
+        const syncCloudMetadata = async () => {
+            const metadata = user.user_metadata;
+            if (!metadata) return;
+
+            try {
+                // Sync API Keys (Cloud takes precedence when logged in)
+                if (metadata.api_keys) {
+                    setApiKeys(metadata.api_keys);
+                    if (metadata.api_keys.gemini) updateGeminiApiKey(metadata.api_keys.gemini);
+                    if (metadata.api_keys.fal) updateFalApiKey(metadata.api_keys.fal);
+                    await dbService.saveConfig('api_keys', metadata.api_keys);
+                }
+
+                // Sync UI Configurations
+                if (metadata.themes) {
+                    setThemes(metadata.themes);
+                    await dbService.saveConfig('themes', metadata.themes);
+                }
+                if (metadata.caption_styles) {
+                    setCaptionStyles(metadata.caption_styles);
+                    await dbService.saveConfig('caption_styles', metadata.caption_styles);
+                }
+                if (metadata.creator_profile) {
+                    setProfile(metadata.creator_profile);
+                    await dbService.saveConfig('creator_profile', metadata.creator_profile);
+                }
+            } catch (e) {
+                console.error("[Sync] Failed to sync cloud metadata:", e);
+            }
+        };
+
+        syncCloudMetadata();
+    }, [user]);
 
     // Persist Parameters Helper
     const persistParam = async (key: string, value: any) => {
