@@ -80,7 +80,6 @@ export function EditTab({
         { id: 'fal-ai/wan/v2.2-14b/animate/move', name: 'Wan Move (Ref Only)' },
         { id: 'fal-ai/wan/v2.2-14b/animate/replace', name: 'Wan Replace' },
     ] : [
-        { id: 'google/gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash' },
         { id: 'nano-banana-pro-preview', name: 'Nano Banana Pro' },
         { id: 'fal-ai/bytedance/seedream/v4.5/edit', name: 'Seedream 4.5 Edit' },
         { id: 'xai/grok-imagine-image/edit', name: 'Grok Image Edit' }

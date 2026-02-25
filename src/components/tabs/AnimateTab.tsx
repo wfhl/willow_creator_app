@@ -313,7 +313,6 @@ export function AnimateTab({
                                                 <option value="wan/v2.6/image-to-video/flash">Wan 2.6 Flash I2V</option>
                                                 <option value="fal-ai/wan/v2.2-a14b/image-to-video/lora">Wan 2.2 I2V (LoRA Support)</option>
                                                 <option value="veo-3.1-generate-preview">Veo 3.1 (Google)</option>
-                                                <option value="veo-2.0-generate-001">Veo 2.0 (Google Legacy)</option>
                                             </select>
                                         </div>
                                         <div className="space-y-1">
