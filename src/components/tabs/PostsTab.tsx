@@ -50,8 +50,12 @@ export function PostsTab({
 
     // Lasso Selection State
     const gridRef = useRef<HTMLDivElement>(null);
+    const scrollRafId = useRef<number | null>(null);
     const [dragStart, setDragStart] = useState<{ x: number, y: number } | null>(null);
-    const [dragCurrent, setDragCurrent] = useState<{ x: number, y: number } | null>(null);
+    const [dragCurrent, setDragCurrent] = useState<{ x: number, y: number, tick?: number } | null>(null);
+    const [dragStartScrollTop, setDragStartScrollTop] = useState(0);
+    const [dragInitialSelection, setDragInitialSelection] = useState<Set<string>>(new Set());
+    const [isDraggingLasso, setIsDraggingLasso] = useState(false);
 
     const displayPosts = searchQuery.trim() ? searchResults : savedPosts;
 
@@ -95,68 +99,125 @@ export function PostsTab({
     useEffect(() => {
         if (!dragStart) return;
 
-        const handleMouseMove = (e: MouseEvent) => {
-            setDragCurrent({ x: e.clientX, y: e.clientY });
+        let currentX = dragCurrent?.x || dragStart.x;
+        let currentY = dragCurrent?.y || dragStart.y;
+        let isLassoActive = isDraggingLasso;
+        const scrollContainer = document.querySelector('.overflow-y-auto') as HTMLElement;
+
+        const updateSelection = (cx: number, cy: number) => {
+            if (!scrollContainer || !gridRef.current) return;
+
+            const currentScrollTop = scrollContainer.scrollTop;
+            const startX = dragStart.x;
+            const startY = dragStart.y - (currentScrollTop - dragStartScrollTop);
+
+            const box = {
+                left: Math.min(startX, cx),
+                top: Math.min(startY, cy),
+                right: Math.max(startX, cx),
+                bottom: Math.max(startY, cy)
+            };
+
+            const kids = Array.from(gridRef.current.children);
+            const newlySelected = new Set(dragInitialSelection);
+
+            displayPosts.forEach((post, idx) => {
+                const el = kids[idx] as HTMLElement;
+                if (!el) return;
+                const r = el.getBoundingClientRect();
+
+                const intersects = !(
+                    r.right < box.left ||
+                    r.left > box.right ||
+                    r.bottom < box.top ||
+                    r.top > box.bottom
+                );
+
+                if (intersects) {
+                    newlySelected.add(post.id);
+                }
+            });
+
+            setSelectedPostIds(newlySelected);
         };
 
-        const handleMouseUp = (e: MouseEvent) => {
-            if (dragStart && gridRef.current) {
-                const endX = e.clientX;
-                const endY = e.clientY;
+        const autoScroll = () => {
+            if (!scrollContainer) return;
+            const edgeThreshold = 100;
+            const maxScrollSpeed = 15;
 
-                const box = {
-                    left: Math.min(dragStart.x, endX),
-                    top: Math.min(dragStart.y, endY),
-                    right: Math.max(dragStart.x, endX),
-                    bottom: Math.max(dragStart.y, endY)
-                };
+            let scrolled = false;
+            const containerRect = scrollContainer.getBoundingClientRect();
 
-                // Identify intersecting items
-                const kids = Array.from(gridRef.current.children);
-                const newlySelected = new Set(selectedPostIds);
-                let changed = false;
+            if (currentY < containerRect.top + edgeThreshold) {
+                scrollContainer.scrollTop -= maxScrollSpeed;
+                scrolled = true;
+            } else if (currentY > containerRect.bottom - edgeThreshold) {
+                scrollContainer.scrollTop += maxScrollSpeed;
+                scrolled = true;
+            }
 
-                displayPosts.forEach((post, idx) => {
-                    const el = kids[idx] as HTMLElement;
-                    if (!el) return;
-                    const r = el.getBoundingClientRect();
+            if (scrolled) {
+                if (isLassoActive) {
+                    updateSelection(currentX, currentY);
+                }
+                setDragCurrent({ x: currentX, y: currentY, tick: Date.now() });
+            }
 
-                    const intersects = !(
-                        r.right < box.left ||
-                        r.left > box.right ||
-                        r.bottom < box.top ||
-                        r.top > box.bottom
-                    );
+            scrollRafId.current = requestAnimationFrame(autoScroll);
+        };
 
-                    if (intersects) {
-                        if (!newlySelected.has(post.id)) {
-                            newlySelected.add(post.id);
-                            changed = true;
-                        }
-                    }
-                });
+        const handleMouseMove = (e: MouseEvent) => {
+            currentX = e.clientX;
+            currentY = e.clientY;
 
-                if (changed) setSelectedPostIds(newlySelected);
+            if (!isLassoActive && (Math.abs(currentX - dragStart.x) > 5 || Math.abs(currentY - dragStart.y) > 5)) {
+                isLassoActive = true;
+                setIsDraggingLasso(true);
+            }
+
+            if (isLassoActive) {
+                updateSelection(currentX, currentY);
+            }
+
+            setDragCurrent({ x: currentX, y: currentY, tick: Date.now() });
+        };
+
+        const handleMouseUp = () => {
+            if (scrollRafId.current !== null) {
+                cancelAnimationFrame(scrollRafId.current);
+                scrollRafId.current = null;
             }
             setDragStart(null);
             setDragCurrent(null);
+            setIsDraggingLasso(false);
         };
 
         window.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mouseup', handleMouseUp);
+
+        scrollRafId.current = requestAnimationFrame(autoScroll);
+
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
+            if (scrollRafId.current !== null) {
+                cancelAnimationFrame(scrollRafId.current);
+            }
         };
-    }, [dragStart, displayPosts, selectedPostIds]);
+    }, [dragStart, dragStartScrollTop, dragInitialSelection, displayPosts]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
         if (!isSelectionMode) return;
         // Don't start if clicking a button or carousel control
         if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('a')) return;
 
+        const scrollContainer = document.querySelector('.overflow-y-auto') as HTMLElement;
         setDragStart({ x: e.clientX, y: e.clientY });
         setDragCurrent({ x: e.clientX, y: e.clientY });
+        setDragStartScrollTop(scrollContainer ? scrollContainer.scrollTop : 0);
+        setDragInitialSelection(new Set(selectedPostIds));
+        setIsDraggingLasso(false);
     };
 
     // Observer for infinite scroll
@@ -379,23 +440,30 @@ Total Media Items: ${post.mediaUrls.length}
                 </div>
             </div>
 
+            {/* Visual Lasso Box (Moved outside the grid to not mess with gridRef.children indexing) */}
+            {isDraggingLasso && dragStart && dragCurrent && (() => {
+                const scrollContainer = document.querySelector('.overflow-y-auto') as HTMLElement;
+                const currentScrollTop = scrollContainer ? scrollContainer.scrollTop : dragStartScrollTop;
+                const startX = dragStart.x;
+                const startY = dragStart.y - (currentScrollTop - dragStartScrollTop);
+                return (
+                    <div
+                        className="fixed border border-emerald-500 bg-emerald-500/20 z-[9999] pointer-events-none rounded-sm shadow-lg shadow-emerald-500/10"
+                        style={{
+                            left: Math.min(startX, dragCurrent.x),
+                            top: Math.min(startY, dragCurrent.y),
+                            width: Math.abs(dragCurrent.x - startX),
+                            height: Math.abs(dragCurrent.y - startY)
+                        }}
+                    />
+                );
+            })()}
+
             <div
                 ref={gridRef}
                 onMouseDown={handleMouseDown}
                 className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 select-none ${isSelectionMode ? 'cursor-crosshair' : ''}`}
             >
-                {/* Visual Lasso Box */}
-                {dragStart && dragCurrent && (
-                    <div
-                        className="fixed border border-emerald-500 bg-emerald-500/20 z-[9999] pointer-events-none rounded-sm shadow-lg shadow-emerald-500/10"
-                        style={{
-                            left: Math.min(dragStart.x, dragCurrent.x),
-                            top: Math.min(dragStart.y, dragCurrent.y),
-                            width: Math.abs(dragCurrent.x - dragStart.x),
-                            height: Math.abs(dragCurrent.y - dragStart.y)
-                        }}
-                    />
-                )}
                 {(() => {
                     if (savedPosts.length === 0 && !searchQuery) {
                         return (
