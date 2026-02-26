@@ -1304,8 +1304,8 @@ export default function SimpleCreator() {
                             setActiveTab('create');
                         }}
                         onRecall={handleRecallPost}
-                        onDeletePost={async (id) => {
-                            if (!confirm("Delete this post?")) return;
+                        onDeletePost={async (id, silent = false) => {
+                            if (!silent && !confirm("Delete this post?")) return;
                             await dbService.deletePost(id);
                             setSavedPosts(prev => prev.filter(p => p.id !== id));
                             setTotalSavedCount(prev => prev - 1);

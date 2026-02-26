@@ -18,7 +18,7 @@ interface PostsTabProps {
     onSortChange: (order: 'prev' | 'next') => void;
     onLoadPost: (post: SavedPost) => void;
     onRecall: (post: SavedPost) => void;
-    onDeletePost: (id: string) => void;
+    onDeletePost: (id: string, silent?: boolean) => void;
     onImportReferences: () => void;
     onImportIGArchive: () => void;
     onLoadMore: () => void;
@@ -206,7 +206,7 @@ Total Media Items: ${post.mediaUrls.length}
         setIsProcessingBulk(true);
         try {
             for (const id of Array.from(selectedPostIds)) {
-                await onDeletePost(id);
+                await onDeletePost(id, true);
             }
         } catch (e) {
             console.error("Bulk delete failed:", e);
