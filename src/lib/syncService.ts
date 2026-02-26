@@ -5,6 +5,7 @@ import type { User } from '@supabase/supabase-js';
 export const syncService = {
     user: null as User | null,
     recentlyDeleted: new Set<string>(),
+    isSyncing: false,
 
     init(user: User) {
         this.user = user;
@@ -12,7 +13,7 @@ export const syncService = {
 
         // Subscribe to local changes
         dbService.subscribe(async (store, type, data) => {
-            if (!this.user) return;
+            if (!this.user || this.isSyncing) return;
 
             try {
                 if (type === 'delete') {
@@ -46,7 +47,8 @@ export const syncService = {
     },
 
     async fullSync() {
-        if (!this.user) return;
+        if (!this.user || this.isSyncing) return;
+        this.isSyncing = true;
         console.group("[Sync] Full background sync session");
         try {
             await this.syncTable('folders');
@@ -56,8 +58,10 @@ export const syncService = {
             await this.syncTable('assets'); // Assets last as they might trigger storage uploads
         } catch (e) {
             console.error("[Sync] Full sync failed:", e);
+        } finally {
+            this.isSyncing = false;
+            console.groupEnd();
         }
-        console.groupEnd();
     },
 
     async syncTable(store: DBStore) {

@@ -48,6 +48,11 @@ export function PostsTab({
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [isProcessingBulk, setIsProcessingBulk] = useState(false);
 
+    // Lasso Selection State
+    const gridRef = useRef<HTMLDivElement>(null);
+    const [dragStart, setDragStart] = useState<{ x: number, y: number } | null>(null);
+    const [dragCurrent, setDragCurrent] = useState<{ x: number, y: number } | null>(null);
+
     const displayPosts = searchQuery.trim() ? searchResults : savedPosts;
 
     const toggleSelection = (id: string) => {
@@ -85,6 +90,73 @@ export function PostsTab({
     const handleCarouselDot = (postId: string, index: number) => (e: React.MouseEvent) => {
         e.stopPropagation();
         setCarouselIndexes(prev => ({ ...prev, [postId]: index }));
+    };
+
+    useEffect(() => {
+        if (!dragStart) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            setDragCurrent({ x: e.clientX, y: e.clientY });
+        };
+
+        const handleMouseUp = (e: MouseEvent) => {
+            if (dragStart && gridRef.current) {
+                const endX = e.clientX;
+                const endY = e.clientY;
+
+                const box = {
+                    left: Math.min(dragStart.x, endX),
+                    top: Math.min(dragStart.y, endY),
+                    right: Math.max(dragStart.x, endX),
+                    bottom: Math.max(dragStart.y, endY)
+                };
+
+                // Identify intersecting items
+                const kids = Array.from(gridRef.current.children);
+                const newlySelected = new Set(selectedPostIds);
+                let changed = false;
+
+                displayPosts.forEach((post, idx) => {
+                    const el = kids[idx] as HTMLElement;
+                    if (!el) return;
+                    const r = el.getBoundingClientRect();
+
+                    const intersects = !(
+                        r.right < box.left ||
+                        r.left > box.right ||
+                        r.bottom < box.top ||
+                        r.top > box.bottom
+                    );
+
+                    if (intersects) {
+                        if (!newlySelected.has(post.id)) {
+                            newlySelected.add(post.id);
+                            changed = true;
+                        }
+                    }
+                });
+
+                if (changed) setSelectedPostIds(newlySelected);
+            }
+            setDragStart(null);
+            setDragCurrent(null);
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [dragStart, displayPosts, selectedPostIds]);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (!isSelectionMode) return;
+        // Don't start if clicking a button or carousel control
+        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('a')) return;
+
+        setDragStart({ x: e.clientX, y: e.clientY });
+        setDragCurrent({ x: e.clientX, y: e.clientY });
     };
 
     // Observer for infinite scroll
@@ -307,7 +379,23 @@ Total Media Items: ${post.mediaUrls.length}
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div
+                ref={gridRef}
+                onMouseDown={handleMouseDown}
+                className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 select-none ${isSelectionMode ? 'cursor-crosshair' : ''}`}
+            >
+                {/* Visual Lasso Box */}
+                {dragStart && dragCurrent && (
+                    <div
+                        className="fixed border border-emerald-500 bg-emerald-500/20 z-[9999] pointer-events-none rounded-sm shadow-lg shadow-emerald-500/10"
+                        style={{
+                            left: Math.min(dragStart.x, dragCurrent.x),
+                            top: Math.min(dragStart.y, dragCurrent.y),
+                            width: Math.abs(dragCurrent.x - dragStart.x),
+                            height: Math.abs(dragCurrent.y - dragStart.y)
+                        }}
+                    />
+                )}
                 {(() => {
                     if (savedPosts.length === 0 && !searchQuery) {
                         return (
