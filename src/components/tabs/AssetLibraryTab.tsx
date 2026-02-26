@@ -497,7 +497,7 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
                 </div>
             ) : (
                 <div className="flex-1 overflow-y-auto min-h-0">
-                    <div className="grid grid-cols-1 gap-6 pb-20">
+                    <div className="grid grid-cols-1 gap-6">
                         {filteredHistory.length === 0 ? (
                             <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
                                 <History className="w-12 h-12 mb-4 opacity-10" />

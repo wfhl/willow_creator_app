@@ -45,6 +45,7 @@ export interface GenerationRequest {
     styleReference?: string;
     model?: string;
     sourceImage?: string; // Base64 for Image-to-Image refinement
+    image_urls?: string[]; // Multiple references
     contentParts?: any[]; // For Direct Mode
     videoConfig?: {
         durationSeconds: string;
@@ -170,6 +171,26 @@ export const geminiService = {
                                 }
                             });
                         }
+                    });
+                }
+
+                // Also support image_urls array if passed correctly via reference arrays (like from EditTab)
+                if (request.image_urls && request.image_urls.length > 0) {
+                    console.log(`Attaching ${request.image_urls.length} reference URLs`);
+                    for (const url of request.image_urls) {
+                        if (url.startsWith('data:')) {
+                            const mimeType = url.split(';')[0].split(':')[1];
+                            const data = url.split(',')[1];
+                            parts.push({
+                                inlineData: { mimeType, data }
+                            });
+                        }
+                    }
+                } else if (request.sourceImage && request.sourceImage.startsWith('data:')) {
+                    const mimeType = request.sourceImage.split(';')[0].split(':')[1];
+                    const data = request.sourceImage.split(',')[1];
+                    parts.push({
+                        inlineData: { mimeType, data }
                     });
                 }
 

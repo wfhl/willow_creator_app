@@ -500,10 +500,6 @@ export function CreateTab({
                                                 onChange={(e) => {
                                                     if (selectedModel.includes('v4.5') || selectedModel.includes('v5') || selectedModel.includes('seedream/v4')) {
                                                         setCreateImageSize(e.target.value);
-                                                        // Also sync aspect ratio to keep other logic happy if needed
-                                                        if (e.target.value.includes('portrait')) setAspectRatio('3:4');
-                                                        if (e.target.value.includes('landscape')) setAspectRatio('4:3');
-                                                        if (e.target.value.includes('square')) setAspectRatio('1:1');
                                                     } else {
                                                         setAspectRatio(e.target.value);
                                                     }
@@ -617,6 +613,12 @@ export function CreateTab({
                                                     <option value={2}>2 Images</option>
                                                     <option value={3}>3 Images</option>
                                                     <option value={4}>4 Images</option>
+                                                    {selectedModel.includes('seedream') && (
+                                                        <>
+                                                            <option value={5}>5 Images</option>
+                                                            <option value={6}>6 Images</option>
+                                                        </>
+                                                    )}
                                                 </select>
                                                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 pointer-events-none" />
                                             </div>

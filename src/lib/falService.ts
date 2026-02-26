@@ -106,21 +106,28 @@ export const falService = {
                 // --- SEEDREAM (BYTEDANCE) ---
             } else if (request.model.includes('seedream') && request.model.includes('edit')) {
                 endpoint = request.model; // e.g. "fal-ai/bytedance/seedream/v4.5/edit" or "fal-ai/bytedance/seedream/v5/lite/edit"
+                let imageSize = request.editConfig?.imageSize || "auto_4K";
+                if (request.model.includes('v5/lite') && imageSize === "auto_4K") imageSize = "auto_2K";
+
                 input = {
                     prompt: request.prompt,
                     image_urls: [primaryImageUrl, ...additionalImageUrls],
-                    image_size: request.editConfig?.imageSize || "auto_4K",
+                    image_size: imageSize,
                     num_images: request.editConfig?.numImages || 1,
                     enable_safety_checker: request.editConfig?.enableSafety ?? false,
                     enhance_prompt_mode: request.editConfig?.enhancePromptMode || "standard"
                 };
             } else if (request.model.includes('seedream') && request.model.includes('text-to-image')) {
                 endpoint = request.model;
+                let imageSize = request.editConfig?.imageSize || "auto_4K";
+                if (request.model.includes('v5/lite') && imageSize === "auto_4K") imageSize = "auto_2K";
+
                 input = {
                     prompt: request.prompt,
-                    image_size: request.editConfig?.imageSize || "auto_4K",
+                    image_size: imageSize,
                     num_images: request.editConfig?.numImages || 1,
-                    enable_safety_checker: request.editConfig?.enableSafety ?? false
+                    enable_safety_checker: request.editConfig?.enableSafety ?? false,
+                    enhance_prompt_mode: request.editConfig?.enhancePromptMode || "standard"
                 };
 
             } else if (request.model.includes('wan/v2.6/image-to-video/flash')) {
