@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Download, ImagePlus, Search, Loader2, X, ChevronLeft, ChevronRight, Image as ImageIcon, RotateCcw } from 'lucide-react';
+import { Download, ImagePlus, Search, Loader2, X, ChevronLeft, ChevronRight, Image as ImageIcon, RotateCcw, Check } from 'lucide-react';
 import type { DBSavedPost as SavedPost } from '../../lib/dbService';
 import { SIMPLE_THEMES } from '../creator-presets';
 import JSZip from 'jszip'; // For download logic if we move it here, or pass handler
@@ -44,6 +44,26 @@ export function PostsTab({
 }: PostsTabProps) {
     const observerTarget = useRef<HTMLDivElement>(null);
     const [carouselIndexes, setCarouselIndexes] = useState<Record<string, number>>({});
+    const [selectedPostIds, setSelectedPostIds] = useState<Set<string>>(new Set());
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [isProcessingBulk, setIsProcessingBulk] = useState(false);
+
+    const displayPosts = searchQuery.trim() ? searchResults : savedPosts;
+
+    const toggleSelection = (id: string) => {
+        const newSelected = new Set(selectedPostIds);
+        if (newSelected.has(id)) newSelected.delete(id);
+        else newSelected.add(id);
+        setSelectedPostIds(newSelected);
+    };
+
+    const handleSelectAll = () => {
+        if (selectedPostIds.size === displayPosts.length) {
+            setSelectedPostIds(new Set());
+        } else {
+            setSelectedPostIds(new Set(displayPosts.map(p => p.id)));
+        }
+    };
 
     // Carousel handlers
     const handleCarouselPrev = (postId: string, currentIndex: number, totalMedia: number) => (e: React.MouseEvent) => {
@@ -86,16 +106,15 @@ export function PostsTab({
     }, [onLoadMore]);
 
 
-    // Internal Download Handler (Moved from parent to keep it self-contained)
+    // Internal Download Handler
     const handleDownloadPost = async (post: SavedPost) => {
-        try {
-            const zip = new JSZip();
+        const zip = new JSZip();
 
-            // Create metadata text file
-            const themeName = SIMPLE_THEMES.find(t => t.id === post.themeId)?.name || "Unknown Theme";
-            const postDate = new Date(post.timestamp).toLocaleString();
+        // Create metadata text file
+        const themeName = SIMPLE_THEMES.find(t => t.id === post.themeId)?.name || "Unknown Theme";
+        const postDate = new Date(post.timestamp).toLocaleString();
 
-            const metadata = `POST METADATA
+        const metadata = `POST METADATA
 ================
 
 Title: ${post.topic || "Untitled"}
@@ -120,55 +139,81 @@ Media Type: ${post.mediaType}
 Total Media Items: ${post.mediaUrls.length}
 `;
 
-            zip.file("metadata.txt", metadata);
+        zip.file("metadata.txt", metadata);
 
-            // Download all media files
-            let imageCount = 0;
-            let videoCount = 0;
+        // Download all media files
+        let imageCount = 0;
+        let videoCount = 0;
 
-            for (let i = 0; i < post.mediaUrls.length; i++) {
-                const url = post.mediaUrls[i];
-                const cleanPath = (url.split('?')[0] || '').split('#')[0].toLowerCase();
-                const isVideo = url.startsWith('data:video') ||
-                    ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => cleanPath.endsWith(ext));
+        for (let i = 0; i < post.mediaUrls.length; i++) {
+            const url = post.mediaUrls[i];
+            const cleanPath = (url.split('?')[0] || '').split('#')[0].toLowerCase();
+            const isVideo = url.startsWith('data:video') ||
+                ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => cleanPath.endsWith(ext));
 
-                try {
-                    let blob: Blob;
+            try {
+                const response = await fetch(url);
+                const blob = await response.blob();
 
-                    if (url.startsWith('data:')) {
-                        const response = await fetch(url);
-                        blob = await response.blob();
-                    } else {
-                        const response = await fetch(url);
-                        blob = await response.blob();
-                    }
-
-                    if (isVideo) {
-                        videoCount++;
-                        zip.file(`video_${videoCount}.mp4`, blob);
-                    } else {
-                        imageCount++;
-                        const ext = url.match(/\.(png|jpg|jpeg|webp|gif)($|\?)/i)?.[1] || 'png';
-                        zip.file(`image_${imageCount}.${ext}`, blob);
-                    }
-                } catch (err) {
-                    console.error(`Failed to download media ${i + 1}:`, err);
+                if (isVideo) {
+                    videoCount++;
+                    zip.file(`video_${videoCount}.mp4`, blob);
+                } else {
+                    imageCount++;
+                    const ext = url.match(/\.(png|jpg|jpeg|webp|gif)($|\?)/i)?.[1] || 'png';
+                    zip.file(`image_${imageCount}.${ext}`, blob);
                 }
+            } catch (err) {
+                console.error(`Failed to download media ${i + 1}:`, err);
             }
+        }
 
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
-            const zipUrl = window.URL.createObjectURL(zipBlob);
-            const a = document.createElement('a');
-            a.href = zipUrl;
-            const safeName = (post.topic || 'post').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            a.download = `${safeName}_${Date.now()}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(zipUrl);
-            document.body.removeChild(a);
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const zipUrl = window.URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = zipUrl;
+        const safeName = (post.topic || 'post').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.download = `${safeName}_${Date.now()}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(zipUrl);
+        document.body.removeChild(a);
+    };
+
+    const handleBulkDownload = async () => {
+        if (selectedPostIds.size === 0) return;
+        setIsProcessingBulk(true);
+        try {
+            const selectedPosts = displayPosts.filter(p => selectedPostIds.has(p.id));
+            for (const post of selectedPosts) {
+                await handleDownloadPost(post);
+                // Slight delay between downloads to prevent browser blocking
+                await new Promise(r => setTimeout(r, 800));
+            }
         } catch (e) {
-            console.error("Download failed:", e);
-            alert("Failed to download post. Please try again.");
+            console.error("Bulk download failed:", e);
+        } finally {
+            setIsProcessingBulk(false);
+            setIsSelectionMode(false);
+            setSelectedPostIds(new Set());
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedPostIds.size === 0) return;
+        if (!confirm(`Are you sure you want to delete ${selectedPostIds.size} posts?`)) return;
+
+        setIsProcessingBulk(true);
+        try {
+            for (const id of Array.from(selectedPostIds)) {
+                await onDeletePost(id);
+            }
+        } catch (e) {
+            console.error("Bulk delete failed:", e);
+        } finally {
+            setIsProcessingBulk(false);
+            setIsSelectionMode(false);
+            setSelectedPostIds(new Set());
         }
     };
 
@@ -176,8 +221,30 @@ Total Media Items: ${post.mediaUrls.length}
         <div className="max-w-[1600px] mx-auto w-full p-4 md:p-8 pb-32">
             <div className="flex flex-col gap-4 mb-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <h2 className="text-xl font-bold font-serif text-white/90">Saved Library</h2>
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-xl font-bold font-serif text-white/90">Saved Library</h2>
+                        {displayPosts.length > 0 && (
+                            <button
+                                onClick={() => {
+                                    setIsSelectionMode(!isSelectionMode);
+                                    if (!isSelectionMode) setSelectedPostIds(new Set());
+                                }}
+                                className={`text-[10px] uppercase font-bold tracking-widest px-3 py-1.5 rounded-lg border transition-all ${isSelectionMode ? 'bg-emerald-500 text-black border-emerald-500' : 'bg-white/5 text-white/40 border-white/10 hover:text-white'}`}
+                            >
+                                {isSelectionMode ? 'Cancel' : 'Multi-Select'}
+                            </button>
+                        )}
+                    </div>
                     <div className="flex flex-wrap gap-2">
+                        {isSelectionMode && (
+                            <button
+                                type="button"
+                                onClick={handleSelectAll}
+                                className="text-[10px] md:text-xs px-2 md:px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded flex items-center gap-2 transition-all text-emerald-400 font-bold uppercase tracking-widest"
+                            >
+                                {selectedPostIds.size === displayPosts.length ? 'Deselect All' : 'Select All'}
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={onImportReferences}
@@ -239,10 +306,9 @@ Total Media Items: ${post.mediaUrls.length}
                     </div>
                 </div>
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {(() => {
-                    const displayPosts = searchQuery.trim() ? searchResults : savedPosts;
-
                     if (savedPosts.length === 0 && !searchQuery) {
                         return (
                             <div className="col-span-full py-20 text-center text-white/30">
@@ -270,6 +336,7 @@ Total Media Items: ${post.mediaUrls.length}
                         const mediaUrls = post.mediaUrls || [];
                         const currentIndex = carouselIndexes[post.id] || 0;
                         const currentMedia = mediaUrls[currentIndex] || mediaUrls[0];
+                        const isSelected = selectedPostIds.has(post.id);
 
                         const isVideo = (() => {
                             if (!currentMedia) return false;
@@ -280,10 +347,26 @@ Total Media Items: ${post.mediaUrls.length}
                         const hasMultipleMedia = mediaUrls.length > 1;
 
                         return (
-                            <div key={post.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-emerald-500/50 transition-all group flex flex-col h-full">
+                            <div
+                                key={post.id}
+                                onClick={() => isSelectionMode ? toggleSelection(post.id) : null}
+                                className={`bg-white/5 border rounded-xl overflow-hidden transition-all group flex flex-col h-full relative ${isSelectionMode ? 'cursor-pointer hover:bg-white/10' : 'hover:border-emerald-500/50'} ${isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-500/5' : 'border-white/10'}`}
+                            >
+                                {isSelectionMode && (
+                                    <div className="absolute top-3 left-3 z-30">
+                                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/40' : 'bg-black/40 border-white/20'}`}>
+                                            {isSelected && <Check className="w-4 h-4 text-black" />}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div
                                     className="aspect-[3/4] relative bg-black/40 cursor-zoom-in"
-                                    onClick={() => onPreview(currentMedia, mediaUrls)}
+                                    onClick={(e) => {
+                                        if (isSelectionMode) return;
+                                        e.stopPropagation();
+                                        onPreview(currentMedia, mediaUrls);
+                                    }}
                                 >
                                     {currentMedia ? (
                                         isVideo ?
@@ -315,24 +398,27 @@ Total Media Items: ${post.mediaUrls.length}
                                         <>
                                             <button
                                                 onClick={handleCarouselPrev(post.id, currentIndex, mediaUrls.length)}
-                                                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 text-white rounded-full hover:bg-black/80 backdrop-blur-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 text-white rounded-full hover:bg-black/80 backdrop-blur-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-20"
                                                 title="Previous"
                                             >
                                                 <ChevronLeft className="w-4 h-4" />
                                             </button>
                                             <button
                                                 onClick={handleCarouselNext(post.id, currentIndex, mediaUrls.length)}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 text-white rounded-full hover:bg-black/80 backdrop-blur-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 text-white rounded-full hover:bg-black/80 backdrop-blur-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-20"
                                                 title="Next"
                                             >
                                                 <ChevronRight className="w-4 h-4" />
                                             </button>
 
-                                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/40 px-2 py-1 rounded-full backdrop-blur-sm">
+                                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/40 px-2 py-1 rounded-full backdrop-blur-sm z-20">
                                                 {mediaUrls.map((_, idx) => (
                                                     <button
                                                         key={idx}
-                                                        onClick={handleCarouselDot(post.id, idx)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCarouselDot(post.id, idx)(e);
+                                                        }}
                                                         className={`w-1.5 h-1.5 rounded-full transition-all ${idx === currentIndex
                                                             ? 'bg-white w-4'
                                                             : 'bg-white/40 hover:bg-white/60'
@@ -344,60 +430,66 @@ Total Media Items: ${post.mediaUrls.length}
                                         </>
                                     )}
 
-                                    <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex gap-1">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDownloadPost(post);
-                                            }}
-                                            className="p-1.5 bg-black/50 text-white rounded-md hover:bg-black/80 backdrop-blur-sm"
-                                            title="Download Complete Post"
-                                        >
-                                            <Download className="w-3 h-3" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onRecall(post);
-                                            }}
-                                            className="p-1.5 bg-black/50 text-white rounded-md hover:bg-emerald-600/80 backdrop-blur-sm"
-                                            title="Recall to Create"
-                                        >
-                                            <RotateCcw className="w-3 h-3" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation(); // Use StopPropagation for delete logic
-                                                onDeletePost(post.id);
-                                            }}
-                                            className="p-1.5 bg-red-900/80 text-white rounded-md hover:bg-red-700 backdrop-blur-sm"
-                                            title="Delete Post"
-                                        >
-                                            <X className="w-3 h-3" />
-                                        </button>
-                                    </div>
+                                    {!isSelectionMode && (
+                                        <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex gap-1 z-20">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDownloadPost(post);
+                                                }}
+                                                className="p-1.5 bg-black/50 text-white rounded-md hover:bg-black/80 backdrop-blur-sm"
+                                                title="Download Complete Post"
+                                            >
+                                                <Download className="w-3 h-3" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onRecall(post);
+                                                }}
+                                                className="p-1.5 bg-black/50 text-white rounded-md hover:bg-emerald-600/80 backdrop-blur-sm"
+                                                title="Recall to Create"
+                                            >
+                                                <RotateCcw className="w-3 h-3" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onDeletePost(post.id);
+                                                }}
+                                                className="p-1.5 bg-red-900/80 text-white rounded-md hover:bg-red-700 backdrop-blur-sm"
+                                                title="Delete Post"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    )}
 
-                                    <div className="absolute top-2 left-2 px-2 py-1 bg-black/50 backdrop-blur-sm rounded text-[10px] uppercase tracking-wider text-white/70 font-bold border border-white/10 flex gap-2">
-                                        {(() => {
-                                            const vidCount = mediaUrls.filter(u => {
-                                                if (u.startsWith('data:video')) return true;
-                                                const clean = u.split('?')[0].split('#')[0].toLowerCase();
-                                                return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
-                                            }).length;
-                                            const imgCount = mediaUrls.length - vidCount;
-
-                                            const parts = [];
-                                            if (imgCount > 0) parts.push(`${imgCount} Image${imgCount !== 1 ? 's' : ''}`);
-                                            if (vidCount > 0) parts.push(`${vidCount} Video${vidCount !== 1 ? 's' : ''}`);
-
-                                            return parts.join(', ');
-                                        })()}
+                                    <div className="absolute top-2 inset-x-2 flex justify-center pointer-events-none">
+                                        <div className="px-2 py-1 bg-black/50 backdrop-blur-sm rounded text-[10px] uppercase tracking-wider text-white/70 font-bold border border-white/10 flex gap-2">
+                                            {(() => {
+                                                const vidCount = mediaUrls.filter(u => {
+                                                    if (u.startsWith('data:video')) return true;
+                                                    const clean = u.split('?')[0].split('#')[0].toLowerCase();
+                                                    return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+                                                }).length;
+                                                const imgCount = mediaUrls.length - vidCount;
+                                                const parts = [];
+                                                if (imgCount > 0) parts.push(`${imgCount} Image${imgCount !== 1 ? 's' : ''}`);
+                                                if (vidCount > 0) parts.push(`${vidCount} Video${vidCount !== 1 ? 's' : ''}`);
+                                                return parts.join(', ');
+                                            })()}
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div
                                     className="p-4 flex flex-col gap-3 flex-1 bg-gradient-to-b from-white/[0.02] to-transparent cursor-pointer hover:bg-white/5 transition-colors"
-                                    onClick={() => onLoadPost(post)}
+                                    onClick={(e) => {
+                                        if (isSelectionMode) return;
+                                        e.stopPropagation();
+                                        onLoadPost(post);
+                                    }}
                                 >
                                     <div className="flex justify-between items-start gap-2">
                                         <div className="flex-1">
@@ -443,6 +535,37 @@ Total Media Items: ${post.mediaUrls.length}
                     );
                 })()}
             </div>
+
+            {/* Bulk Actions Modal/Bar */}
+            {selectedPostIds.size > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="bg-black/80 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl p-2 px-4 flex items-center gap-4">
+                        <div className="pr-4 border-r border-white/10">
+                            <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-400">
+                                {selectedPostIds.size} {selectedPostIds.size === 1 ? 'Post' : 'Posts'} Selected
+                            </span>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleBulkDownload}
+                                disabled={isProcessingBulk}
+                                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] uppercase font-bold tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
+                            >
+                                {isProcessingBulk ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                                Download Sequential Zips
+                            </button>
+                            <button
+                                onClick={handleBulkDelete}
+                                disabled={isProcessingBulk}
+                                className="px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] uppercase font-bold tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
+                            >
+                                <X className="w-3 h-3" />
+                                Delete Selected
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
