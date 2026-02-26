@@ -470,8 +470,10 @@ export function CreateTab({
                                             {mediaType === 'image' ? (
                                                 <>
                                                     <option value="nano-banana-pro-preview">Nano Banana Pro (Image)</option>
+                                                    <option value="gemini-3.1-flash-image-preview">Nano Banana 2</option>
                                                     <option value="gemini-3-pro-image-preview">Gemini 3 Pro (Multimodal Image)</option>
                                                     <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
+                                                    <option value="fal-ai/bytedance/seedream/v5/lite/text-to-image">Seedream 5.1 Lite (t2i)</option>
                                                     <option value="fal-ai/bytedance/seedream/v4.5/text-to-image">Seedream v4.5 (High Fidelity)</option>
                                                     <option value="fal-ai/bytedance/seedream/v4/text-to-image">Seedream v4.0 (Standard)</option>
                                                     <option value="xai/grok-imagine-image/text-to-image">Grok 2 (xAI)</option>
@@ -496,7 +498,7 @@ export function CreateTab({
                                             <select
                                                 value={selectedModel.includes('v4.5') ? createImageSize : aspectRatio}
                                                 onChange={(e) => {
-                                                    if (selectedModel.includes('v4.5') || selectedModel.includes('seedream/v4')) {
+                                                    if (selectedModel.includes('v4.5') || selectedModel.includes('v5') || selectedModel.includes('seedream/v4')) {
                                                         setCreateImageSize(e.target.value);
                                                         // Also sync aspect ratio to keep other logic happy if needed
                                                         if (e.target.value.includes('portrait')) setAspectRatio('3:4');
@@ -508,7 +510,7 @@ export function CreateTab({
                                                 }}
                                                 className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-base md:text-xs text-white appearance-none focus:outline-none focus:border-emerald-500/50"
                                             >
-                                                {selectedModel.includes('v4.5') ? (
+                                                {selectedModel.includes('v4.5') || selectedModel.includes('v5') ? (
                                                     <>
                                                         <option value="auto_4K">Auto 4K</option>
                                                         <option value="square_hd">Square 2K</option>
@@ -522,7 +524,7 @@ export function CreateTab({
                                                         <option value="portrait_hd">Portrait 2K</option>
                                                         <option value="landscape_hd">Landscape 2K</option>
                                                     </>
-                                                ) : selectedModel.includes('xai') || selectedModel.includes('nano') ? (
+                                                ) : selectedModel.includes('xai') || selectedModel.includes('nano') || selectedModel.includes('gemini-3.1-flash-image') ? (
                                                     <>
                                                         <option value="1:1">1:1 Square</option>
                                                         <option value="4:3">4:3 Landscape(ish)</option>

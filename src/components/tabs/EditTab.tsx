@@ -81,6 +81,8 @@ export function EditTab({
         { id: 'fal-ai/wan/v2.2-14b/animate/replace', name: 'Wan Replace' },
     ] : [
         { id: 'nano-banana-pro-preview', name: 'Nano Banana Pro' },
+        { id: 'gemini-3.1-flash-image-preview', name: 'Nano Banana 2' },
+        { id: 'fal-ai/bytedance/seedream/v5/lite/edit', name: 'Seedream 5.0 Lite Edit' },
         { id: 'fal-ai/bytedance/seedream/v4.5/edit', name: 'Seedream 4.5 Edit' },
         { id: 'xai/grok-imagine-image/edit', name: 'Grok Image Edit' }
     ], [isVideo]);
@@ -387,13 +389,13 @@ export function EditTab({
                                                         onChange={(e) => setRefineImageSize(e.target.value)}
                                                         className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none cursor-pointer hover:bg-white/5 transition-colors"
                                                     >
-                                                        {selectedModel.includes('banana') ? (
+                                                        {selectedModel.includes('banana') || selectedModel.includes('gemini-3.1-flash-image') ? (
                                                             <>
                                                                 <option value="1:1">1:1 Square</option>
                                                                 <option value="4:3">4:3 Landscape(ish)</option>
                                                                 <option value="16:9">16:9 Landscape</option>
                                                             </>
-                                                        ) : selectedModel.includes('v4.5') ? (
+                                                        ) : selectedModel.includes('v4.5') || selectedModel.includes('v5/lite') ? (
                                                             <>
                                                                 <option value="auto_4K">Auto 4K (Default)</option>
                                                                 <option value="square_hd">Square 2K</option>

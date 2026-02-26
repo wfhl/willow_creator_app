@@ -104,15 +104,15 @@ export const falService = {
                 };
 
                 // --- SEEDREAM (BYTEDANCE) ---
-            } else if (request.model.includes('seedream/v4.5/edit') || request.model.includes('seedream/v4/edit')) {
-                endpoint = request.model; // e.g. "fal-ai/bytedance/seedream/v4.5/edit"
+            } else if (request.model.includes('seedream') && request.model.includes('edit')) {
+                endpoint = request.model; // e.g. "fal-ai/bytedance/seedream/v4.5/edit" or "fal-ai/bytedance/seedream/v5/lite/edit"
                 input = {
                     prompt: request.prompt,
                     image_urls: [primaryImageUrl, ...additionalImageUrls],
                     image_size: request.editConfig?.imageSize || "auto_4K",
                     num_images: request.editConfig?.numImages || 1,
                     enable_safety_checker: request.editConfig?.enableSafety ?? false,
-                    ...((request.model.includes('v4/') || request.model.includes('v4.5/')) ? { enhance_prompt_mode: request.editConfig?.enhancePromptMode || "standard" } : {})
+                    enhance_prompt_mode: request.editConfig?.enhancePromptMode || "standard"
                 };
             } else if (request.model.includes('seedream') && request.model.includes('text-to-image')) {
                 endpoint = request.model;
