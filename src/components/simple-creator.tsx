@@ -470,7 +470,6 @@ export default function SimpleCreator() {
     };
 
     const handleGenerateMedia = async (promptOverride?: string) => {
-        if (isGeneratingMedia) return;
         const finalPromptToUse = promptOverride || generatedPrompt;
         if (!finalPromptToUse) return;
         setIsGeneratingMedia(true);

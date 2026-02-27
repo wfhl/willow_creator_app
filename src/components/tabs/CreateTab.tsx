@@ -874,7 +874,6 @@ export function CreateTab({
                         <button
                             onClick={handleGenerateContent}
                             disabled={
-                                isGeneratingMedia ||
                                 isGeneratingCaption ||
                                 (selectedModel.match(/grok|seedream|seedance|wan|flux/i) ? !apiKeys.fal : !apiKeys.gemini)
                             }

@@ -468,8 +468,8 @@ export function EditTab({
                                     <div className="flex flex-col items-center gap-2">
                                         <button
                                             onClick={onRefineSubmit}
-                                            disabled={isRefining || !refinePrompt || (selectedModel.toLowerCase().match(/grok|seedream|wan|fal/i) ? !apiKeys.fal : !apiKeys.gemini)}
-                                            className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all active-scale ${isRefining || !refinePrompt || (selectedModel.toLowerCase().match(/grok|seedream|wan|fal/i) ? !apiKeys.fal : !apiKeys.gemini) ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
+                                            disabled={!refinePrompt || (selectedModel.toLowerCase().match(/grok|seedream|wan|fal/i) ? !apiKeys.fal : !apiKeys.gemini)}
+                                            className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all active-scale ${!refinePrompt || (selectedModel.toLowerCase().match(/grok|seedream|wan|fal/i) ? !apiKeys.fal : !apiKeys.gemini) ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
                                                 }`}
                                         >
                                             <Sparkles className="w-5 h-5" />
