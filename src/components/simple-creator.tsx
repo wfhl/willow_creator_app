@@ -482,6 +482,37 @@ export default function SimpleCreator() {
         let generationError = '';
         let resultUrls: string[] = [];
 
+        const historyId = generateUUID();
+        const baseHistoryEntry: DBGenerationHistory = {
+            id: historyId,
+            timestamp: Date.now(),
+            type: mediaType,
+            prompt: finalPromptToUse,
+            model: selectedModel,
+            mediaUrls: [],
+            aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
+            imageSize: createImageSize,
+            numImages: createNumImages,
+            videoResolution: mediaType === 'video' ? videoResolution : undefined,
+            videoDuration: mediaType === 'video' ? videoDuration : undefined,
+            withAudio: mediaType === 'video' ? withAudio : undefined,
+            cameraFixed: mediaType === 'video' ? cameraFixed : undefined,
+            themeId: selectedThemeId,
+            themeName: currentTheme?.name,
+            topic: topic || undefined,
+            visuals: specificVisuals || undefined,
+            outfit: specificOutfit || undefined,
+            service: isFalModel ? 'fal' : 'gemini',
+            status: 'pending',
+            tab: activeTab
+        };
+
+        try {
+            await dbService.saveGenerationHistory(baseHistoryEntry);
+        } catch (e) {
+            console.error('Failed to save pending history:', e);
+        }
+
         try {
             const selectedImages = assets.filter(a => a.selected && a.type === 'image');
             let finalPrompt = finalPromptToUse;
@@ -514,7 +545,12 @@ export default function SimpleCreator() {
                         numImages: 1, // SimpleCreator handles the loop with delays
                         enableSafety
                     },
-                    loras: loras
+                    loras: loras,
+                    onEnqueue: async (requestId, endpoint) => {
+                        baseHistoryEntry.requestId = requestId;
+                        baseHistoryEntry.falEndpoint = endpoint;
+                        try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { }
+                    }
                 };
 
                 if (mediaType === 'image' && createNumImages > 1 && !selectedModel.includes('edit')) {
@@ -588,31 +624,12 @@ export default function SimpleCreator() {
 
             // --- Save to Generation History ---
             try {
-                const historyEntry: DBGenerationHistory = {
-                    id: generateUUID(),
-                    timestamp: Date.now(),
-                    type: mediaType,
-                    prompt: finalPromptToUse,
-                    model: selectedModel,
+                await dbService.saveGenerationHistory({
+                    ...baseHistoryEntry,
                     mediaUrls: resultUrls,
-                    aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
-                    imageSize: createImageSize,
-                    numImages: createNumImages,
-                    videoResolution: mediaType === 'video' ? videoResolution : undefined,
-                    videoDuration: mediaType === 'video' ? videoDuration : undefined,
-                    withAudio: mediaType === 'video' ? withAudio : undefined,
-                    cameraFixed: mediaType === 'video' ? cameraFixed : undefined,
-                    themeId: selectedThemeId,
-                    themeName: currentTheme?.name,
-                    topic: topic || undefined,
-                    visuals: specificVisuals || undefined,
-                    outfit: specificOutfit || undefined,
-                    service: isFalModel ? 'fal' : 'gemini',
                     status: generationSucceeded ? 'success' : 'failed',
-                    errorMessage: generationError || undefined,
-                    tab: activeTab
-                };
-                await dbService.saveGenerationHistory(historyEntry);
+                    errorMessage: generationError || undefined
+                });
             } catch (histErr) {
                 console.error('Failed to save generation history:', histErr);
             }
@@ -1352,6 +1369,31 @@ export default function SimpleCreator() {
                             if (!refineTarget || !refinePrompt) return;
                             setIsRefining(true);
                             setRefineProgress(10); // Start progress
+
+                            const isVideo = (() => {
+                                const url = refineTarget?.url || '';
+                                if (url.startsWith('data:video')) return true;
+                                const clean = url.split('?')[0].split('#')[0].toLowerCase();
+                                return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+                            })();
+
+                            const historyId = generateUUID();
+                            const baseHistoryEntry: DBGenerationHistory = {
+                                id: historyId,
+                                timestamp: Date.now(),
+                                type: isVideo ? 'video' : 'image',
+                                prompt: refinePrompt,
+                                model: editSelectedModel,
+                                mediaUrls: [],
+                                service: (editSelectedModel.includes('grok') || editSelectedModel.includes('seedream') || isVideo) ? 'fal' : 'gemini',
+                                status: 'pending',
+                                inputImageUrl: refineTarget?.url,
+                                imageSize: refineImageSize,
+                                numImages: refineNumImages,
+                                tab: 'edit'
+                            };
+                            try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { console.error(e); }
+
                             try {
                                 const urlToBase64 = async (url: string) => {
                                     if (url.startsWith('data:')) return url.split(',')[1];
@@ -1365,12 +1407,6 @@ export default function SimpleCreator() {
                                 };
 
                                 let urlUrls: string[] = [];
-                                const isVideo = (() => {
-                                    const url = refineTarget?.url || '';
-                                    if (url.startsWith('data:video')) return true;
-                                    const clean = url.split('?')[0].split('#')[0].toLowerCase();
-                                    return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
-                                })();
 
                                 if (isVideo) {
                                     // VIDEO EDIT FLOW
@@ -1385,7 +1421,12 @@ export default function SimpleCreator() {
                                         model: editSelectedModel,
                                         prompt: refinePrompt,
                                         video_url: videoUrl,
-                                        editConfig: { enableSafety: false }
+                                        editConfig: { enableSafety: false },
+                                        onEnqueue: async (requestId, endpoint) => {
+                                            baseHistoryEntry.requestId = requestId;
+                                            baseHistoryEntry.falEndpoint = endpoint;
+                                            try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { }
+                                        }
                                     };
 
                                     if (editSelectedModel.includes('move') || editSelectedModel.includes('replace')) {
@@ -1421,6 +1462,11 @@ export default function SimpleCreator() {
                                                 imageSize: refineImageSize,
                                                 numImages: refineNumImages,
                                                 enableSafety: false
+                                            },
+                                            onEnqueue: async (requestId, endpoint) => {
+                                                baseHistoryEntry.requestId = requestId;
+                                                baseHistoryEntry.falEndpoint = endpoint;
+                                                try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { }
                                             }
                                         };
                                         const results = await falService.generateMedia(req);
@@ -1447,24 +1493,22 @@ export default function SimpleCreator() {
                                     setRefineProgress(100);
                                     try {
                                         await dbService.saveGenerationHistory({
-                                            id: generateUUID(),
-                                            timestamp: Date.now(),
-                                            type: isVideo ? 'video' : 'image',
-                                            prompt: refinePrompt,
-                                            model: editSelectedModel,
+                                            ...baseHistoryEntry,
                                             mediaUrls: urlUrls,
-                                            service: (editSelectedModel.includes('grok') || editSelectedModel.includes('seedream') || isVideo) ? 'fal' : 'gemini',
-                                            status: 'success',
-                                            inputImageUrl: refineTarget?.url,
-                                            imageSize: refineImageSize,
-                                            numImages: refineNumImages,
-                                            tab: 'edit'
+                                            status: 'success'
                                         });
                                     } catch (err) { console.error("Failed to save history:", err); }
                                 }
-                            } catch (e) {
+                            } catch (e: any) {
                                 console.error(e);
                                 alert("Refinement failed");
+                                try {
+                                    await dbService.saveGenerationHistory({
+                                        ...baseHistoryEntry,
+                                        status: 'failed',
+                                        errorMessage: e?.message || 'Unknown error'
+                                    });
+                                } catch (err) { }
                             } finally {
                                 setIsRefining(false);
                                 setRefineProgress(0);
@@ -1543,6 +1587,27 @@ export default function SimpleCreator() {
                         onGenerateI2V={async () => {
                             if (!i2vTarget || !i2vPrompt) return;
                             setIsGeneratingI2V(true);
+
+                            const historyId = generateUUID();
+                            const baseHistoryEntry: DBGenerationHistory = {
+                                id: historyId,
+                                timestamp: Date.now(),
+                                type: 'video',
+                                prompt: i2vPrompt,
+                                model: selectedModel,
+                                mediaUrls: [],
+                                service: (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) ? 'fal' : 'gemini',
+                                status: 'pending',
+                                inputImageUrl: i2vTarget?.url,
+                                videoResolution: videoResolution,
+                                videoDuration: videoDuration,
+                                aspectRatio: i2vAspectRatio,
+                                withAudio: withAudio,
+                                cameraFixed: cameraFixed,
+                                tab: 'animate'
+                            };
+                            try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { console.error(e); }
+
                             try {
                                 const urlToBase64 = async (url: string) => {
                                     if (url.startsWith('data:')) return url.split(',')[1];
@@ -1574,6 +1639,11 @@ export default function SimpleCreator() {
                                         },
                                         editConfig: {
                                             enableSafety: false
+                                        },
+                                        onEnqueue: async (requestId, endpoint) => {
+                                            baseHistoryEntry.requestId = requestId;
+                                            baseHistoryEntry.falEndpoint = endpoint;
+                                            try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { }
                                         }
                                     };
                                     const results = await falService.generateMedia(req);
@@ -1601,25 +1671,23 @@ export default function SimpleCreator() {
                                     // Save to History
                                     try {
                                         await dbService.saveGenerationHistory({
-                                            id: generateUUID(),
-                                            timestamp: Date.now(),
-                                            type: 'video',
-                                            prompt: i2vPrompt,
-                                            model: selectedModel,
+                                            ...baseHistoryEntry,
                                             mediaUrls: [url],
-                                            service: (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) ? 'fal' : 'gemini',
-                                            status: 'success',
-                                            inputImageUrl: i2vTarget?.url,
-                                            videoResolution: videoResolution,
-                                            videoDuration: videoDuration,
-                                            aspectRatio: i2vAspectRatio,
-                                            withAudio: withAudio,
-                                            cameraFixed: cameraFixed,
-                                            tab: 'animate'
+                                            status: 'success'
                                         });
                                     } catch (err) { console.error("Failed to save history:", err); }
                                 }
-                            } catch (e: any) { console.error(e); alert(`Video gen failed: ${e.message || e}`); } finally { setIsGeneratingI2V(false); }
+                            } catch (e: any) {
+                                console.error(e);
+                                alert(`Video gen failed: ${e.message || e}`);
+                                try {
+                                    await dbService.saveGenerationHistory({
+                                        ...baseHistoryEntry,
+                                        status: 'failed',
+                                        errorMessage: e?.message || 'Unknown error'
+                                    });
+                                } catch (err) { }
+                            } finally { setIsGeneratingI2V(false); }
                         }}
                         generatedI2VUrl={i2vResultUrl}
                         onExit={() => setActiveTab('create')}

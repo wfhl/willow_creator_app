@@ -170,6 +170,48 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
         return () => { unsubscribe(); };
     }, [subTab, loadContent, loadHistory, history.length]);
 
+    // Polling for pending generations
+    useEffect(() => {
+        if (subTab !== 'history' || history.length === 0) return;
+
+        let isPolling = true;
+        const checkPending = async () => {
+            if (!isPolling) return;
+            const pendingItems = history.filter(h => h.status === 'pending' && h.requestId && h.falEndpoint);
+            if (pendingItems.length === 0) return;
+
+            try {
+                const { falService } = await import('../../lib/falService');
+                for (const item of pendingItems) {
+                    if (!isPolling) break;
+                    try {
+                        const result = await falService.checkGenerationStatus(item.requestId!, item.falEndpoint!);
+                        if (result.status !== 'pending') {
+                            await dbService.saveGenerationHistory({
+                                ...item,
+                                status: result.status,
+                                mediaUrls: result.mediaUrls || [],
+                                errorMessage: result.error
+                            });
+                        }
+                    } catch (e) {
+                        console.error("Error polling history item", item.id, e);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to import falService for polling", e);
+            }
+        };
+
+        const interval = setInterval(checkPending, 5000); // Poll every 5s
+        checkPending();
+
+        return () => {
+            isPolling = false;
+            clearInterval(interval);
+        };
+    }, [subTab, history]);
+
     // Derived filtered states for search
     const filteredFolders = folders.filter(f =>
         f.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -509,7 +551,10 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
                                     <div className="flex items-start justify-between gap-4 mb-4">
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className={`text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded ${item.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>{item.status}</span>
+                                                <span className={`text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded ${item.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500 animate-pulse flex items-center gap-1' : 'bg-red-500/20 text-red-400'}`}>
+                                                    {item.status === 'pending' && <Loader2 className="w-3 h-3 animate-spin" />}
+                                                    {item.status === 'pending' ? 'Generating...' : item.status}
+                                                </span>
                                                 <span className="text-xs text-white/40">{new Date(item.timestamp).toLocaleString()}</span>
                                                 <span className="text-xs text-white/40 px-1.5 py-0.5 bg-white/5 rounded-full border border-white/5">{item.service} / {item.model}</span>
                                             </div>

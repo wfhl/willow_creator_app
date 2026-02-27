@@ -77,11 +77,13 @@ export interface DBGenerationHistory {
     visuals?: string;
     outfit?: string;
     service: 'gemini' | 'fal';
-    status: 'success' | 'failed';
+    status: 'pending' | 'success' | 'failed';
     errorMessage?: string;
     inputImageUrl?: string;
     enhancePromptMode?: 'standard' | 'fast';
     tab?: string; // 'create' | 'edit' | 'animate'
+    requestId?: string;
+    falEndpoint?: string;
 }
 
 export interface DBConfig {

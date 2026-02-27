@@ -33,6 +33,7 @@ export interface FalGenerationRequest {
         enhancePromptMode?: "standard" | "fast";
     };
     loras?: Array<{ path: string; scale?: number }>;
+    onEnqueue?: (requestId: string, endpoint: string) => void;
 }
 
 export const falService = {
@@ -244,12 +245,17 @@ export const falService = {
             console.log("Fal Request Input:", JSON.stringify(input, null, 2));
 
             // 3. Call Inference
+            let enqueuedCalled = false;
             const result: any = await fal.subscribe(endpoint, {
                 input,
                 logs: true,
-                onQueueUpdate: (update) => {
-                    if (update.status === "IN_PROGRESS") {
-                        update.logs.map((log) => log.message).forEach(msg => console.log(`[Fal] ${msg}`));
+                onQueueUpdate: (update: any) => {
+                    if (request.onEnqueue && update.request_id && !enqueuedCalled) {
+                        enqueuedCalled = true;
+                        request.onEnqueue(update.request_id, endpoint);
+                    }
+                    if (update.status === "IN_PROGRESS" && update.logs) {
+                        update.logs.map((log: any) => log.message).forEach((msg: any) => console.log(`[Fal] ${msg}`));
                     }
                 }
             });
@@ -297,5 +303,32 @@ export const falService = {
 
     async uploadFile(file: File | Blob): Promise<string> {
         return await fal.storage.upload(file);
+    },
+
+    async checkGenerationStatus(requestId: string, endpoint: string): Promise<{ status: 'pending' | 'success' | 'failed', mediaUrls?: string[], error?: string }> {
+        try {
+            const statusResult: any = await fal.queue.status(endpoint, { requestId, logs: false });
+            if (statusResult.status === 'COMPLETED') {
+                const result: any = await fal.queue.result(endpoint, { requestId });
+                const mediaUrls: string[] = [];
+                if (result.data && result.data.video && result.data.video.url) mediaUrls.push(result.data.video.url);
+                else if (result.video && result.video.url) mediaUrls.push(result.video.url);
+
+                if (result.data && result.data.images && result.data.images.length > 0) {
+                    result.data.images.forEach((img: any) => mediaUrls.push(img.url));
+                } else if (result.images && result.images.length > 0) {
+                    result.images.forEach((img: any) => mediaUrls.push(img.url));
+                }
+                if (mediaUrls.length > 0) return { status: 'success', mediaUrls };
+                return { status: 'failed', error: 'No media URLs found in result' };
+            } else if (statusResult.status === 'IN_PROGRESS' || statusResult.status === 'IN_QUEUE') {
+                return { status: 'pending' };
+            } else {
+                return { status: 'failed', error: `Status: ${statusResult.status}` };
+            }
+        } catch (e: any) {
+            console.error('Failed to check generation status', e);
+            return { status: 'failed', error: e.message || 'Unknown error' };
+        }
     }
 };
