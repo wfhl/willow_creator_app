@@ -469,9 +469,9 @@ export function CreateTab({
                                         >
                                             {mediaType === 'image' ? (
                                                 <>
-                                                    <option value="nano-banana-pro-preview">Nano Banana Pro (Image)</option>
+                                                    <option value="gemini-3-pro-image-preview">Nano Banana Pro</option>
                                                     <option value="gemini-3.1-flash-image-preview">Nano Banana 2</option>
-                                                    <option value="gemini-3-pro-image-preview">Gemini 3 Pro (Multimodal Image)</option>
+                                                    <option value="gemini-2.5-flash-image">Nano Banana</option>
                                                     <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
                                                     <option value="fal-ai/bytedance/seedream/v5/lite/text-to-image">Seedream 5.1 Lite (t2i)</option>
                                                     <option value="fal-ai/bytedance/seedream/v4.5/text-to-image">Seedream v4.5 (High Fidelity)</option>

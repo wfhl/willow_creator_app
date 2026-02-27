@@ -145,7 +145,7 @@ export const geminiService = {
 
         // 1. Image Generation (Nano Banana Pro / Gemini 3 Pro)
         if (request.type === 'image' || request.type === 'edit') {
-            const modelId = request.model || "nano-banana-pro-preview";
+            const modelId = request.model || "gemini-3-pro-image-preview";
             console.group(`[Real Gen] Generating image with ${modelId}`);
             console.log("Request:", JSON.stringify(request, null, 2));
 
@@ -215,8 +215,7 @@ export const geminiService = {
                             }
                         ],
                         config: {
-                            // For pure image models, strict modality reduces "yapping" and executable code blocks
-                            responseModalities: (modelId.includes("image") || modelId.includes("banana")) ? ["IMAGE"] : ["TEXT", "IMAGE"],
+                            responseModalities: ["TEXT", "IMAGE"],
                             imageConfig: {
                                 aspectRatio: aspectRatio,
                                 imageSize: "2K"

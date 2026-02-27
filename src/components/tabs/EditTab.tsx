@@ -80,8 +80,9 @@ export function EditTab({
         { id: 'fal-ai/wan/v2.2-14b/animate/move', name: 'Wan Move (Ref Only)' },
         { id: 'fal-ai/wan/v2.2-14b/animate/replace', name: 'Wan Replace' },
     ] : [
-        { id: 'nano-banana-pro-preview', name: 'Nano Banana Pro' },
+        { id: 'gemini-3-pro-image-preview', name: 'Nano Banana Pro' },
         { id: 'gemini-3.1-flash-image-preview', name: 'Nano Banana 2' },
+        { id: 'gemini-2.5-flash-image', name: 'Nano Banana' },
         { id: 'fal-ai/bytedance/seedream/v5/lite/edit', name: 'Seedream 5.0 Lite Edit' },
         { id: 'fal-ai/bytedance/seedream/v4.5/edit', name: 'Seedream 4.5 Edit' },
         { id: 'xai/grok-imagine-image/edit', name: 'Grok Image Edit' }

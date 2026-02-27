@@ -89,7 +89,7 @@ export default function SimpleCreator() {
     const [i2vResultUrl, setI2VResultUrl] = useState<string | null>(null);
 
     // Control State
-    const [selectedModel, setSelectedModel] = useState<string>('nano-banana-pro-preview');
+    const [selectedModel, setSelectedModel] = useState<string>('gemini-3-pro-image-preview');
     const [aspectRatio, setAspectRatio] = useState<string>('3:4');
     const [createImageSize, setCreateImageSize] = useState<string>("auto_4K");
     const [createNumImages, setCreateNumImages] = useState<number>(4);
@@ -334,7 +334,7 @@ export default function SimpleCreator() {
                 selectedModel.includes('seedream') ||
                 selectedModel.includes('grok-imagine-image');
             if (!isValidImageModel) {
-                const defaultImageModel = 'nano-banana-pro-preview';
+                const defaultImageModel = 'gemini-3-pro-image-preview';
                 setSelectedModel(defaultImageModel);
                 persistParam('selectedModel', defaultImageModel);
             }
@@ -513,16 +513,17 @@ export default function SimpleCreator() {
         }
 
         try {
-            const selectedImages = assets.filter(a => a.selected && a.type === 'image');
+            const selectedImages = assets.filter(a => a.selected && (a.type === 'image' || a.type === 'face_reference'));
             let finalPrompt = finalPromptToUse;
             const contentParts: any[] = [];
 
             if (selectedImages.length > 0) {
-                const faceInstruction = `Generate a portrait consistent with the character identity in the attached reference images. Focus on her specific red hair, blue-green eyes, and freckles. Maintain the subject's unique facial features while implementing the following scene:`;
+                const faceInstruction = `Generate a portrait consistent with the character identity in the attached reference images. Maintain the subject's unique facial features and attributes while implementing the following scene:`;
                 finalPrompt = `${faceInstruction} ${finalPromptToUse}`;
                 selectedImages.forEach(img => {
+                    const mimeType = img.base64.split(';')[0].split(':')[1] || "image/jpeg";
                     contentParts.push({
-                        inlineData: { mimeType: "image/jpeg", data: img.base64.split(',')[1] }
+                        inlineData: { mimeType, data: img.base64.split(',')[1] }
                     });
                 });
             }
@@ -1171,15 +1172,16 @@ export default function SimpleCreator() {
                             const isFalModel = selectedModel.includes('grok') || selectedModel.includes('seedream') || selectedModel.includes('seedance') || selectedModel.includes('wan');
 
                             // Prepare assets part
-                            const selectedImages = assets.filter(a => a.selected && a.type === 'image');
+                            const selectedImages = assets.filter(a => a.selected && (a.type === 'image' || a.type === 'face_reference'));
                             let finalPrompt = promptOverride;
                             const contentParts: any[] = [];
                             if (selectedImages.length > 0) {
-                                const faceInstruction = `Generate a portrait consistent with the character identity in the attached reference images. Focus on her specific red hair, blue-green eyes, and freckles. Maintain the subject's unique facial features while implementing the following scene:`;
+                                const faceInstruction = `Generate a portrait consistent with the character identity in the attached reference images. Maintain the subject's unique facial features and attributes while implementing the following scene:`;
                                 finalPrompt = `${faceInstruction} ${promptOverride}`;
                                 selectedImages.forEach(img => {
+                                    const mimeType = img.base64.split(';')[0].split(':')[1] || "image/jpeg";
                                     contentParts.push({
-                                        inlineData: { mimeType: "image/jpeg", data: img.base64.split(',')[1] }
+                                        inlineData: { mimeType, data: img.base64.split(',')[1] }
                                     });
                                 });
                             }
@@ -1446,9 +1448,11 @@ export default function SimpleCreator() {
                                 } else {
                                     // IMAGE EDIT FLOW
                                     const base64 = await urlToBase64(refineTarget.url);
-                                    const contentParts: any[] = [{ inlineData: { mimeType: "image/jpeg", data: base64 } }];
+                                    const baseMime = refineTarget.url.split(';')[0].split(':')[1] || "image/jpeg";
+                                    const contentParts: any[] = [{ inlineData: { mimeType: baseMime, data: base64 } }];
                                     refineAdditionalImages.forEach(img => {
-                                        contentParts.push({ inlineData: { mimeType: "image/jpeg", data: img.base64.split(',')[1] } });
+                                        const refMime = img.base64.split(';')[0].split(':')[1] || "image/jpeg";
+                                        contentParts.push({ inlineData: { mimeType: refMime, data: img.base64.split(',')[1] } });
                                     });
                                     setRefineProgress(40);
 
@@ -1619,7 +1623,8 @@ export default function SimpleCreator() {
                                     });
                                 };
                                 const base64 = await urlToBase64(i2vTarget.url);
-                                const contentParts = [{ inlineData: { mimeType: "image/jpeg", data: base64 } }];
+                                const sourceMime = i2vTarget.url.split(';')[0].split(':')[1] || "image/jpeg";
+                                const contentParts = [{ inlineData: { mimeType: sourceMime, data: base64 } }];
 
                                 let url = "";
                                 if (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) {
