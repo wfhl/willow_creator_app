@@ -6,13 +6,17 @@ export const syncService = {
     user: null as User | null,
     recentlyDeleted: new Set<string>(),
     isSyncing: false,
+    unsubscribe: null as (() => void) | null,
 
     init(user: User) {
         this.user = user;
         console.log("[Sync] Initializing for user:", user.email);
 
+        // Prevent multiple listeners from stacking up
+        if (this.unsubscribe) this.unsubscribe();
+
         // Subscribe to local changes
-        dbService.subscribe(async (store, type, data) => {
+        this.unsubscribe = dbService.subscribe(async (store, type, data) => {
             if (!this.user || this.isSyncing) return;
 
             try {
@@ -107,25 +111,52 @@ export const syncService = {
                 console.log(`[Sync] Skipping pull for recently/persistently deleted ${store}: ${cloud.id}`);
                 continue;
             }
-            const existsLocally = localItems.some(l => l.id === cloud.id);
-            if (!existsLocally) {
-                console.log(`[Sync] Pulling cloud-only ${store}: ${cloud.id}`);
-                const mapped = this.mapFromCloud(store, cloud);
 
-                if (store === 'assets') {
-                    // Start download
-                    try {
-                        const dlAsset = await this.downloadAssetFromStorage(mapped);
-                        await dbService.saveAsset(dlAsset);
-                    } catch (e) {
-                        console.error(`[Sync] Failed to download asset ${cloud.id}`, e);
-                    }
-                }
-                else if (store === 'posts') await dbService.savePost(mapped);
-                else if (store === 'presets') await dbService.savePreset(mapped);
-                else if (store === 'folders') await dbService.saveFolder(mapped);
-                else if (store === 'generation_history') await dbService.saveGenerationHistory(mapped);
+            const mapped = this.mapFromCloud(store, cloud);
+            const existsLocally = localItems.find(l => l.id === cloud.id);
+
+            if (existsLocally) {
+                // If cloud is newer, update local? For now, we favor local as truth if IDs match
+                // but we could sync cloud changes to local here if timestamp > existsLocally.timestamp
+                continue;
             }
+
+            // DEDUPLICATION MERGE: If ID is different but content exists locally, remove orphaned cloud copy
+            if (store === 'folders') {
+                const sameName = localItems.find(l => l.name === mapped.name && l.parentId === mapped.parentId);
+                if (sameName) {
+                    console.log(`[Sync] Folder with same name already exists in cloud with different ID, removing orphaned cloud copy: ${mapped.id}`);
+                    await this.removeFromCloud(store, mapped.id);
+                    continue;
+                }
+            }
+
+            if (store === 'assets') {
+                const sameContent = localItems.find(l =>
+                    (l.publicUrl && l.publicUrl === mapped.publicUrl) ||
+                    (l.name === mapped.name && l.timestamp === mapped.timestamp)
+                );
+                if (sameContent) {
+                    console.log(`[Sync] Asset already exists under different ID, removing orphaned cloud copy: ${mapped.id}`);
+                    await this.removeFromCloud(store, mapped.id);
+                    continue;
+                }
+            }
+
+            console.log(`[Sync] Pulling cloud-only ${store}: ${cloud.id}`);
+
+            if (store === 'assets') {
+                try {
+                    const dlAsset = await this.downloadAssetFromStorage(mapped);
+                    await dbService.saveAsset(dlAsset);
+                } catch (e) {
+                    console.error(`[Sync] Failed to download asset ${cloud.id}`, e);
+                }
+            }
+            else if (store === 'posts') await dbService.savePost(mapped);
+            else if (store === 'presets') await dbService.savePreset(mapped);
+            else if (store === 'folders') await dbService.saveFolder(mapped);
+            else if (store === 'generation_history') await dbService.saveGenerationHistory(mapped);
         }
     },
 

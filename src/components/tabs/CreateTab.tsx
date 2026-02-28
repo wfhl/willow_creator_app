@@ -2,7 +2,6 @@ import React, { type ChangeEvent } from 'react';
 import { Sparkles, Edit2, ChevronDown, Wand2, ImagePlus, Upload, Trash2, RotateCw, Copy, Save, Layers, Loader2, Video as VideoIcon, X, Download, Dices } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
 import { ImageWithLoader } from '../image-with-loader';
-import { PresetsDropdown } from './PresetsDropdown';
 import type { DBAsset as Asset } from '../../lib/dbService';
 import { dbService } from '../../lib/dbService';
 import { generateUUID } from '../../lib/uuid';

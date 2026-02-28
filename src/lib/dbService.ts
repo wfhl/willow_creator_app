@@ -196,6 +196,10 @@ export const dbService = {
         listeners.forEach(l => l(store, type, data));
     },
 
+    clearListeners() {
+        listeners = [];
+    },
+
     async getConfig<T = any>(id: string): Promise<T | undefined> {
         const db = await openDB();
         return new Promise((resolve, reject) => {
