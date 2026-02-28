@@ -127,6 +127,7 @@ export const falService = {
                     prompt: request.prompt,
                     image_size: imageSize,
                     num_images: request.editConfig?.numImages || 1,
+                    image_urls: primaryImageUrl ? [primaryImageUrl, ...additionalImageUrls] : undefined,
                     enable_safety_checker: request.editConfig?.enableSafety ?? false,
                     enhance_prompt_mode: request.editConfig?.enhancePromptMode || "standard"
                 };

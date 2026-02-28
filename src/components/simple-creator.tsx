@@ -565,7 +565,18 @@ export default function SimpleCreator() {
             }
 
             if (contentParts.length > 0) {
-                finalPrompt = `You are an expert digital artist. Use the provided reference images to guide the generation.\n\n${referenceContext}\n\nTECHNICAL PROMPT: ${finalPromptToUse}\n\nMaintain strict character consistency from the identity references while adopting the scene structure and outfit details from their respective references.`;
+                finalPrompt = `You are an expert digital artist and high-fidelity image generator.
+I have provided ${contentParts.length} reference images. You MUST strictly follow these references to ensure coherence:
+
+${referenceContext}
+
+INSTRUCTIONS:
+1. Generate a new high-resolution image based on the TECHNICAL PROMPT below.
+2. The subject MUST have the exact facial features and identity seen in the CHARACTER IDENTITY references.
+3. The environment, lighting, and composition MUST be derived from the SCENE CONTEXT reference.
+4. The clothing, accessories, and textures MUST match the OUTFIT reference exactly.
+
+TECHNICAL PROMPT: ${finalPromptToUse}`;
             }
 
             if (isFalModel) {
@@ -1152,6 +1163,8 @@ export default function SimpleCreator() {
             <div className="flex-1 overflow-y-auto pt-16 md:pt-20 pb-48 md:pb-10 scroll-smooth">
                 {activeTab === 'create' && (
                     <CreateTab
+                        visualsImage={visualsImage}
+                        outfitImage={outfitImage}
                         promptRef={createPromptRef}
                         themes={themes}
                         captionStyles={captionStyles}

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo, type ChangeEvent } from 'react';
-import { Sparkles, Edit2, Play, ChevronDown, Wand2, ImagePlus, Upload, Trash2, Folder, Archive, RotateCw, Copy, Save, PenTool, Dices, Layers, Loader2, Video as VideoIcon, X, Download } from 'lucide-react';
+import React, { type ChangeEvent } from 'react';
+import { Sparkles, Edit2, ChevronDown, Wand2, ImagePlus, Upload, Trash2, RotateCw, Copy, Save, Layers, Loader2, Video as VideoIcon, X, Download, Dices } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
 import { ImageWithLoader } from '../image-with-loader';
 import { PresetsDropdown } from './PresetsDropdown';
@@ -26,6 +26,8 @@ interface CreateTabProps {
     onAssetRemove: (id: string) => void;
     onAssetToggle: (id: string) => void;
     handleInputImageUpload: (e: ChangeEvent<HTMLInputElement>, target: 'visuals' | 'outfit') => void;
+    visualsImage: string | null;
+    outfitImage: string | null;
     generatedPrompt: string;
     setGeneratedPrompt: (val: string) => void;
     selectedModel: string;
@@ -141,7 +143,9 @@ export function CreateTab({
     setLoras,
     onLoRAUpload,
     promptRef,
-    apiKeys
+    apiKeys,
+    visualsImage,
+    outfitImage
 }: CreateTabProps) {
 
     const currentTheme = selectedThemeId === 'CUSTOM'
@@ -292,7 +296,18 @@ export function CreateTab({
                                         <input type="file" className="hidden" accept="image/*" onChange={(e) => handleInputImageUpload(e, 'visuals')} />
                                     </label>
                                 </div>
-                                {selectedThemeId === 'CUSTOM' ? (
+                                {visualsImage ? (
+                                    <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-emerald-500/30 group">
+                                        <img src={visualsImage} alt="Visual Reference" className="w-full h-full object-cover" />
+                                        <button
+                                            onClick={() => setSpecificVisuals("")}
+                                            className="absolute top-2 right-2 p-1 bg-black/60 rounded-full text-white/60 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                        <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none" />
+                                    </div>
+                                ) : selectedThemeId === 'CUSTOM' ? (
                                     <textarea
                                         value={specificVisuals}
                                         onChange={(e) => setSpecificVisuals(e.target.value)}
@@ -318,13 +333,25 @@ export function CreateTab({
                                         <input type="file" className="hidden" accept="image/*" onChange={(e) => handleInputImageUpload(e, 'outfit')} />
                                     </label>
                                 </div>
-                                <input
-                                    type="text"
-                                    value={specificOutfit}
-                                    onChange={(e) => setSpecificOutfit(e.target.value)}
-                                    placeholder={currentTheme.defaultOutfit}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-base md:text-sm text-white focus:outline-none focus:border-emerald-500/50 placeholder:text-white/20 transition-colors"
-                                />
+                                {outfitImage ? (
+                                    <div className="relative aspect-[4/3] w-24 rounded-lg overflow-hidden border border-emerald-500/30 group">
+                                        <img src={outfitImage} alt="Outfit Reference" className="w-full h-full object-cover" />
+                                        <button
+                                            onClick={() => setSpecificOutfit("")}
+                                            className="absolute top-1 right-1 p-0.5 bg-black/60 rounded-full text-white/60 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={specificOutfit}
+                                        onChange={(e) => setSpecificOutfit(e.target.value)}
+                                        placeholder={currentTheme.defaultOutfit}
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-base md:text-sm text-white focus:outline-none focus:border-emerald-500/50 placeholder:text-white/20 transition-colors"
+                                    />
+                                )}
                             </div>
                         </div>
 
