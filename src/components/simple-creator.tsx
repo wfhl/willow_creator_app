@@ -548,46 +548,48 @@ export default function SimpleCreator() {
             let referenceContext = "";
 
             if (selectedImages.length > 0) {
-                referenceContext += "CHARACTER IDENTITY REFERENCES:\n";
-                selectedImages.forEach(img => {
+                referenceContext += "CHARACTER IDENTITY:\n";
+                selectedImages.forEach((img, idx) => {
                     const mimeType = img.base64.split(';')[0].split(':')[1] || "image/jpeg";
+                    contentParts.push({ text: `[IDENTITY REFERENCE ${idx + 1}]:` });
                     contentParts.push({
                         inlineData: { mimeType, data: img.base64.split(',')[1] }
                     });
-                    referenceContext += `- Reference Image ${imageIndex} is the subject's face and identity.\n`;
+                    referenceContext += `- Reference Image ${imageIndex} represents the EXACT facial features, bone structure, eye shape, and hair of the subject. You MUST replicate this identity perfectly.\n`;
                     imageIndex++;
                 });
             }
 
             if (visualsImage) {
                 const mimeType = visualsImage.split(';')[0].split(':')[1] || "image/jpeg";
+                contentParts.push({ text: `[SCENE CONTEXT REFERENCE]:` });
                 contentParts.push({
                     inlineData: { mimeType, data: visualsImage.split(',')[1] }
                 });
-                referenceContext += `SCENE CONTEXT REFERENCE:\n- Reference Image ${imageIndex} is the structural and style reference for the environment, lighting, and composition.\n`;
+                referenceContext += `SCENE CONTEXT:\n- Reference Image ${imageIndex} is the environment and structural reference. Follow its lighting, architectural details, depth of field, and overall mood.\n`;
                 imageIndex++;
             }
 
             if (outfitImage) {
                 const mimeType = outfitImage.split(';')[0].split(':')[1] || "image/jpeg";
+                contentParts.push({ text: `[OUTFIT REFERENCE]:` });
                 contentParts.push({
                     inlineData: { mimeType, data: outfitImage.split(',')[1] }
                 });
-                referenceContext += `OUTFIT REFERENCE:\n- Reference Image ${imageIndex} is the clothing and texture reference.\n`;
+                referenceContext += `OUTFIT DETAILS:\n- Reference Image ${imageIndex} is the specific clothing reference. You MUST replicate the exact fabrics, colors, textures, and design of the outfit shown in this image.\n`;
                 imageIndex++;
             }
 
             if (contentParts.length > 0) {
-                finalPrompt = `You are an expert digital artist and high-fidelity image generator.
-I have provided ${contentParts.length} reference images. You MUST strictly follow these references to ensure coherence:
+                finalPrompt = `You are an elite cinematic photographer. I have provided ${imageIndex - 1} reference images with explicit labels. You MUST synthesize them according to these specific rules:
 
 ${referenceContext}
 
-INSTRUCTIONS:
-1. Generate a new high-resolution image based on the TECHNICAL PROMPT below.
-2. The subject MUST have the exact facial features and identity seen in the CHARACTER IDENTITY references.
-3. The environment, lighting, and composition MUST be derived from the SCENE CONTEXT reference.
-4. The clothing, accessories, and textures MUST match the OUTFIT reference exactly.
+MASTER INSTRUCTIONS:
+1. IDENTITY: The subject in the output MUST be the same individual as shown in the IDENTITY REFERENCES.
+2. SCENE: Place this subject into the environment described or shown in the SCENE CONTEXT.
+3. OUTFIT: Dress the subject in the exact garments shown in the OUTFIT REFERENCE.
+4. COHERENCE: Ensure the lighting from the SCENE correctly interacts with the OUTFIT and the subject's face.
 
 TECHNICAL PROMPT: ${finalPromptToUse}`;
             }
@@ -1173,7 +1175,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                 savedCount={totalSavedCount}
             />
 
-            <div className="flex-1 overflow-y-auto pt-16 md:pt-20 pb-48 md:pb-10 scroll-smooth">
+            <div className="flex-1 overflow-y-auto pt-16 md:pt-20 pb-24 md:pb-10 scroll-smooth">
                 {activeTab === 'create' && (
                     <CreateTab
                         visualsImage={visualsImage}

@@ -362,7 +362,7 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
     };
 
     return (
-        <div className="max-w-[1600px] mx-auto w-full p-4 md:p-8 pb-20 flex flex-col h-full bg-[#050505] min-h-0">
+        <div className="max-w-[1600px] mx-auto w-full p-4 md:p-8 pb-4 flex flex-col h-full bg-[#050505] min-h-0">
             <div className="flex flex-col gap-4 mb-6">
                 <div className="flex justify-between items-center gap-4">
                     <div className="flex items-center gap-2 md:gap-4 shrink-0 overflow-hidden">
@@ -551,13 +551,17 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
                                 <div key={item.id} className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-all">
                                     <div className="flex items-start justify-between gap-4 mb-4">
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-1">
+                                            <div className="flex items-center gap-2 mb-2">
                                                 <span className={`text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded ${item.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500 animate-pulse flex items-center gap-1' : 'bg-red-500/20 text-red-400'}`}>
                                                     {item.status === 'pending' && <Loader2 className="w-3 h-3 animate-spin" />}
                                                     {item.status === 'pending' ? 'Generating...' : item.status}
                                                 </span>
                                                 <span className="text-xs text-white/40">{new Date(item.timestamp).toLocaleString()}</span>
-                                                <span className="text-xs text-white/40 px-1.5 py-0.5 bg-white/5 rounded-full border border-white/5">{item.service} / {item.model}</span>
+                                            </div>
+                                            <div className="mb-3">
+                                                <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-400/60 px-2 py-0.5 bg-emerald-500/5 rounded border border-emerald-500/10">
+                                                    {item.service} / {item.model}
+                                                </span>
                                             </div>
                                             <p className="text-sm text-white/90 line-clamp-2 mb-1">{item.prompt}</p>
                                         </div>

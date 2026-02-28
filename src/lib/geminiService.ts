@@ -161,7 +161,7 @@ export const geminiService = {
                 const parts: any[] = [];
 
                 if (request.contentParts && request.contentParts.length > 0) {
-                    console.log(`Attaching ${request.contentParts.length} reference images`);
+                    console.log(`Attaching ${request.contentParts.length} content parts (mixed text/images)`);
                     request.contentParts.forEach(part => {
                         if (part.inlineData) {
                             parts.push({
@@ -170,6 +170,8 @@ export const geminiService = {
                                     data: part.inlineData.data
                                 }
                             });
+                        } else if (part.text) {
+                            parts.push({ text: part.text });
                         }
                     });
                 }

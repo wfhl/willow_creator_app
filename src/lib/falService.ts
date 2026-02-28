@@ -50,17 +50,17 @@ export const falService = {
             const additionalImageUrls: string[] = [];
 
             if (request.contentParts && request.contentParts.length > 0) {
-                // Process Component 1 (Primary)
-                const p1 = request.contentParts[0];
-                if (p1.inlineData && p1.inlineData.data) {
-                    primaryImageUrl = await this.uploadBase64ToFal(p1.inlineData.data, p1.inlineData.mimeType);
-                    console.log("Primary Image Uploaded:", primaryImageUrl);
-                }
+                const imageParts = request.contentParts.filter(p => p.inlineData && p.inlineData.data);
 
-                // Process Additional Components
-                for (let i = 1; i < request.contentParts.length; i++) {
-                    const p = request.contentParts[i];
-                    if (p.inlineData && p.inlineData.data) {
+                if (imageParts.length > 0) {
+                    // Process First Image (Primary)
+                    const p1 = imageParts[0];
+                    primaryImageUrl = await this.uploadBase64ToFal(p1.inlineData.data, p1.inlineData.mimeType);
+                    console.log("Fal Primary Image Uploaded:", primaryImageUrl);
+
+                    // Process Remaining Images
+                    for (let i = 1; i < imageParts.length; i++) {
+                        const p = imageParts[i];
                         const url = await this.uploadBase64ToFal(p.inlineData.data, p.inlineData.mimeType);
                         additionalImageUrls.push(url);
                     }
