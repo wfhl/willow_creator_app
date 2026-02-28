@@ -1,6 +1,7 @@
 import React, { useState, type ChangeEvent } from 'react';
 import { Sparkles, Edit2, ImagePlus, X, RefreshCw, Download, Video as VideoIcon, Save } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
+import { ImageWithLoader } from '../image-with-loader';
 import type { DBAsset as Asset } from '../../lib/dbService';
 import { generateUUID } from '../../lib/uuid';
 
@@ -212,10 +213,10 @@ export function EditTab({
                                     loop
                                 />
                             ) : (
-                                <img
+                                <ImageWithLoader
                                     src={refineTarget.url}
                                     alt="Target"
-                                    className="w-full h-full object-cover cursor-zoom-in"
+                                    className="w-full h-full cursor-zoom-in"
                                     onClick={() => onPreview(refineTarget.url)}
                                 />
                             )}
@@ -245,8 +246,8 @@ export function EditTab({
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     {refineAdditionalImages.map((img, idx) => (
-                                        <div key={idx} className="relative w-16 h-16 group">
-                                            <img src={img.base64} className="w-full h-full object-cover rounded-lg border border-white/10" alt="ref" />
+                                        <div key={idx} className="relative w-16 h-16 group flex-shrink-0">
+                                            <ImageWithLoader src={img.base64} className="w-full h-full rounded-lg border border-white/10" alt="ref" />
                                             <button
                                                 onClick={() => setRefineAdditionalImages(prev => prev.filter((_, i) => i !== idx))}
                                                 className="absolute -top-1 -right-1 p-0.5 bg-red-500 rounded-full opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity"
@@ -302,8 +303,8 @@ export function EditTab({
                                 </div>
                                 <div className="flex gap-4">
                                     {refineAdditionalImages.length > 0 ? (
-                                        <div className="relative w-24 h-24 group">
-                                            <img src={refineAdditionalImages[0].base64} className="w-full h-full object-cover rounded-xl border border-white/10" alt="subject" />
+                                        <div className="relative w-24 h-24 group flex-shrink-0">
+                                            <ImageWithLoader src={refineAdditionalImages[0].base64} className="w-full h-full rounded-xl border border-white/10" alt="subject" />
                                             <button
                                                 onClick={() => setRefineAdditionalImages([])}
                                                 className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full hover:bg-red-600 transition-colors shadow-lg"
@@ -503,13 +504,13 @@ export function EditTab({
                                     <div className="grid grid-cols-1 gap-4">
                                         {refineResultUrls.map((url, idx) => (
                                             <div key={idx} className="aspect-[3/4] bg-black/40 rounded-xl overflow-hidden border-2 border-emerald-500/30 shadow-2xl shadow-emerald-500/10 relative group">
-                                                <img
+                                                <ImageWithLoader
                                                     src={url}
                                                     alt={`Refined Result ${idx + 1}`}
-                                                    className="w-full h-full object-cover cursor-zoom-in"
+                                                    className="w-full h-full cursor-zoom-in"
                                                     onClick={() => onPreview(url)}
                                                 />
-                                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1">
+                                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1 z-10">
                                                     <button
                                                         onClick={() => setRefineTarget({ url: url, index: -1 })}
                                                         className="p-1 hover:bg-white/20 rounded"

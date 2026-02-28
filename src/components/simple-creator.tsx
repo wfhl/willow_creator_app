@@ -18,6 +18,7 @@ import { ScriptsTab } from './tabs/ScriptsTab';
 import { SettingsTab, type Theme, type CaptionStyle, type CreatorProfile } from './tabs/SettingsTab';
 import { AssetLibraryTab } from './tabs/AssetLibraryTab';
 import { PresetsDropdown } from './tabs/PresetsDropdown';
+import { ImageWithLoader } from './image-with-loader';
 import { useAuth } from '../components/AuthProvider';
 import { syncService } from '../lib/syncService';
 
@@ -1848,10 +1849,10 @@ export default function SimpleCreator() {
                                     className="max-w-full max-h-full rounded-xl md:rounded-2xl shadow-2xl border border-white/10"
                                 />
                             ) : (
-                                <img
+                                <ImageWithLoader
                                     src={previewUrl}
                                     alt="Full Preview"
-                                    className="max-w-full max-h-full object-contain rounded-xl md:rounded-2xl shadow-2xl border border-white/10"
+                                    className="max-w-full max-h-full object-contain shadow-2xl"
                                 />
                             )}
 

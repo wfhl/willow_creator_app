@@ -1,6 +1,8 @@
-import React, { type ChangeEvent } from 'react';
-import { Layers, Edit2, ImagePlus, ChevronDown, Video as VideoIcon, Sparkles, Copy, Loader2, Dices, Wand2, Download, Save, X, Upload, RotateCw, Trash2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, type ChangeEvent } from 'react';
+import { Sparkles, Edit2, Play, ChevronDown, Wand2, ImagePlus, Upload, Trash2, Folder, Archive, RotateCw, Copy, Save, PenTool, Dices, Layers, Loader2, Video as VideoIcon, X, Download } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
+import { ImageWithLoader } from '../image-with-loader';
+import { PresetsDropdown } from './PresetsDropdown';
 import type { DBAsset as Asset } from '../../lib/dbService';
 import { dbService } from '../../lib/dbService';
 import { generateUUID } from '../../lib/uuid';
@@ -679,10 +681,10 @@ export function CreateTab({
                                                     }}
                                                 />
                                             ) : (
-                                                <img
+                                                <ImageWithLoader
                                                     src={url}
                                                     alt={`Generated ${idx}`}
-                                                    className="w-full h-full object-cover rounded-lg shadow-2xl cursor-pointer"
+                                                    className="w-full h-full shadow-2xl cursor-pointer"
                                                     onClick={() => onPreview(url)}
                                                 />
                                             )}
