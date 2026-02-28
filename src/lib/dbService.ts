@@ -31,6 +31,7 @@ export interface DBSavedPost {
     caption: string;
     captionType: string;
     mediaUrls: string[];
+    thumbnailUrls?: string[]; // Added for fast gallery loading
     mediaType: 'image' | 'video';
     themeId: string;
     visuals: string;
@@ -64,6 +65,7 @@ export interface DBGenerationHistory {
     prompt: string;
     model: string;
     mediaUrls: string[];
+    thumbnailUrls?: string[]; // Added for fast gallery loading
     aspectRatio?: string;
     imageSize?: string;
     numImages?: number;
