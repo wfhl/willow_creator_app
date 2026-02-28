@@ -276,7 +276,7 @@ export const falService = {
 
             if (mediaUrls.length > 0) return mediaUrls;
 
-            throw new Error("No media URL in Fal response: " + JSON.stringify(result));
+            throw new Error(`No media URL in Fal response. Result status: ${result.status || 'unknown'}`);
         } catch (e: any) {
             console.error("Fal generation failed. Full Request Input:", JSON.stringify(input, null, 2));
             console.error("Error Detail:", e);

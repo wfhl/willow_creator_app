@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Download, ImagePlus, Search, Loader2, X, ChevronLeft, ChevronRight, Image as ImageIcon, RotateCcw, Check } from 'lucide-react';
+import { ImageWithLoader } from '../image-with-loader';
 import type { DBSavedPost as SavedPost } from '../../lib/dbService';
 import { SIMPLE_THEMES } from '../creator-presets';
 import JSZip from 'jszip'; // For download logic if we move it here, or pass handler
@@ -537,11 +538,10 @@ Total Media Items: ${post.mediaUrls.length}
                                                     e.currentTarget.currentTime = 0;
                                                 }}
                                             /> :
-                                            <img
+                                            <ImageWithLoader
                                                 src={currentMedia}
                                                 alt={post.topic}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                loading="lazy"
                                             />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-white/5">

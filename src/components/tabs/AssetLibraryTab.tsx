@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ImageWithLoader } from '../image-with-loader';
 import {
     Folder as FolderIcon,
     FileVideo,
@@ -570,7 +571,16 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
                                         <div className={`grid gap-2 ${item.mediaUrls.length > 1 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'}`}>
                                             {item.mediaUrls.map((url, idx) => (
                                                 <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-black/50 border border-white/5 group">
-                                                    {item.type === 'video' ? <video src={url} className="w-full h-full object-cover cursor-pointer" onClick={() => onPreview(url)} /> : <img src={url} className="w-full h-full object-cover cursor-pointer" onClick={() => onPreview(url)} />}
+                                                    {item.type === 'video' ? (
+                                                        <video src={url} className="w-full h-full object-cover cursor-pointer" onClick={() => onPreview(url)} />
+                                                    ) : (
+                                                        <ImageWithLoader
+                                                            src={url}
+                                                            className="w-full h-full object-cover cursor-pointer"
+                                                            onClick={() => onPreview(url)}
+                                                            alt={`History ${idx}`}
+                                                        />
+                                                    )}
                                                     <button onClick={() => handleDownloadAsset(url, `history-${idx}`)} className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Download className="w-3.5 h-3.5" /></button>
                                                 </div>
                                             ))}

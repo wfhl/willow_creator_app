@@ -147,7 +147,7 @@ export const geminiService = {
         if (request.type === 'image' || request.type === 'edit') {
             const modelId = request.model || "gemini-3-pro-image-preview";
             console.group(`[Real Gen] Generating image with ${modelId}`);
-            console.log("Request:", JSON.stringify(request, null, 2));
+            console.log("Request:", request);
 
             try {
                 const currentKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -232,7 +232,7 @@ export const geminiService = {
                         }
                     });
 
-                    console.log(`[${modelId}] Raw Response:`, JSON.stringify(response, null, 2));
+                    console.log(`[${modelId}] Raw Response:`, response);
 
                     let foundImage = null;
                     if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
@@ -246,7 +246,7 @@ export const geminiService = {
                     if (foundImage) {
                         return foundImage;
                     }
-                    throw new Error(`No image data found. Response parts: ${JSON.stringify(response.candidates?.[0]?.content?.parts || [])}`);
+                    throw new Error(`No image data found. Response candidate exists but parts are missing or invalid.`);
                 };
 
                 const generationPromises = [];
@@ -414,7 +414,7 @@ export const geminiService = {
 
         try {
             const result = await model.generateContent(prompt);
-            console.log("Raw Response:", JSON.stringify(result.response, null, 2));
+            console.log("Raw Response:", result.response);
             console.groupEnd();
             return result.response.text();
         } catch (error) {

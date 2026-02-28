@@ -2,6 +2,7 @@
 import React, { useEffect, useState, type ChangeEvent } from 'react';
 import { Video as VideoIcon, ImagePlus, X, RefreshCw, Play, Save, Download, Layers, Sparkles, Upload, Trash2 } from 'lucide-react';
 import LoadingIndicator from '../loading-indicator';
+import { ImageWithLoader } from '../image-with-loader';
 import { dbService } from '../../lib/dbService';
 import { generateUUID } from '../../lib/uuid';
 
@@ -240,7 +241,7 @@ export function AnimateTab({
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
                     <div className="p-4 md:p-8 border-b lg:border-b-0 lg:border-r border-white/5">
                         <div className="aspect-[3/4] bg-black/40 rounded-xl overflow-hidden border border-white/10 shadow-inner group relative">
-                            <img
+                            <ImageWithLoader
                                 src={i2vTarget.url}
                                 alt="Target"
                                 className="w-full h-full object-cover cursor-zoom-in"
