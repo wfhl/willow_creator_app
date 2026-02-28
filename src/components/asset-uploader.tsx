@@ -154,13 +154,13 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                                     </div>
                                 )}
 
-                                {/* Remove Button (Hover) */}
+                                {/* Remove Button (Always on mobile, Hover on desktop) */}
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         onRemove(asset.id);
                                     }}
-                                    className="absolute top-1 left-1 bg-black/60 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 backdrop-blur-sm"
+                                    className="absolute top-1 left-1 bg-black/60 rounded-full p-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-red-500/80 backdrop-blur-sm shadow-xl z-20"
                                 >
                                     <X className="h-3 w-3 text-white" />
                                 </button>
@@ -208,7 +208,7 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                     {userLibraryAssets.length > 0 ? (
                         <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 mb-6 p-1">
                             {userLibraryAssets.map((asset) => {
-                                const isSelected = assets.some(a => a.base64 === asset.base64);
+                                const isSelected = assets.some(a => a.id === asset.id || a.base64 === asset.base64);
                                 return (
                                     <div
                                         key={asset.id}
@@ -219,21 +219,21 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
                                             src={asset.base64}
                                             alt={asset.name}
                                             loading="lazy"
-                                            className={`w-full h-full object-cover transition-opacity ${isSelected ? 'opacity-100' : 'opacity-80 group-hover:opacity-100'}`}
+                                            className={`w-full h-full object-cover transition-opacity ${isSelected ? 'opacity-100 font-bold' : 'opacity-80 group-hover:opacity-100'}`}
                                         />
                                         {/* Selection Indicator */}
                                         {isSelected && (
                                             <div className="absolute top-1 right-1 bg-emerald-500 rounded-full p-0.5 shadow-lg z-10">
-                                                <Check className="h-2 w-2 text-black" />
+                                                <Check className="h-2.5 w-2.5 text-black font-bold" />
                                             </div>
                                         )}
-                                        {/* Delete Button */}
+                                        {/* Delete Button (Always on mobile, Hover on desktop) */}
                                         {!isSelected && (
                                             <button
                                                 onClick={(e) => handleDeleteUserAsset(asset.id, e)}
-                                                className="absolute top-1 right-1 bg-black/60 hover:bg-red-500 rounded p-1 opacity-0 group-hover:opacity-100 transition-all z-10"
+                                                className="absolute top-1 right-1 bg-black/60 hover:bg-red-500 rounded p-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-10 shadow-lg"
                                             >
-                                                <Trash2 className="w-3 h-3 text-white" />
+                                                <Trash2 className="w-3.5 h-3.5 text-white" />
                                             </button>
                                         )}
                                     </div>

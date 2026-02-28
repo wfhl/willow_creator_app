@@ -471,17 +471,30 @@ export default function SimpleCreator() {
     };
 
     const handleAssetToggle = async (id: string) => {
-        setAssets(prev => {
-            const next = prev.map(a => {
-                if (a.id === id) {
-                    const updated = { ...a, selected: !a.selected };
-                    dbService.saveAsset(updated);
-                    return updated;
-                }
-                return a;
+        // First check if it's already in the active session
+        const existing = assets.find(a => a.id === id);
+        if (existing) {
+            setAssets(prev => {
+                const updated = { ...existing, selected: !existing.selected };
+                dbService.saveAsset(updated);
+                return prev.map(a => a.id === id ? updated : a);
             });
-            return next;
-        });
+        } else {
+            // It's in the library but not in the active session list
+            // Fetch it from DB to get the full asset data
+            const allAssets = await dbService.getAllAssets();
+            const assetFromLib = allAssets.find(a => a.id === id);
+
+            if (assetFromLib) {
+                const updated = { ...assetFromLib, selected: !assetFromLib.selected };
+                await dbService.saveAsset(updated);
+                if (updated.selected) {
+                    setAssets(prev => [...prev, updated]);
+                } else {
+                    setAssets(prev => prev.filter(a => a.id !== id));
+                }
+            }
+        }
     };
 
     const handleGenerateMedia = async (promptOverride?: string) => {
