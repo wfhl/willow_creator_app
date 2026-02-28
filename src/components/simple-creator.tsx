@@ -64,6 +64,8 @@ export default function SimpleCreator() {
     const [customTheme, setCustomTheme] = useState("");
     const [specificVisuals, setSpecificVisuals] = useState("");
     const [specificOutfit, setSpecificOutfit] = useState("");
+    const [visualsImage, setVisualsImage] = useState<string | null>(null);
+    const [outfitImage, setOutfitImage] = useState<string | null>(null);
     const [generatedPrompt, setGeneratedPrompt] = useState("");
     const [isDreaming, setIsDreaming] = useState(false);
 
@@ -192,14 +194,8 @@ export default function SimpleCreator() {
                 dbService.getRecentPostsBatch(24, 0, sortOrder).then(setSavedPosts);
                 dbService.getPostsCount().then(setTotalSavedCount);
             } else if (store === 'assets') {
-                if (type === 'insert' || type === 'update') {
-                    // This creates a potential issue if we are in a subfolder. 
-                    // Ideally we only reload if effective. 
-                    // For now, let's rely on AssetLibraryTab's own subscription/loading?
-                    // AssetLibraryTab is a child, it should handle its own subscriptions if needed.
-                    // But shared state 'assets' is unused? 
-                    // Actually 'assets' state at line 24 seems unused in the main view, mostly AssetLibraryTab manages its own.
-                    // Let's just fix Posts for now.
+                if (type === 'insert' || type === 'update' || type === 'delete') {
+                    dbService.getSelectedAssets().then(setAssets).catch(console.error);
                 }
             }
         });
@@ -408,14 +404,32 @@ export default function SimpleCreator() {
     }, [selectedThemeId, specificVisuals, specificOutfit, profile]);
 
 
+    useEffect(() => {
+        if (!specificVisuals) setVisualsImage(null);
+    }, [specificVisuals]);
+
+    useEffect(() => {
+        if (!specificOutfit) setOutfitImage(null);
+    }, [specificOutfit]);
+
     const handleInputImageUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'visuals' | 'outfit') => {
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
-            const simulatedText = target === 'visuals'
-                ? `Scene inspired by uploaded image: ${file.name}`
-                : `Outfit context from: ${file.name}`;
-            if (target === 'visuals') setSpecificVisuals(simulatedText);
-            if (target === 'outfit') setSpecificOutfit(simulatedText);
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                const base64 = event.target?.result as string;
+                if (target === 'visuals') {
+                    setVisualsImage(base64);
+                    setSpecificVisuals(`Scene styled like the uploaded reference image: ${file.name}`);
+                }
+                if (target === 'outfit') {
+                    setOutfitImage(base64);
+                    setSpecificOutfit(`Wearing outfit from the uploaded reference image: ${file.name}`);
+                }
+            };
+
+            reader.readAsDataURL(file);
         }
     };
 
@@ -517,16 +531,41 @@ export default function SimpleCreator() {
             const selectedImages = assets.filter(a => a.selected && (a.type === 'image' || a.type === 'face_reference'));
             let finalPrompt = finalPromptToUse;
             const contentParts: any[] = [];
+            let imageIndex = 1;
+            let referenceContext = "";
 
             if (selectedImages.length > 0) {
-                const faceInstruction = `Generate a portrait consistent with the character identity in the attached reference images. Maintain the subject's unique facial features and attributes while implementing the following scene:`;
-                finalPrompt = `${faceInstruction} ${finalPromptToUse}`;
+                referenceContext += "CHARACTER IDENTITY REFERENCES:\n";
                 selectedImages.forEach(img => {
                     const mimeType = img.base64.split(';')[0].split(':')[1] || "image/jpeg";
                     contentParts.push({
                         inlineData: { mimeType, data: img.base64.split(',')[1] }
                     });
+                    referenceContext += `- Reference Image ${imageIndex} is the subject's face and identity.\n`;
+                    imageIndex++;
                 });
+            }
+
+            if (visualsImage) {
+                const mimeType = visualsImage.split(';')[0].split(':')[1] || "image/jpeg";
+                contentParts.push({
+                    inlineData: { mimeType, data: visualsImage.split(',')[1] }
+                });
+                referenceContext += `SCENE CONTEXT REFERENCE:\n- Reference Image ${imageIndex} is the structural and style reference for the environment, lighting, and composition.\n`;
+                imageIndex++;
+            }
+
+            if (outfitImage) {
+                const mimeType = outfitImage.split(';')[0].split(':')[1] || "image/jpeg";
+                contentParts.push({
+                    inlineData: { mimeType, data: outfitImage.split(',')[1] }
+                });
+                referenceContext += `OUTFIT REFERENCE:\n- Reference Image ${imageIndex} is the clothing and texture reference.\n`;
+                imageIndex++;
+            }
+
+            if (contentParts.length > 0) {
+                finalPrompt = `You are an expert digital artist. Use the provided reference images to guide the generation.\n\n${referenceContext}\n\nTECHNICAL PROMPT: ${finalPromptToUse}\n\nMaintain strict character consistency from the identity references while adopting the scene structure and outfit details from their respective references.`;
             }
 
             if (isFalModel) {

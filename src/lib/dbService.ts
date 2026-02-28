@@ -1,6 +1,6 @@
 
 const DB_NAME = 'simple_creator_db';
-const DB_VERSION = 7; // Bumped for 'selected' index on assets
+const DB_VERSION = 8; // Bumped for 'deleted_ids' store and better sync persistence
 
 
 export interface DBFolder {
@@ -168,6 +168,10 @@ const openDB = (): Promise<IDBDatabase> => {
                 if (!historyStore.indexNames.contains('model')) {
                     historyStore.createIndex('model', 'model', { unique: false });
                 }
+            }
+
+            if (!db.objectStoreNames.contains('deleted_ids')) {
+                db.createObjectStore('deleted_ids', { keyPath: 'id' });
             }
         };
     });
@@ -721,6 +725,29 @@ export const dbService = {
             const store = transaction.objectStore('generation_history');
             const request = store.count();
             request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    // --- DELETED IDS PERSISTENCE ---
+    async trackDeletion(id: string): Promise<void> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('deleted_ids', 'readwrite');
+            const store = transaction.objectStore('deleted_ids');
+            const request = store.put({ id, timestamp: Date.now() });
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async isDeleted(id: string): Promise<boolean> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('deleted_ids', 'readonly');
+            const store = transaction.objectStore('deleted_ids');
+            const request = store.get(id);
+            request.onsuccess = () => resolve(!!request.result);
             request.onerror = () => reject(request.error);
         });
     }

@@ -22,6 +22,7 @@ export const syncService = {
                         return;
                     }
                     this.recentlyDeleted.add(data.id);
+                    dbService.trackDeletion(data.id).catch(console.error);
                     await this.removeFromCloud(store, data.id);
                 } else {
                     await this.syncToCloud(store, data);
@@ -91,6 +92,9 @@ export const syncService = {
         for (const local of localItems) {
             const existsInCloud = cloudItems.some(c => c.id === local.id);
             if (!existsInCloud) {
+                // Before pushing, check if this item was intentionally deleted in cloud but exists locally
+                // This can happen if user deletes in cloud but not local (unlikely in this unidirectional flow).
+                // Actually, if it's local but not in cloud, we assume it's NEW and push it.
                 console.log(`[Sync] Pushing local-only ${store}: ${local.id}`);
                 await this.syncToCloud(store, local);
             }
@@ -98,8 +102,9 @@ export const syncService = {
 
         // Pull cloud-only to local
         for (const cloud of cloudItems) {
-            if (this.recentlyDeleted.has(cloud.id)) {
-                console.log(`[Sync] Skipping pull for recently deleted ${store}: ${cloud.id}`);
+            const isDeleted = await dbService.isDeleted(cloud.id);
+            if (this.recentlyDeleted.has(cloud.id) || isDeleted) {
+                console.log(`[Sync] Skipping pull for recently/persistently deleted ${store}: ${cloud.id}`);
                 continue;
             }
             const existsLocally = localItems.some(l => l.id === cloud.id);

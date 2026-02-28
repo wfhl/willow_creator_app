@@ -158,7 +158,7 @@ export const geminiService = {
                 const ai = new GoogleGenAI({ apiKey: currentKey });
 
                 // Construct Content Parts (Text + Images)
-                const parts: any[] = [{ text: request.prompt }];
+                const parts: any[] = [];
 
                 if (request.contentParts && request.contentParts.length > 0) {
                     console.log(`Attaching ${request.contentParts.length} reference images`);
@@ -173,6 +173,9 @@ export const geminiService = {
                         }
                     });
                 }
+
+                // Append the prompt at the end for multimodal instruction following
+                parts.push({ text: request.prompt });
 
                 // Also support image_urls array if passed correctly via reference arrays (like from EditTab)
                 if (request.image_urls && request.image_urls.length > 0) {

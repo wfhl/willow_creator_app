@@ -81,22 +81,7 @@ export function AssetUploader({ assets, onAdd, onRemove, onToggleSelection, labe
     };
 
     const handleUserAssetSelect = (asset: DBAsset) => {
-        // Check if already in selected assets
-        if (assets.some(a => a.base64 === asset.base64)) {
-            // Optional: could toggle off, but for now just inform
-            return;
-        }
-
-        // Convert base64 to file and add
-        fetch(asset.base64)
-            .then(res => res.blob())
-            .then(blob => {
-                const file = new File([blob], asset.name, { type: blob.type });
-                const dt = new DataTransfer();
-                dt.items.add(file);
-                onAdd(dt.files);
-                // Stay in library view
-            });
+        onToggleSelection(asset.id);
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
