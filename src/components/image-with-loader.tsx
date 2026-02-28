@@ -19,7 +19,7 @@ export function ImageWithLoader({ className, fallbackIcon, ...props }: ImageWith
         <div className={`relative flex items-center justify-center overflow-hidden bg-black/40 ${className || ''}`}>
             {/* Loading State */}
             {!isLoaded && !hasError && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/5 animate-pulse z-10">
+                <div className={`absolute inset-0 flex flex-col items-center justify-center bg-white/5 z-10 ${props.src ? 'backdrop-blur-sm' : 'animate-pulse'}`}>
                     <Loader2 className="w-8 h-8 text-emerald-500/50 animate-spin" />
                 </div>
             )}
@@ -35,6 +35,7 @@ export function ImageWithLoader({ className, fallbackIcon, ...props }: ImageWith
             <img
                 {...props}
                 decoding="async"
+                loading="lazy"
                 onLoad={(e) => {
                     setIsLoaded(true);
                     if (props.onLoad) props.onLoad(e);
@@ -43,7 +44,7 @@ export function ImageWithLoader({ className, fallbackIcon, ...props }: ImageWith
                     setHasError(true);
                     if (props.onError) props.onError(e);
                 }}
-                className={`w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'} ${className || ''}`}
+                className={`w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-40'} ${className || ''}`}
             />
         </div>
     );

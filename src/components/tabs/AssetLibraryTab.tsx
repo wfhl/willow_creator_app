@@ -133,7 +133,7 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
     useEffect(() => {
         if (subTab === 'history' && history.length === 0) {
             loadHistory(false);
-        } else if (subTab === 'saved') {
+        } else if (subTab === 'saved' && assets.length === 0) {
             loadContent(false);
         }
     }, [subTab]);
@@ -159,17 +159,27 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
     }, [subTab, hasMoreAssets, hasMoreHistory, isLoadingMore, loadContent, loadHistory]);
 
     useEffect(() => {
-        const unsubscribe = dbService.subscribe((store, type) => {
+        const unsubscribe = dbService.subscribe((store, type, data) => {
             if (store === 'assets' || store === 'folders') {
                 if (type === 'insert' || type === 'delete' || type === 'update') {
-                    loadContent(false);
+                    // Only reload if we are on the relevant subtab or it's empty
+                    if (subTab === 'saved' || assets.length === 0) loadContent(false);
                 }
             } else if (store === 'generation_history') {
-                if (subTab === 'history' || history.length === 0) loadHistory(false);
+                // If a specific history item was updated (e.g. status changed from pending to success)
+                // we should update it in the local state immediately
+                if (type === 'update' && data && data.id) {
+                    setHistory(prev => prev.map(h => h.id === data.id ? { ...h, ...data } : h));
+                } else if (type === 'insert') {
+                    // Prepend new items to history for instant feedback
+                    setHistory(prev => [data, ...prev]);
+                } else {
+                    if (subTab === 'history' || history.length === 0) loadHistory(false);
+                }
             }
         });
         return () => { unsubscribe(); };
-    }, [subTab, loadContent, loadHistory, history.length]);
+    }, [subTab, loadContent, loadHistory, history.length, assets.length]);
 
     // Polling for pending generations
     useEffect(() => {
