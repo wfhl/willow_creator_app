@@ -275,7 +275,30 @@ export const falService = {
                 result.images.forEach((img: any) => mediaUrls.push(img.url));
             }
 
-            if (mediaUrls.length > 0) return mediaUrls;
+            if (mediaUrls.length > 0) {
+                // Pre-fetch image URLs as blob object URLs so they are already in browser memory
+                // when assigned to an <img> src. This makes them appear instantly instead of
+                // requiring a separate CDN download after generation completes.
+                const isVideo = (url: string) => {
+                    const clean = url.split('?')[0].split('#')[0].toLowerCase();
+                    return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+                };
+
+                const resolvedUrls = await Promise.all(
+                    mediaUrls.map(async (url) => {
+                        if (isVideo(url)) return url; // Don't pre-fetch videos
+                        try {
+                            const res = await fetch(url);
+                            const blob = await res.blob();
+                            return URL.createObjectURL(blob);
+                        } catch {
+                            console.warn('[FalService] Could not pre-fetch image, falling back to CDN URL:', url);
+                            return url;
+                        }
+                    })
+                );
+                return resolvedUrls;
+            }
 
             throw new Error(`No media URL in Fal response. Result status: ${result.status || 'unknown'}`);
         } catch (e: any) {
