@@ -1,0 +1,1985 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Edit2, Play, PenTool, Archive, Folder } from 'lucide-react';
+import { generateUUID } from '../lib/uuid';
+import { geminiService, updateGeminiApiKey } from '../lib/geminiService';
+import type { GenerationRequest } from '../lib/geminiService';
+import { falService, updateFalApiKey, type FalGenerationRequest } from '../lib/falService';
+import { dbService } from '../lib/dbService';
+import type { DBAsset as Asset, DBSavedPost as SavedPost, DBPromptPreset, DBGenerationHistory } from '../lib/dbService';
+import { SIMPLE_PROFILE, SIMPLE_THEMES, CAPTION_TEMPLATES } from './creator-presets';
+
+// Component Imports
+import { CreatorHeader } from './tabs/CreatorHeader';
+import { CreateTab } from './tabs/CreateTab';
+import { PostsTab } from './tabs/PostsTab';
+import { EditTab } from './tabs/EditTab';
+import { AnimateTab } from './tabs/AnimateTab';
+import { ScriptsTab } from './tabs/ScriptsTab';
+import { SettingsTab, type Theme, type CaptionStyle, type CreatorProfile } from './tabs/SettingsTab';
+import { AssetLibraryTab } from './tabs/AssetLibraryTab';
+import { PresetsDropdown } from './tabs/PresetsDropdown';
+import { ImageWithLoader } from './image-with-loader';
+import { useAuth } from '../components/AuthProvider';
+import { syncService } from '../lib/syncService';
+
+export default function SimpleCreator() {
+    const { user } = useAuth();
+    // --- Shared State ---
+    const [assets, setAssets] = useState<Asset[]>([]);
+    const [activeTab, setActiveTab] = useState<'create' | 'posts' | 'assets' | 'edit' | 'animate' | 'scripts' | 'settings'>('create');
+
+    // --- Configuration State ---
+    const [themes, setThemes] = useState<Theme[]>(SIMPLE_THEMES as Theme[]);
+    const [captionStyles, setCaptionStyles] = useState<CaptionStyle[]>(CAPTION_TEMPLATES as CaptionStyle[]);
+    const [profile, setProfile] = useState<CreatorProfile>(SIMPLE_PROFILE);
+
+    // --- Saved Posts State ---
+    const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
+    const [totalSavedCount, setTotalSavedCount] = useState(0);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchResults, setSearchResults] = useState<SavedPost[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [sortOrder, setSortOrder] = useState<'prev' | 'next'>('prev');
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const ignoreNextPromptUpdate = useRef(false);
+
+    // --- Textarea Refs for Cursor-Aware Insertion ---
+    const createPromptRef = useRef<HTMLTextAreaElement>(null);
+    const editPromptRef = useRef<HTMLTextAreaElement>(null);
+    const animatePromptRef = useRef<HTMLTextAreaElement>(null);
+
+    // --- Preset State ---
+    const [presets, setPresets] = useState<DBPromptPreset[]>([]);
+    const [isPresetsOpen, setIsPresetsOpen] = useState(false);
+    const [showSaveForm, setShowSaveForm] = useState(false);
+
+    // --- Post Generation State ---
+    const [topic, setTopic] = useState("");
+    const [captionType, setCaptionType] = useState("reflective");
+    const [generatedCaption, setGeneratedCaption] = useState("");
+    const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
+
+    // --- Media Generation State ---
+    const [selectedThemeId, setSelectedThemeId] = useState("A");
+    const [customTheme, setCustomTheme] = useState("");
+    const [specificVisuals, setSpecificVisuals] = useState("");
+    const [specificOutfit, setSpecificOutfit] = useState("");
+    const [visualsImage, setVisualsImage] = useState<string | null>(null);
+    const [outfitImage, setOutfitImage] = useState<string | null>(null);
+    const [generatedPrompt, setGeneratedPrompt] = useState("");
+    const [isDreaming, setIsDreaming] = useState(false);
+
+    // Media Output State
+    const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
+    const [generatedMediaUrls, setGeneratedMediaUrls] = useState<string[]>([]);
+    const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+
+    // Refinement / I2V States
+    const [refineTarget, setRefineTarget] = useState<{ url: string, index: number } | null>(null);
+    const [refinePrompt, setRefinePrompt] = useState("");
+    const [isRefining, setIsRefining] = useState(false);
+    const [refineResultUrls, setRefineResultUrls] = useState<string[]>([]);
+    const [refineProgress, setRefineProgress] = useState(0);
+    const [refineAdditionalImages, setRefineAdditionalImages] = useState<Asset[]>([]);
+
+    // Mutable Parameters State
+    const [refineImageSize, setRefineImageSize] = useState<string>("square_hd");
+    const [refineNumImages, setRefineNumImages] = useState<number>(1);
+
+    const [i2vTarget, setI2VTarget] = useState<{ url: string, index: number } | null>(null);
+    const [i2vPrompt, setI2VPrompt] = useState("");
+    const [isGeneratingI2V, setIsGeneratingI2V] = useState(false);
+    const [i2vResultUrl, setI2VResultUrl] = useState<string | null>(null);
+
+    // Control State
+    const [selectedModel, setSelectedModel] = useState<string>('gemini-3-pro-image-preview');
+    const [aspectRatio, setAspectRatio] = useState<string>('3:4');
+    const [createImageSize, setCreateImageSize] = useState<string>("auto_4K");
+    const [createNumImages, setCreateNumImages] = useState<number>(4);
+    const [editSelectedModel, setEditSelectedModel] = useState<string>('google/gemini-2.0-flash-exp');
+    const [previewContext, setPreviewContext] = useState<{ urls: string[], index: number } | null>(null);
+    const previewUrl = previewContext ? previewContext.urls[previewContext.index] : null;
+
+    const handleOpenPreview = (url: string, allUrls?: string[]) => {
+        const urls = allUrls || [url];
+        const index = urls.indexOf(url);
+        setPreviewContext({ urls, index: index >= 0 ? index : 0 });
+    };
+
+    // Video Configuration
+    const [videoResolution, setVideoResolution] = useState<string>('1080p');
+    const [videoDuration, setVideoDuration] = useState<string>('6s');
+    const [i2vAspectRatio, setI2vAspectRatio] = useState<string>('9:16');
+    const [withAudio, setWithAudio] = useState(true);
+    const [cameraFixed, setCameraFixed] = useState(false);
+
+    const [enableSafety, setEnableSafety] = useState(false);
+    const [loras, setLoras] = useState<Array<{ path: string; scale: number }>>([]);
+
+    // API Keys State
+    const [apiKeys, setApiKeys] = useState<{ gemini: string; fal: string }>({ gemini: '', fal: '' });
+
+    // --- INITIALIZATION EFFECTS ---
+
+    // Load presets
+    useEffect(() => {
+        dbService.getAllPresets().then(setPresets).catch(console.error);
+    }, []);
+
+    // Load Assets & Posts (Persistence)
+    useEffect(() => {
+        const loadInitialLocalData = async () => {
+            try {
+                // Configs
+                const savedThemes = await dbService.getConfig<Theme[]>('themes');
+                if (savedThemes) setThemes(savedThemes);
+                else await dbService.saveConfig('themes', SIMPLE_THEMES);
+
+                const savedStyles = await dbService.getConfig<CaptionStyle[]>('caption_styles');
+                if (savedStyles) setCaptionStyles(savedStyles);
+                else await dbService.saveConfig('caption_styles', CAPTION_TEMPLATES);
+
+                const savedProfile = await dbService.getConfig<CreatorProfile>('creator_profile');
+                if (savedProfile) setProfile(savedProfile);
+                else await dbService.saveConfig('creator_profile', SIMPLE_PROFILE);
+
+                // API Keys (Local)
+                const savedKeys = await dbService.getConfig('api_keys');
+                if (savedKeys) {
+                    setApiKeys(savedKeys);
+                    if (savedKeys.gemini) updateGeminiApiKey(savedKeys.gemini);
+                    if (savedKeys.fal) updateFalApiKey(savedKeys.fal);
+                }
+
+                // Assets
+                const selectedAssets = await dbService.getSelectedAssets();
+                setAssets(selectedAssets);
+
+                // Posts
+                const count = await dbService.getPostsCount();
+                setTotalSavedCount(count);
+                if (count > 0) {
+                    const batch = await dbService.getRecentPostsBatch(24, 0, sortOrder);
+                    setSavedPosts(batch);
+                }
+
+                // Parameters
+                const savedParams = await dbService.getConfig('user_parameters');
+                if (savedParams) {
+                    if (savedParams.selectedModel) setSelectedModel(savedParams.selectedModel);
+                    if (savedParams.aspectRatio) setAspectRatio(savedParams.aspectRatio);
+                    if (savedParams.createImageSize) setCreateImageSize(savedParams.createImageSize);
+                    if (savedParams.createNumImages) setCreateNumImages(savedParams.createNumImages);
+                    if (savedParams.videoResolution) setVideoResolution(savedParams.videoResolution);
+                    if (savedParams.videoDuration) setVideoDuration(savedParams.videoDuration);
+                    if (savedParams.i2vAspectRatio) setI2vAspectRatio(savedParams.i2vAspectRatio);
+                    if (savedParams.withAudio !== undefined) setWithAudio(savedParams.withAudio);
+                    if (savedParams.cameraFixed !== undefined) setCameraFixed(savedParams.cameraFixed);
+                    if (savedParams.enableSafety !== undefined) setEnableSafety(savedParams.enableSafety);
+                    if (savedParams.mediaType) setMediaType(savedParams.mediaType);
+                    if (savedParams.selectedThemeId) setSelectedThemeId(savedParams.selectedThemeId);
+                    if (savedParams.captionType) setCaptionType(savedParams.captionType);
+                    if (savedParams.refineImageSize) setRefineImageSize(savedParams.refineImageSize);
+                    if (savedParams.refineNumImages) setRefineNumImages(savedParams.refineNumImages);
+                    if (savedParams.editSelectedModel) setEditSelectedModel(savedParams.editSelectedModel);
+                }
+            } catch (e) { console.error(e); }
+        };
+        loadInitialLocalData();
+
+        // Subscribe to DB changes to keep UI in sync
+        const unsubscribe = dbService.subscribe((store, type, _data) => {
+            if (store === 'posts') {
+                // Reload posts for simplicity, or optimistically update
+                dbService.getRecentPostsBatch(24, 0, sortOrder).then(setSavedPosts);
+                dbService.getPostsCount().then(setTotalSavedCount);
+            } else if (store === 'assets') {
+                if (type === 'insert' || type === 'update' || type === 'delete') {
+                    dbService.getSelectedAssets().then(setAssets).catch(console.error);
+                }
+            }
+        });
+
+        return () => { unsubscribe(); };
+    }, []);
+
+    // Cloud Metadata Sync Effect
+    useEffect(() => {
+        if (!user) return;
+
+        const syncCloudMetadata = async () => {
+            const metadata = user.user_metadata;
+            if (!metadata) return;
+
+            try {
+                // Sync API Keys (Cloud takes precedence when logged in)
+                if (metadata.api_keys) {
+                    setApiKeys(metadata.api_keys);
+                    if (metadata.api_keys.gemini) updateGeminiApiKey(metadata.api_keys.gemini);
+                    if (metadata.api_keys.fal) updateFalApiKey(metadata.api_keys.fal);
+                    await dbService.saveConfig('api_keys', metadata.api_keys);
+                }
+
+                // Sync UI Configurations
+                if (metadata.themes) {
+                    setThemes(metadata.themes);
+                    await dbService.saveConfig('themes', metadata.themes);
+                }
+                if (metadata.caption_styles) {
+                    setCaptionStyles(metadata.caption_styles);
+                    await dbService.saveConfig('caption_styles', metadata.caption_styles);
+                }
+                if (metadata.creator_profile) {
+                    setProfile(metadata.creator_profile);
+                    await dbService.saveConfig('creator_profile', metadata.creator_profile);
+                }
+            } catch (e) {
+                console.error("[Sync] Failed to sync cloud metadata:", e);
+            }
+        };
+
+        syncCloudMetadata();
+    }, [user]);
+
+    // Persist Parameters Helper
+    const persistParam = async (key: string, value: any) => {
+        try {
+            const current = await dbService.getConfig('user_parameters') || {};
+            await dbService.saveConfig('user_parameters', { ...current, [key]: value });
+        } catch (e) { console.error("Failed to persist param:", e); }
+    };
+    // Auto-persist effects for key parameters
+    useEffect(() => { persistParam('selectedModel', selectedModel); }, [selectedModel]);
+    useEffect(() => { persistParam('aspectRatio', aspectRatio); }, [aspectRatio]);
+    useEffect(() => { persistParam('createImageSize', createImageSize); }, [createImageSize]);
+    useEffect(() => { persistParam('createNumImages', createNumImages); }, [createNumImages]);
+    useEffect(() => { persistParam('videoResolution', videoResolution); }, [videoResolution]);
+    useEffect(() => { persistParam('videoDuration', videoDuration); }, [videoDuration]);
+    useEffect(() => { persistParam('i2vAspectRatio', i2vAspectRatio); }, [i2vAspectRatio]);
+    useEffect(() => { persistParam('withAudio', withAudio); }, [withAudio]);
+    useEffect(() => { persistParam('cameraFixed', cameraFixed); }, [cameraFixed]);
+    useEffect(() => { persistParam('enableSafety', enableSafety); }, [enableSafety]);
+    useEffect(() => { persistParam('mediaType', mediaType); }, [mediaType]);
+    useEffect(() => { persistParam('selectedThemeId', selectedThemeId); }, [selectedThemeId]);
+    useEffect(() => { persistParam('captionType', captionType); }, [captionType]);
+    useEffect(() => { persistParam('refineImageSize', refineImageSize); }, [refineImageSize]);
+    useEffect(() => { persistParam('refineNumImages', refineNumImages); }, [refineNumImages]);
+    useEffect(() => { persistParam('editSelectedModel', editSelectedModel); }, [editSelectedModel]);
+
+    // Persist Configs
+    const persistThemes = (newThemes: Theme[]) => {
+        setThemes(newThemes);
+        dbService.saveConfig('themes', newThemes).catch(console.error);
+        if (user) syncService.saveUserConfig('themes', newThemes).catch(console.error);
+    };
+
+    const persistCaptionStyles = (newStyles: CaptionStyle[]) => {
+        setCaptionStyles(newStyles);
+        dbService.saveConfig('caption_styles', newStyles).catch(console.error);
+        if (user) syncService.saveUserConfig('caption_styles', newStyles).catch(console.error);
+    };
+
+    const persistProfile = (newProfile: CreatorProfile) => {
+        setProfile(newProfile);
+        dbService.saveConfig('creator_profile', newProfile).catch(console.error);
+        if (user) syncService.saveUserConfig('creator_profile', newProfile).catch(console.error);
+    };
+
+    const handleUpdateApiKeys = async (newKeys: { gemini: string, fal: string }) => {
+        setApiKeys(newKeys);
+        if (newKeys.gemini) updateGeminiApiKey(newKeys.gemini);
+        if (newKeys.fal) updateFalApiKey(newKeys.fal);
+        await dbService.saveConfig('api_keys', newKeys);
+        if (user) await syncService.saveUserConfig('api_keys', newKeys);
+    };
+
+    // Reload posts on sort/search
+    useEffect(() => {
+        const reloadSortedPosts = async () => {
+            if (activeTab === 'posts' && !searchQuery) {
+                const count = await dbService.getPostsCount();
+                setTotalSavedCount(count);
+                const batch = await dbService.getRecentPostsBatch(24, 0, sortOrder);
+                setSavedPosts(batch);
+            }
+        };
+        reloadSortedPosts();
+    }, [sortOrder, activeTab, searchQuery]);
+
+    // Deep search
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            setSearchResults([]);
+            setIsSearching(false);
+            return;
+        }
+        const timer = setTimeout(async () => {
+            setIsSearching(true);
+            try {
+                const results = await dbService.searchPosts(searchQuery, 48, sortOrder);
+                setSearchResults(results);
+            } catch (err) { console.error(err); } finally { setIsSearching(false); }
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [searchQuery, sortOrder]);
+
+    // Update model when type changes
+    useEffect(() => {
+        if (mediaType === 'image') {
+            const isValidImageModel = selectedModel.includes('gemini') ||
+                selectedModel.includes('banana') ||
+                selectedModel.includes('seedream') ||
+                selectedModel.includes('grok-imagine-image');
+            if (!isValidImageModel) {
+                const defaultImageModel = 'gemini-3-pro-image-preview';
+                setSelectedModel(defaultImageModel);
+                persistParam('selectedModel', defaultImageModel);
+            }
+        } else {
+            const isValidVideoModel = selectedModel.includes('veo') ||
+                selectedModel.includes('grok-imagine-video');
+            if (!isValidVideoModel) {
+                const defaultVideoModel = 'veo-3.1-generate-preview';
+                setSelectedModel(defaultVideoModel);
+                persistParam('selectedModel', defaultVideoModel);
+            }
+        }
+    }, [mediaType]);
+
+    const currentTheme = themes.find((t: Theme) => t.id === selectedThemeId) || themes[0];
+
+
+    // --- LOGIC HANDLERS ---
+
+    // Keyboard Navigation for Preview Carousel
+    useEffect(() => {
+        if (!previewContext) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowLeft') {
+                setPreviewContext(prev => prev ? { ...prev, index: (prev.index - 1 + prev.urls.length) % prev.urls.length } : null);
+            } else if (e.key === 'ArrowRight') {
+                setPreviewContext(prev => prev ? { ...prev, index: (prev.index + 1) % prev.urls.length } : null);
+            } else if (e.key === 'Escape') {
+                setPreviewContext(null);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [previewContext]);
+
+    const constructPrompt = () => {
+        let prompt = `SUBJECT: ${profile.subject} `;
+
+        if (selectedThemeId === 'CUSTOM') {
+            prompt += ` ${specificVisuals || "A creative, artistic portrait."}`;
+            if (specificOutfit) prompt += ` Wearing ${specificOutfit}.`;
+        } else {
+            let base = currentTheme.basePrompt;
+            base = base.replace("[Subject Definition], ", "").replace("[Subject Definition]", "");
+            base = base.replace("[Outfit]", specificOutfit || currentTheme.defaultOutfit || "");
+
+            const theme = currentTheme as any;
+            if (currentTheme.id === 'B') {
+                base = base.replace("[Visuals]", specificVisuals || theme.defaultVisuals || "");
+            } else if (['C', 'D', 'E'].includes(currentTheme.id)) {
+                base = base.replace("[Action]", specificVisuals || theme.defaultAction || "");
+            } else {
+                base = base.replace("[Setting]", specificVisuals || theme.defaultSetting || "");
+            }
+            prompt += base;
+        }
+
+        prompt += ` ${profile.defaultParams} ${profile.negativePrompt}`;
+        setGeneratedPrompt(prompt);
+    };
+
+    useEffect(() => {
+        if (ignoreNextPromptUpdate.current) {
+            ignoreNextPromptUpdate.current = false;
+            return;
+        }
+        constructPrompt();
+    }, [selectedThemeId, specificVisuals, specificOutfit, profile]);
+
+
+    useEffect(() => {
+        if (!specificVisuals) setVisualsImage(null);
+    }, [specificVisuals]);
+
+    useEffect(() => {
+        if (!specificOutfit) setOutfitImage(null);
+    }, [specificOutfit]);
+
+    const handleInputImageUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'visuals' | 'outfit') => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                const base64 = event.target?.result as string;
+                if (target === 'visuals') {
+                    setVisualsImage(base64);
+                    setSpecificVisuals(`Scene styled like the uploaded reference image: ${file.name}`);
+                }
+                if (target === 'outfit') {
+                    setOutfitImage(base64);
+                    setSpecificOutfit(`Wearing outfit from the uploaded reference image: ${file.name}`);
+                }
+            };
+
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleDreamConcept = async () => {
+        setIsDreaming(true);
+        try {
+            const themeToUse = selectedThemeId === 'CUSTOM' ? (customTheme || 'creative concept') : currentTheme.name;
+            const concept = await (geminiService as any).generateConcept(themeToUse, 'post');
+            setTopic(concept.topic);
+            setSpecificVisuals(concept.setting);
+            setSpecificOutfit(concept.outfit);
+        } catch (e) { console.error(e); } finally { setIsDreaming(false); }
+    };
+
+    const handleAssetsAdd = (files: FileList) => {
+        Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const base64 = e.target?.result as string;
+                const newAsset: Asset = {
+                    id: Date.now().toString() + Math.random().toString().slice(2, 6),
+                    name: file.name,
+                    type: 'face_reference', // Explicitly mark as face reference when added via reference uploader
+                    base64,
+                    folderId: null,
+                    timestamp: Date.now(),
+                    selected: true
+                };
+                setAssets(prev => [...prev, newAsset]);
+                await dbService.saveAsset(newAsset);
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const handleAssetRemove = async (id: string) => {
+        setAssets(prev => prev.filter(a => a.id !== id));
+        await dbService.deleteAsset(id);
+    };
+
+    const handleAssetToggle = async (id: string) => {
+        // First check if it's already in the active session
+        const existing = assets.find(a => a.id === id);
+        if (existing) {
+            setAssets(prev => {
+                const updated = { ...existing, selected: !existing.selected };
+                dbService.saveAsset(updated);
+                return prev.map(a => a.id === id ? updated : a);
+            });
+        } else {
+            // It's in the library but not in the active session list
+            // Fetch it from DB to get the full asset data
+            const allAssets = await dbService.getAllAssets();
+            const assetFromLib = allAssets.find(a => a.id === id);
+
+            if (assetFromLib) {
+                const updated = { ...assetFromLib, selected: !assetFromLib.selected };
+                await dbService.saveAsset(updated);
+                if (updated.selected) {
+                    setAssets(prev => [...prev, updated]);
+                } else {
+                    setAssets(prev => prev.filter(a => a.id !== id));
+                }
+            }
+        }
+    };
+
+    const handleGenerateMedia = async (promptOverride?: string) => {
+        const finalPromptToUse = promptOverride || generatedPrompt;
+        if (!finalPromptToUse) return;
+        setIsGeneratingMedia(true);
+        setGeneratedMediaUrls([]);
+
+        // Determine service type early for history tracking
+        const isFalModel = selectedModel.includes('grok') || selectedModel.includes('seedream') || selectedModel.includes('seedance') || selectedModel.includes('wan');
+        let generationSucceeded = false;
+        let generationError = '';
+        let resultUrls: string[] = [];
+
+        const historyId = generateUUID();
+        const baseHistoryEntry: DBGenerationHistory = {
+            id: historyId,
+            timestamp: Date.now(),
+            type: mediaType,
+            prompt: finalPromptToUse,
+            model: selectedModel,
+            mediaUrls: [],
+            aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
+            imageSize: createImageSize,
+            numImages: createNumImages,
+            videoResolution: mediaType === 'video' ? videoResolution : undefined,
+            videoDuration: mediaType === 'video' ? videoDuration : undefined,
+            withAudio: mediaType === 'video' ? withAudio : undefined,
+            cameraFixed: mediaType === 'video' ? cameraFixed : undefined,
+            themeId: selectedThemeId,
+            themeName: currentTheme?.name,
+            topic: topic || undefined,
+            visuals: specificVisuals || undefined,
+            outfit: specificOutfit || undefined,
+            service: isFalModel ? 'fal' : 'gemini',
+            status: 'pending',
+            tab: activeTab
+        };
+
+        try {
+            await dbService.saveGenerationHistory(baseHistoryEntry);
+        } catch (e) {
+            console.error('Failed to save pending history:', e);
+        }
+
+        try {
+            const selectedImages = assets.filter(a => a.selected && (a.type === 'image' || a.type === 'face_reference'));
+            let finalPrompt = finalPromptToUse;
+            const contentParts: any[] = [];
+            let imageIndex = 1;
+            let referenceContext = "";
+
+            if (selectedImages.length > 0) {
+                referenceContext += "CHARACTER IDENTITY:\n";
+                selectedImages.forEach((img, idx) => {
+                    const mimeType = img.base64.split(';')[0].split(':')[1] || "image/jpeg";
+                    contentParts.push({ text: `[IDENTITY REFERENCE ${idx + 1}]:` });
+                    contentParts.push({
+                        inlineData: { mimeType, data: img.base64.split(',')[1] }
+                    });
+                    referenceContext += `- Reference Image ${imageIndex} represents the EXACT facial features, bone structure, eye shape, and hair of the subject. You MUST replicate this identity perfectly.\n`;
+                    imageIndex++;
+                });
+            }
+
+            if (visualsImage) {
+                const mimeType = visualsImage.split(';')[0].split(':')[1] || "image/jpeg";
+                contentParts.push({ text: `[SCENE CONTEXT REFERENCE]:` });
+                contentParts.push({
+                    inlineData: { mimeType, data: visualsImage.split(',')[1] }
+                });
+                referenceContext += `SCENE CONTEXT:\n- Reference Image ${imageIndex} is the environment and structural reference. Follow its lighting, architectural details, depth of field, and overall mood.\n`;
+                imageIndex++;
+            }
+
+            if (outfitImage) {
+                const mimeType = outfitImage.split(';')[0].split(':')[1] || "image/jpeg";
+                contentParts.push({ text: `[OUTFIT REFERENCE]:` });
+                contentParts.push({
+                    inlineData: { mimeType, data: outfitImage.split(',')[1] }
+                });
+                referenceContext += `OUTFIT DETAILS:\n- Reference Image ${imageIndex} is the specific clothing reference. You MUST replicate the exact fabrics, colors, textures, and design of the outfit shown in this image.\n`;
+                imageIndex++;
+            }
+
+            if (contentParts.length > 0) {
+                finalPrompt = `You are an elite cinematic photographer. I have provided ${imageIndex - 1} reference images with explicit labels. You MUST synthesize them according to these specific rules:
+
+${referenceContext}
+
+MASTER INSTRUCTIONS:
+1. IDENTITY: The subject in the output MUST be the same individual as shown in the IDENTITY REFERENCES.
+2. SCENE: Place this subject into the environment described or shown in the SCENE CONTEXT.
+3. OUTFIT: Dress the subject in the exact garments shown in the OUTFIT REFERENCE.
+4. COHERENCE: Ensure the lighting from the SCENE correctly interacts with the OUTFIT and the subject's face.
+
+TECHNICAL PROMPT: ${finalPromptToUse}`;
+            }
+
+            if (isFalModel) {
+                const request: FalGenerationRequest = {
+                    model: selectedModel,
+                    prompt: finalPrompt,
+                    aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
+                    contentParts: contentParts,
+                    videoConfig: mediaType === 'video' ? {
+                        resolution: videoResolution,
+                        durationSeconds: videoDuration.replace('s', ''),
+                        withAudio,
+                        cameraFixed
+                    } : undefined,
+                    editConfig: {
+                        imageSize: createImageSize,
+                        numImages: 1, // SimpleCreator handles the loop with delays
+                        enableSafety
+                    },
+                    loras: loras,
+                    onEnqueue: async (requestId, endpoint) => {
+                        baseHistoryEntry.requestId = requestId;
+                        baseHistoryEntry.falEndpoint = endpoint;
+                        try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { }
+                    }
+                };
+
+                if (mediaType === 'image' && createNumImages > 1 && !selectedModel.includes('edit')) {
+                    const taskIndexes = Array.from({ length: createNumImages }, (_, i) => i);
+                    const promises = taskIndexes.map(async (i) => {
+                        if (i > 0) await new Promise(r => setTimeout(r, i * 500));
+                        return falService.generateMedia(request);
+                    });
+                    const results = await Promise.all(promises);
+                    const flattened = results.flat();
+                    setGeneratedMediaUrls(flattened);
+                    resultUrls = flattened;
+                } else {
+                    const results = await falService.generateMedia(request);
+                    setGeneratedMediaUrls(results);
+                    resultUrls = results;
+                }
+
+            } else {
+                const request: GenerationRequest = {
+                    type: mediaType,
+                    prompt: finalPrompt,
+                    model: selectedModel,
+                    aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
+                    contentParts: contentParts,
+                    videoConfig: mediaType === 'video' ? {
+                        resolution: videoResolution,
+                        durationSeconds: videoDuration.replace('s', ''),
+                        withAudio: false
+                    } : undefined,
+                    editConfig: {
+                        imageSize: createImageSize,
+                        numImages: 1 // SimpleCreator handles the loop with delays to avoid rate limits
+                    }
+                };
+
+                if (mediaType === 'image') {
+                    const taskIndexes = Array.from({ length: createNumImages }, (_, i) => i);
+                    const collectedUrls: string[] = [];
+                    const imagePromises = taskIndexes.map(async (i) => {
+                        try {
+                            if (i > 0) await new Promise(r => setTimeout(r, i * 2000));
+                            const urls = await geminiService.generateMedia(request);
+                            if (urls && urls.length > 0) {
+                                setGeneratedMediaUrls(prev => [...prev, ...urls]);
+                                collectedUrls.push(...urls);
+                                return urls;
+                            }
+                        } catch (e) { console.error(e); }
+                        return null;
+                    });
+                    await Promise.all(imagePromises);
+                    resultUrls = collectedUrls;
+                } else {
+                    const results = await geminiService.generateMedia(request);
+                    if (results && results.length > 0) {
+                        setGeneratedMediaUrls(results);
+                        resultUrls = results;
+                    }
+                }
+            }
+
+            generationSucceeded = resultUrls.length > 0;
+
+        } catch (error: any) {
+            console.error(error);
+            generationError = error?.message || 'Unknown error';
+            alert("Media generation failed.");
+        } finally {
+            setIsGeneratingMedia(false);
+
+            // --- Save to Generation History ---
+            try {
+                await dbService.saveGenerationHistory({
+                    ...baseHistoryEntry,
+                    mediaUrls: resultUrls,
+                    status: generationSucceeded ? 'success' : 'failed',
+                    errorMessage: generationError || undefined
+                });
+            } catch (histErr) {
+                console.error('Failed to save generation history:', histErr);
+            }
+        }
+    };
+
+    const handleGenerateCaption = async (overrides?: any) => {
+        const t = overrides?.topic || topic;
+        if (!t) return;
+        setIsGeneratingCaption(true);
+        try {
+            const template = captionStyles.find(c => c.id === (overrides?.captionType || captionType));
+            const systemInstruction = `
+            You are the Simple Creator.
+            CORE PERSONA: ${profile.subject}
+            CONTEXT: Theme: ${(overrides?.theme || currentTheme).name}, Visuals: ${overrides?.visuals || specificVisuals}, Outfit: ${overrides?.outfit || specificOutfit}
+            TASK: Write a caption for Topic: "${t}". Style: ${template?.prompt}
+            `;
+            const result = await geminiService.generateText(`TOPIC: "${t}"`, systemInstruction);
+            setGeneratedCaption(result);
+        } catch (e) {
+            console.error(e);
+            setGeneratedCaption("Error generating caption.");
+        } finally {
+            setIsGeneratingCaption(false);
+        }
+    };
+
+    const handleGenerateContent = () => {
+        handleGenerateMedia();
+        handleGenerateCaption();
+    };
+
+    const handleGenerateRandomPost = async () => {
+        setIsDreaming(true);
+        try {
+            const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+            const randomCaption = captionStyles[Math.floor(Math.random() * captionStyles.length)];
+            setSelectedThemeId(randomTheme.id);
+            setCaptionType(randomCaption.id);
+
+            const concept = await (geminiService as any).generateConcept(randomTheme.name, 'post');
+            setTopic(concept.topic);
+            setSpecificVisuals(concept.setting);
+            setSpecificOutfit(concept.outfit);
+
+            let prompt = randomTheme.basePrompt.replace("[Subject Definition]", profile.subject)
+                .replace("[Outfit]", concept.outfit || randomTheme.defaultOutfit);
+
+            if (randomTheme.id === 'B') prompt = prompt.replace("[Visuals]", concept.setting || randomTheme.defaultVisuals || "");
+            else if (['C', 'D', 'E'].includes(randomTheme.id)) prompt = prompt.replace("[Action]", concept.setting || randomTheme.defaultAction || "");
+            else prompt = prompt.replace("[Setting]", concept.setting || randomTheme.defaultSetting || "");
+
+            prompt += ` ${profile.defaultParams}`;
+            setGeneratedPrompt(prompt);
+
+            handleGenerateMedia(prompt);
+            handleGenerateCaption({
+                topic: concept.topic,
+                theme: randomTheme,
+                visuals: concept.setting,
+                outfit: concept.outfit,
+                captionType: randomCaption.id
+            });
+
+        } catch (e) { console.error(e); } finally { setIsDreaming(false); }
+    };
+
+    // --- SAVE / PRESET HANDLERS ---
+
+    const handleSavePost = async () => {
+        const newPost: SavedPost = {
+            id: Date.now().toString(),
+            timestamp: Date.now(),
+            topic,
+            caption: generatedCaption,
+            captionType,
+            mediaUrls: generatedMediaUrls,
+            mediaType: generatedMediaUrls.some(url => {
+                if (url.startsWith('data:video')) return true;
+                const clean = url.split('?')[0].split('#')[0].toLowerCase();
+                return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+            }) ? 'video' : 'image',
+            themeId: selectedThemeId,
+            visuals: specificVisuals,
+            outfit: specificOutfit,
+            prompt: generatedPrompt,
+            tags: []
+        };
+        try {
+            await dbService.savePost(newPost);
+            setSavedPosts(prev => [newPost, ...prev]);
+            setTotalSavedCount(prev => prev + 1);
+            alert("Post Saved!");
+        } catch (e) {
+            console.error(e);
+            alert("Save failed.");
+        }
+    };
+
+    const handleSavePreset = async (_data: any, nameOverride?: string) => {
+        // Determine prompts based on active tab
+        let promptToSave = generatedPrompt;
+        let description = topic || "No description";
+
+        if (activeTab === 'edit') {
+            promptToSave = refinePrompt;
+            description = `Refinement: ${refinePrompt.slice(0, 30)}...`;
+        } else if (activeTab === 'animate') {
+            promptToSave = i2vPrompt;
+            description = `Animation: ${i2vPrompt.slice(0, 30)}...`;
+        }
+
+        let name = nameOverride;
+        if (!name) {
+            // Only prompt if no name provided from input
+            name = prompt("Enter a name for this preset:") || `Preset ${new Date().toLocaleTimeString()}`;
+        }
+
+        // If user cancelled prompt (and name became null from prompt cancel), handle it?
+        // prompt() returns null if cancelled. '' if empty ok.
+        // If nameOverride was undefined, we ran prompt. If that returns null, we probably shouldn't save?
+        // But the previous code defaulted to 'Preset Time' if prompt returns falsy.
+        // Let's keep existing fallback behavior for safety if prompt returns empty/null.
+        if (!name) name = `Preset ${new Date().toLocaleTimeString()}`;
+
+        const preset: DBPromptPreset = {
+            id: generateUUID(),
+            name: name,
+            description: description,
+            basePrompt: promptToSave,
+            themeId: selectedThemeId,
+            visuals: specificVisuals,
+            outfit: specificOutfit,
+            action: "",
+            model: selectedModel,
+            aspectRatio: aspectRatio,
+            negativePrompt: profile.negativePrompt,
+            videoDuration,
+            videoResolution,
+            tab: activeTab,
+            timestamp: Date.now()
+        };
+        await dbService.savePreset(preset);
+        setPresets(prev => [preset, ...prev]);
+        alert("Preset saved successfully!");
+        return preset.id;
+    };
+
+    const handleLoadPreset = (preset: DBPromptPreset) => {
+        if (preset.themeId) setSelectedThemeId(preset.themeId);
+        if (preset.visuals) setSpecificVisuals(preset.visuals);
+        if (preset.outfit) setSpecificOutfit(preset.outfit);
+        if (preset.model) setSelectedModel(preset.model);
+        if (preset.videoDuration) setVideoDuration(preset.videoDuration);
+        if (preset.videoResolution) setVideoResolution(preset.videoResolution);
+
+        const insertAtCursor = (textarea: HTMLTextAreaElement | null, text: string, currentVal: string, setter: (val: string) => void) => {
+            if (!textarea) {
+                setter(text);
+                return;
+            }
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+
+            // Smart spacing
+            const prefix = (start > 0 && currentVal[start - 1] !== ' ' && currentVal[start - 1] !== '\n') ? ' ' : '';
+            const suffix = (end < currentVal.length && currentVal[end] !== ' ' && currentVal[end] !== '\n') ? ' ' : '';
+
+            const textToInsert = prefix + text + suffix;
+            const newValue = currentVal.substring(0, start) + textToInsert + currentVal.substring(end);
+            setter(newValue);
+
+            // Refocus and set cursor
+            setTimeout(() => {
+                textarea.focus();
+                textarea.selectionStart = textarea.selectionEnd = start + textToInsert.length;
+            }, 0);
+        };
+
+        if (activeTab === 'create') {
+            if (preset.aspectRatio) setAspectRatio(preset.aspectRatio);
+            if (preset.basePrompt) {
+                ignoreNextPromptUpdate.current = true;
+                insertAtCursor(createPromptRef.current, preset.basePrompt, generatedPrompt, setGeneratedPrompt);
+            }
+        } else if (activeTab === 'edit') {
+            if (preset.basePrompt) {
+                insertAtCursor(editPromptRef.current, preset.basePrompt, refinePrompt, setRefinePrompt);
+            }
+        } else if (activeTab === 'animate') {
+            if (preset.basePrompt) {
+                insertAtCursor(animatePromptRef.current, preset.basePrompt, i2vPrompt, setI2VPrompt);
+            }
+            if (preset.aspectRatio && preset.aspectRatio !== 'auto') {
+                setI2vAspectRatio(preset.aspectRatio);
+            }
+        }
+        setIsPresetsOpen(false);
+    };
+
+    const handleDeletePreset = async (id: string) => {
+        await dbService.deletePreset(id);
+        setPresets(prev => prev.filter(p => p.id !== id));
+    };
+
+    // --- RECALL POST ---
+    // --- RECALL POST ---
+    const handleRecallPost = (post: SavedPost) => {
+        // Correctly set "Create" tab state
+        setSelectedThemeId(post.themeId);
+        setCaptionType(post.captionType || 'A'); // Default to A if missing
+
+        // Tone/Platform are derived or not explicit in saved post, leaving defaulting logic.
+
+        setTopic(post.topic);
+        setSpecificVisuals(post.visuals);
+        setSpecificOutfit(post.outfit);
+
+        // Populate generated content if available, so user sees result immediately
+        setGeneratedCaption(post.caption);
+        setGeneratedPrompt(post.prompt);
+
+        // Ensure manual mode is respected if it was custom
+        if (post.themeId === 'CUSTOM') {
+            // Logic for custom theme is handled by selectedThemeId === 'CUSTOM'
+        }
+
+        // Prevent auto-overwrite of prompt by useEffect on mount/change if we have a saved prompt
+        if (post.prompt) {
+            ignoreNextPromptUpdate.current = true;
+        }
+
+        setActiveTab('create');
+    };
+
+    const handleRecall = (item: DBGenerationHistory) => {
+        const isEditModel = item.model.includes('edit') || item.model.includes('replace') || item.model.includes('move');
+        const targetTab = item.tab || (item.inputImageUrl ? (item.type === 'video' ? (isEditModel ? 'edit' : 'animate') : 'edit') : 'create');
+
+        if (targetTab === 'animate') {
+            setActiveTab('animate');
+            setI2VPrompt(item.prompt);
+            setSelectedModel(item.model);
+            if (item.videoResolution) setVideoResolution(item.videoResolution);
+            if (item.videoDuration) setVideoDuration(item.videoDuration);
+            if (item.aspectRatio) setI2vAspectRatio(item.aspectRatio);
+            if (item.withAudio !== undefined) setWithAudio(item.withAudio);
+            if (item.cameraFixed !== undefined) setCameraFixed(item.cameraFixed);
+
+            if (item.inputImageUrl) {
+                setI2VTarget({ url: item.inputImageUrl, index: -1 });
+            }
+        } else if (targetTab === 'edit') {
+            setActiveTab('edit');
+            setRefinePrompt(item.prompt);
+            setEditSelectedModel(item.model);
+            if (item.imageSize) setRefineImageSize(item.imageSize);
+            if (item.numImages) setRefineNumImages(item.numImages);
+            setRefineResultUrls([]); // Clear old results
+            if (item.inputImageUrl) {
+                setRefineTarget({ url: item.inputImageUrl, index: -1 });
+            }
+        } else {
+            // Default to Create Tab
+            setActiveTab('create');
+            setGeneratedPrompt(item.prompt);
+            setSelectedModel(item.model);
+            if (item.aspectRatio) setAspectRatio(item.aspectRatio);
+            if (item.imageSize) setCreateImageSize(item.imageSize);
+            if (item.numImages) setCreateNumImages(item.numImages);
+            if (item.themeId) setSelectedThemeId(item.themeId);
+
+            if (item.topic) setTopic(item.topic);
+            if (item.visuals) setSpecificVisuals(item.visuals);
+            if (item.outfit) setSpecificOutfit(item.outfit);
+
+            if (item.prompt) {
+                ignoreNextPromptUpdate.current = true;
+            }
+        }
+    };
+
+    const handleImportReferences = async () => {
+        if (!confirm("Import 'GenReference' images into Post Library?")) return;
+        try {
+            const res = await fetch('/references.json');
+            if (!res.ok) throw new Error("References file not found. Please ask admin to run 'process-references' script.");
+            const refs: SavedPost[] = await res.json();
+            if (refs.length === 0) return alert("No references found in catalog.");
+            if (!confirm(`Found ${refs.length} reference images. Import them now?`)) return;
+            let count = 0;
+            for (const item of refs) {
+                await dbService.savePost(item);
+                count++;
+            }
+            const newCount = await dbService.getPostsCount();
+            setTotalSavedCount(newCount);
+            const batch = await dbService.getRecentPostsBatch(24, 0);
+            setSavedPosts(batch);
+            alert(`Successfully imported ${count} references!`);
+        } catch (e: any) { console.error(e); alert("Import failed: " + e.message); }
+    };
+
+    const handleImportIGArchive = async () => {
+        if (!confirm("Import Instagram Archive?")) return;
+        try {
+            const manifestRes = await fetch('/ig_archive_manifest.json');
+            if (!manifestRes.ok) throw new Error("Manifest not found.");
+            const manifest = await manifestRes.json();
+            const { totalChunks, totalPosts } = manifest;
+            if (totalPosts === 0) return alert("Archive is empty.");
+            if (!confirm(`Found ${totalPosts} posts. Import?`)) return;
+
+            let count = 0;
+            for (let i = 0; i < totalChunks; i++) {
+                try {
+                    const res = await fetch(`/ig_archive_${i}.json`);
+                    if (!res.ok) continue;
+                    const chunk: SavedPost[] = await res.json();
+                    for (const post of chunk) {
+                        await dbService.savePost(post);
+                        count++;
+                    }
+                } catch (err) { console.error(err); }
+            }
+            const newCount = await dbService.getPostsCount();
+            setTotalSavedCount(newCount);
+            const batch = await dbService.getRecentPostsBatch(24, 0);
+            setSavedPosts(batch);
+            alert(`Successfully imported ${count} posts!`);
+        } catch (e: any) { console.error(e); alert("Import failed: " + e.message); }
+    };
+
+    const handleRefineEntry = (url: string, index: number) => {
+        setRefineTarget({ url, index });
+        setMediaType('image');
+        setRefinePrompt("");
+        setRefineResultUrls([]);
+        setActiveTab('edit');
+    };
+
+    const handleI2VEntry = (url: string, index: number) => {
+        setI2VTarget({ url, index });
+        setI2VPrompt("");
+        setI2VResultUrl(null);
+        setMediaType('video');
+        setActiveTab('animate');
+    };
+
+    const handleSaveToAssets = async (url: string, type: 'image' | 'video', name?: string) => {
+        try {
+            let base64 = url;
+            if (!url.startsWith('data:')) {
+                const res = await fetch(url);
+                const blob = await res.blob();
+                base64 = await new Promise<string>(r => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => r(reader.result as string);
+                    reader.readAsDataURL(blob);
+                });
+            }
+
+            // Check if already exists (Efficiently)
+            const exists = await dbService.findAssetByBase64(base64);
+            if (exists) {
+                if (!confirm("This image is already in your Asset Library. Save another copy?")) {
+                    return;
+                }
+            }
+
+            const newAsset: Asset = {
+                id: generateUUID(),
+                name: name || `Saved ${type} ${new Date().toLocaleString()}`,
+                type: type, // Keep as 'image' or 'video' for general library
+                base64: base64,
+                folderId: null,
+                timestamp: Date.now(),
+                selected: false // Do NOT automatically select as a prompt reference
+            };
+
+            await dbService.saveAsset(newAsset);
+            // Do NOT update setAssets(prev => [...]) here.
+            // Generative results saved to the library should not become prompt references.
+            alert("Saved to Asset Library!");
+        } catch (err) {
+            console.error("Save to assets failed:", err);
+            alert("Failed to save asset.");
+        }
+    };
+
+    const handleDownload = async (url: string, prefix: string = 'simple') => {
+        try {
+            const isVideo = url.startsWith('data:video') || (() => {
+                const clean = url.split('?')[0].split('#')[0].toLowerCase();
+                return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+            })();
+            const extension = isVideo ? 'mp4' : 'png';
+            const filename = `${prefix}_${Date.now()}.${extension}`;
+
+            let blob: Blob;
+            if (url.startsWith('data:')) {
+                const parts = url.split(',');
+                const mime = parts[0].match(/:(.*?);/)![1];
+                const bstr = atob(parts[1]);
+                let n = bstr.length;
+                const u8arr = new Uint8Array(n);
+                while (n--) {
+                    u8arr[n] = bstr.charCodeAt(n);
+                }
+                blob = new Blob([u8arr], { type: mime });
+            } else {
+                const response = await fetch(url);
+                blob = await response.blob();
+            }
+
+            const file = new File([blob], filename, { type: blob.type });
+
+            // Using Mobile Share API for native "Save to Photos" support
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Save to Photos',
+                    });
+                    return;
+                } catch (shareErr) {
+                    console.log("Share cancelled or failed, falling back to traditional download", shareErr);
+                }
+            }
+
+            // Fallback for desktop/unsupported browsers
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
+        } catch (err) {
+            console.error("Download failed:", err);
+            // Universal fallback
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'simple_media';
+            a.target = "_blank";
+            a.click();
+        }
+    };
+
+    const handleApproveRefinement = (action: 'replace' | 'add', url?: string) => {
+        const targetUrl = url || (refineResultUrls.length > 0 ? refineResultUrls[0] : null);
+        if (!targetUrl) return;
+
+        if (action === 'replace' && refineTarget && refineTarget.index !== -1) {
+            setGeneratedMediaUrls(prev => {
+                const next = [...prev];
+                next[refineTarget.index] = targetUrl;
+                return next;
+            });
+        } else {
+            setGeneratedMediaUrls(prev => [...prev, targetUrl]);
+        }
+        setRefineTarget(null);
+        setRefineResultUrls([]);
+        setActiveTab('create');
+    };
+
+
+    // --- RENDER ---
+    return (
+        <div className="h-screen w-full bg-[#050505] text-white font-sans selection:bg-emerald-500/30 selection:text-emerald-100 flex flex-col overflow-hidden">
+            <CreatorHeader
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                savedCount={totalSavedCount}
+            />
+
+            <div className="flex-1 overflow-y-auto pt-16 md:pt-20 pb-24 md:pb-10 scroll-smooth">
+                {activeTab === 'create' && (
+                    <CreateTab
+                        visualsImage={visualsImage}
+                        outfitImage={outfitImage}
+                        promptRef={createPromptRef}
+                        themes={themes}
+                        captionStyles={captionStyles}
+                        selectedThemeId={selectedThemeId}
+                        setSelectedThemeId={(val) => { setSelectedThemeId(val); persistParam('selectedThemeId', val); }}
+                        customTheme={customTheme}
+                        setCustomTheme={setCustomTheme}
+                        specificVisuals={specificVisuals}
+                        setSpecificVisuals={setSpecificVisuals}
+                        specificOutfit={specificOutfit}
+                        setSpecificOutfit={setSpecificOutfit}
+                        assets={assets}
+                        onAssetsAdd={handleAssetsAdd}
+                        onAssetRemove={handleAssetRemove}
+                        onAssetToggle={handleAssetToggle}
+                        handleInputImageUpload={handleInputImageUpload}
+                        generatedPrompt={generatedPrompt}
+                        setGeneratedPrompt={setGeneratedPrompt}
+                        selectedModel={selectedModel}
+                        setSelectedModel={(val) => { setSelectedModel(val); persistParam('selectedModel', val); }}
+                        mediaType={mediaType}
+                        onGenerateCaptionOnly={handleGenerateCaption}
+                        setMediaType={(val) => { setMediaType(val as 'image' | 'video'); persistParam('mediaType', val); }}
+                        aspectRatio={aspectRatio}
+                        setAspectRatio={(val) => { setAspectRatio(val); persistParam('aspectRatio', val); }}
+                        createImageSize={createImageSize}
+                        setCreateImageSize={(val) => { setCreateImageSize(val); persistParam('createImageSize', val); }}
+                        createNumImages={createNumImages}
+                        setCreateNumImages={(val) => { setCreateNumImages(val); persistParam('createNumImages', val); }}
+                        videoResolution={videoResolution}
+                        setVideoResolution={(val) => { setVideoResolution(val); persistParam('videoResolution', val); }}
+                        videoDuration={videoDuration}
+                        setVideoDuration={(val) => { setVideoDuration(val); persistParam('videoDuration', val); }}
+                        topic={topic}
+                        setTopic={setTopic}
+                        captionType={captionType}
+                        setCaptionType={(val) => { setCaptionType(val); persistParam('captionType', val); }}
+                        generatedCaption={generatedCaption}
+                        setGeneratedCaption={setGeneratedCaption}
+                        isDreaming={isDreaming}
+                        handleDreamConcept={handleDreamConcept}
+                        handleGenerateContent={handleGenerateContent}
+                        isGeneratingMedia={isGeneratingMedia}
+                        isGeneratingCaption={isGeneratingCaption}
+                        handleGenerateRandomPost={handleGenerateRandomPost}
+                        generatedMediaUrls={generatedMediaUrls}
+                        handleRefineEntry={handleRefineEntry}
+                        handleI2VEntry={handleI2VEntry}
+                        onRemoveMedia={(index) => {
+                            setGeneratedMediaUrls(prev => prev.filter((_, i) => i !== index));
+                        }}
+                        onRerollMedia={async (index) => {
+                            // Reroll logic similar to generate but for single item and replacement
+                            const promptOverride = generatedPrompt;
+                            if (!promptOverride) return;
+
+                            // Determine if using Fal or Gemini (reuse logic from handleGenerateMedia)
+                            const isFalModel = selectedModel.includes('grok') || selectedModel.includes('seedream') || selectedModel.includes('seedance') || selectedModel.includes('wan');
+
+                            // Prepare assets part
+                            const selectedImages = assets.filter(a => a.selected && (a.type === 'image' || a.type === 'face_reference'));
+                            let finalPrompt = promptOverride;
+                            const contentParts: any[] = [];
+                            if (selectedImages.length > 0) {
+                                const faceInstruction = `Generate a portrait consistent with the character identity in the attached reference images. Maintain the subject's unique facial features and attributes while implementing the following scene:`;
+                                finalPrompt = `${faceInstruction} ${promptOverride}`;
+                                selectedImages.forEach(img => {
+                                    const mimeType = img.base64.split(';')[0].split(':')[1] || "image/jpeg";
+                                    contentParts.push({
+                                        inlineData: { mimeType, data: img.base64.split(',')[1] }
+                                    });
+                                });
+                            }
+
+                            // Indicate loading state for specific item? 
+                            // For simplicity, use global loading or we'd need a map of loading indices.
+                            // Using global isGeneratingMedia is safest for now to block other actions.
+                            setIsGeneratingMedia(true);
+
+                            try {
+                                let newUrl: string[] | null = null;
+
+                                if (isFalModel) {
+                                    const request: FalGenerationRequest = {
+                                        model: selectedModel,
+                                        prompt: finalPrompt,
+                                        aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
+                                        contentParts: contentParts,
+                                        videoConfig: mediaType === 'video' ? {
+                                            resolution: videoResolution,
+                                            durationSeconds: videoDuration.replace('s', ''),
+                                            withAudio,
+                                            cameraFixed
+                                        } : undefined,
+                                        editConfig: {
+                                            imageSize: createImageSize,
+                                            numImages: 1, // Force 1 for reroll
+                                            enableSafety
+                                        }
+                                    };
+                                    newUrl = await falService.generateMedia(request);
+                                } else {
+                                    // Gemini / Veo
+                                    const request: GenerationRequest = {
+                                        type: mediaType,
+                                        prompt: finalPrompt,
+                                        model: selectedModel,
+                                        aspectRatio: mediaType === 'video' ? i2vAspectRatio : aspectRatio,
+                                        contentParts: contentParts,
+                                        videoConfig: mediaType === 'video' ? {
+                                            resolution: videoResolution,
+                                            durationSeconds: videoDuration.replace('s', ''),
+                                            withAudio: false
+                                        } : undefined,
+                                        editConfig: {
+                                            imageSize: createImageSize,
+                                            numImages: 1
+                                        }
+                                    };
+                                    newUrl = await geminiService.generateMedia(request);
+                                }
+
+                                if (newUrl && newUrl.length > 0) {
+                                    setGeneratedMediaUrls(prev => {
+                                        const next = [...prev];
+                                        next[index] = newUrl![0]; // Take first from reroll
+                                        return next;
+                                    });
+                                }
+
+                            } catch (e) {
+                                console.error("Reroll failed", e);
+                                alert("Reroll failed.");
+                            } finally {
+                                setIsGeneratingMedia(false);
+                            }
+                        }}
+                        onSaveToAssets={handleSaveToAssets}
+                        handleCopy={(t) => navigator.clipboard.writeText(t)}
+                        handleSavePost={handleSavePost}
+                        isSaving={false} // Can add loading state for saving later if needed
+                        showSaveForm={showSaveForm}
+                        setShowSaveForm={setShowSaveForm}
+                        loras={loras}
+                        setLoras={setLoras}
+                        onLoRAUpload={async (file: File) => {
+                            try {
+                                const url = await falService.uploadFile(file);
+                                setLoras(prev => [...prev, { path: url, scale: 1.0 }]);
+                            } catch (e) {
+                                console.error("LoRA Upload Failed", e);
+                                alert("Failed to upload LoRA");
+                            }
+                        }}
+                        presetsDropdown={
+                            <PresetsDropdown
+                                isOpen={isPresetsOpen}
+                                setIsOpen={setIsPresetsOpen}
+                                showSaveForm={showSaveForm}
+                                setShowSaveForm={setShowSaveForm}
+                                currentPostData={{}}
+                                onSavePost={handleSavePreset}
+                                onLoadPreset={handleLoadPreset}
+                                presetsList={presets}
+                                onDeletePreset={handleDeletePreset}
+                                direction="up"
+                                tab="create"
+                            />
+                        }
+                        onPreview={(url) => setPreviewContext({ urls: generatedMediaUrls, index: generatedMediaUrls.indexOf(url) })}
+                        onDownload={handleDownload}
+                        onUploadToPost={(files: FileList | null) => {
+                            if (!files) return;
+                            Array.from(files).forEach(file => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                    if (reader.result) {
+                                        setGeneratedMediaUrls(prev => [...prev, reader.result as string]);
+                                    }
+                                };
+                                reader.readAsDataURL(file);
+                            });
+                        }}
+                        apiKeys={apiKeys}
+                    />
+                )}
+
+                {activeTab === 'posts' && (
+                    <PostsTab
+                        savedPosts={savedPosts}
+                        searchResults={searchResults}
+                        totalSavedCount={totalSavedCount}
+                        searchQuery={searchQuery}
+                        isSearching={isSearching}
+                        sortOrder={sortOrder}
+                        onSearchChange={setSearchQuery}
+                        onSortChange={setSortOrder}
+                        onLoadPost={(post) => {
+                            setTopic(post.topic);
+                            setGeneratedCaption(post.caption);
+                            setCaptionType(post.captionType);
+                            setGeneratedMediaUrls(post.mediaUrls);
+                            setMediaType(post.mediaType);
+                            setSelectedThemeId(post.themeId);
+                            setSpecificVisuals(post.visuals);
+                            setSpecificOutfit(post.outfit);
+                            setGeneratedPrompt(post.prompt);
+                            setActiveTab('create');
+                        }}
+                        onRecall={handleRecallPost}
+                        onDeletePost={async (id, silent = false) => {
+                            if (!silent && !confirm("Delete this post?")) return;
+                            await dbService.deletePost(id);
+                            setSavedPosts(prev => prev.filter(p => p.id !== id));
+                            setTotalSavedCount(prev => prev - 1);
+                        }}
+                        onImportReferences={handleImportReferences}
+                        onImportIGArchive={handleImportIGArchive}
+                        onLoadMore={async () => {
+                            if (isLoadingMore || searchQuery) return;
+                            setIsLoadingMore(true);
+                            try {
+                                const nextBatch = await dbService.getRecentPostsBatch(24, savedPosts.length, sortOrder);
+                                if (nextBatch.length > 0) {
+                                    setSavedPosts(prev => [...prev, ...nextBatch]);
+                                }
+                            } catch (e) { console.error(e); } finally { setIsLoadingMore(false); }
+                        }}
+
+                        onPreview={(url, urls) => handleOpenPreview(url, urls)}
+                    />
+                )}
+
+
+
+                {activeTab === 'edit' && (
+                    <EditTab
+                        promptRef={editPromptRef}
+                        refineTarget={refineTarget}
+                        setRefineTarget={setRefineTarget}
+                        refinePrompt={refinePrompt}
+                        setRefinePrompt={setRefinePrompt}
+                        refineImageSize={refineImageSize}
+                        setRefineImageSize={(val) => { setRefineImageSize(val); persistParam('refineImageSize', val); }}
+                        refineNumImages={refineNumImages}
+                        setRefineNumImages={(val) => { setRefineNumImages(val); persistParam('refineNumImages', val); }}
+                        selectedModel={editSelectedModel}
+                        setSelectedModel={(val) => { setEditSelectedModel(val); persistParam('editSelectedModel', val); }}
+                        refineAdditionalImages={refineAdditionalImages}
+                        setRefineAdditionalImages={setRefineAdditionalImages}
+                        refineResultUrls={refineResultUrls}
+                        setRefineResultUrls={setRefineResultUrls}
+                        isRefining={isRefining}
+                        refineProgress={refineProgress}
+                        onRefineSubmit={async () => {
+                            if (!refineTarget || !refinePrompt) return;
+                            setIsRefining(true);
+                            setRefineProgress(10); // Start progress
+
+                            const isVideo = (() => {
+                                const url = refineTarget?.url || '';
+                                if (url.startsWith('data:video')) return true;
+                                const clean = url.split('?')[0].split('#')[0].toLowerCase();
+                                return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+                            })();
+
+                            const historyId = generateUUID();
+                            const baseHistoryEntry: DBGenerationHistory = {
+                                id: historyId,
+                                timestamp: Date.now(),
+                                type: isVideo ? 'video' : 'image',
+                                prompt: refinePrompt,
+                                model: editSelectedModel,
+                                mediaUrls: [],
+                                service: (editSelectedModel.includes('grok') || editSelectedModel.includes('seedream') || isVideo) ? 'fal' : 'gemini',
+                                status: 'pending',
+                                inputImageUrl: refineTarget?.url,
+                                imageSize: refineImageSize,
+                                numImages: refineNumImages,
+                                tab: 'edit'
+                            };
+                            try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { console.error(e); }
+
+                            try {
+                                const urlToBase64 = async (url: string) => {
+                                    if (url.startsWith('data:')) return url.split(',')[1];
+                                    const res = await fetch(url);
+                                    const blob = await res.blob();
+                                    return new Promise<string>(r => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => r((reader.result as string).split(',')[1]);
+                                        reader.readAsDataURL(blob);
+                                    });
+                                };
+
+                                let urlUrls: string[] = [];
+
+                                if (isVideo) {
+                                    // VIDEO EDIT FLOW
+                                    let videoUrl = refineTarget.url;
+                                    if (videoUrl.startsWith('data:') || videoUrl.startsWith('blob:')) {
+                                        const blob = await (await fetch(videoUrl)).blob();
+                                        videoUrl = await falService.uploadFile(blob);
+                                    }
+                                    setRefineProgress(30);
+
+                                    const req: FalGenerationRequest = {
+                                        model: editSelectedModel,
+                                        prompt: refinePrompt,
+                                        video_url: videoUrl,
+                                        editConfig: { enableSafety: false },
+                                        onEnqueue: async (requestId, endpoint) => {
+                                            baseHistoryEntry.requestId = requestId;
+                                            baseHistoryEntry.falEndpoint = endpoint;
+                                            try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { }
+                                        }
+                                    };
+
+                                    if (editSelectedModel.includes('move') || editSelectedModel.includes('replace')) {
+                                        if (refineAdditionalImages.length > 0) {
+                                            let imgUrl = refineAdditionalImages[0].base64;
+                                            if (imgUrl.startsWith('data:')) {
+                                                imgUrl = await falService.uploadBase64ToFal(imgUrl.split(',')[1]);
+                                            }
+                                            req.image_url = imgUrl;
+                                        } else {
+                                            alert("Subject image required for this model.");
+                                            setIsRefining(false);
+                                            return;
+                                        }
+                                    }
+                                    const results = await falService.generateMedia(req);
+                                    urlUrls = results;
+                                } else {
+                                    // IMAGE EDIT FLOW
+                                    const base64 = await urlToBase64(refineTarget.url);
+                                    const baseMime = refineTarget.url.split(';')[0].split(':')[1] || "image/jpeg";
+                                    const contentParts: any[] = [{ inlineData: { mimeType: baseMime, data: base64 } }];
+                                    refineAdditionalImages.forEach(img => {
+                                        const refMime = img.base64.split(';')[0].split(':')[1] || "image/jpeg";
+                                        contentParts.push({ inlineData: { mimeType: refMime, data: img.base64.split(',')[1] } });
+                                    });
+                                    setRefineProgress(40);
+
+                                    if (editSelectedModel.includes('grok') || editSelectedModel.includes('seedream') || editSelectedModel.includes('wan') || editSelectedModel.includes('fal')) {
+                                        const req: FalGenerationRequest = {
+                                            model: editSelectedModel,
+                                            prompt: refinePrompt,
+                                            contentParts,
+                                            editConfig: {
+                                                imageSize: refineImageSize,
+                                                numImages: refineNumImages,
+                                                enableSafety: false
+                                            },
+                                            onEnqueue: async (requestId, endpoint) => {
+                                                baseHistoryEntry.requestId = requestId;
+                                                baseHistoryEntry.falEndpoint = endpoint;
+                                                try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { }
+                                            }
+                                        };
+                                        const results = await falService.generateMedia(req);
+                                        urlUrls = results;
+                                    } else {
+                                        const req: GenerationRequest = {
+                                            type: 'edit',
+                                            prompt: refinePrompt,
+                                            model: editSelectedModel,
+                                            aspectRatio,
+                                            contentParts,
+                                            editConfig: {
+                                                imageSize: refineImageSize,
+                                                numImages: refineNumImages
+                                            }
+                                        };
+                                        const results = await geminiService.generateMedia(req);
+                                        urlUrls = results;
+                                    }
+                                }
+
+                                if (urlUrls.length > 0) {
+                                    setRefineResultUrls(urlUrls);
+                                    setRefineProgress(100);
+                                    try {
+                                        await dbService.saveGenerationHistory({
+                                            ...baseHistoryEntry,
+                                            mediaUrls: urlUrls,
+                                            status: 'success'
+                                        });
+                                    } catch (err) { console.error("Failed to save history:", err); }
+                                }
+                            } catch (e: any) {
+                                console.error(e);
+                                alert("Refinement failed");
+                                try {
+                                    await dbService.saveGenerationHistory({
+                                        ...baseHistoryEntry,
+                                        status: 'failed',
+                                        errorMessage: e?.message || 'Unknown error'
+                                    });
+                                } catch (err) { }
+                            } finally {
+                                setIsRefining(false);
+                                setRefineProgress(0);
+                            }
+                        }}
+                        onApproveRefinement={(action, url) => {
+                            // If url provided, approve that specific one, otherwise approve all?
+                            // Standard behavior: if 1 result, just do it. If multiple, maybe we need selection.
+                            // For simplicity, let's map action to the primary result or all
+                            const itemsToApprove = url ? [url] : refineResultUrls;
+
+                            itemsToApprove.forEach(u => {
+                                if (action === 'replace') {
+                                    handleApproveRefinement('replace', u);
+                                } else {
+                                    handleApproveRefinement('add', u);
+                                }
+                            });
+                        }}
+                        onExit={() => setActiveTab('create')}
+                        onI2VEntry={(url) => handleI2VEntry(url, -1)}
+                        apiKeys={apiKeys}
+                        presetsDropdown={
+                            <PresetsDropdown
+                                isOpen={isPresetsOpen}
+                                setIsOpen={setIsPresetsOpen}
+                                showSaveForm={showSaveForm}
+                                setShowSaveForm={setShowSaveForm}
+                                currentPostData={{}}
+                                onSavePost={handleSavePreset}
+                                onLoadPreset={handleLoadPreset}
+                                presetsList={presets}
+                                onDeletePreset={handleDeletePreset}
+                                direction="down"
+                                tab={activeTab === 'edit' ? 'edit' : 'animate'}
+                            />
+                        }
+                        onSaveToAssets={handleSaveToAssets}
+                        onPreview={(url) => handleOpenPreview(url)}
+                        onDownload={handleDownload}
+                    />
+                )}
+
+                {activeTab === 'animate' && (
+                    <AnimateTab
+                        promptRef={animatePromptRef}
+                        i2vTarget={i2vTarget}
+                        setI2VTarget={setI2VTarget}
+                        i2vPrompt={i2vPrompt}
+                        setI2VPrompt={setI2VPrompt}
+                        i2vAspectRatio={i2vAspectRatio}
+                        setI2VAspectRatio={(val) => { setI2vAspectRatio(val); persistParam('i2vAspectRatio', val); }}
+                        videoDuration={videoDuration}
+                        setVideoDuration={(val) => { setVideoDuration(val); persistParam('videoDuration', val); }}
+                        videoResolution={videoResolution}
+                        setVideoResolution={(val) => { setVideoResolution(val); persistParam('videoResolution', val); }}
+                        selectedModel={selectedModel}
+                        setSelectedModel={(val) => { setSelectedModel(val); persistParam('selectedModel', val); }}
+                        isGeneratingI2V={isGeneratingI2V}
+                        withAudio={withAudio}
+                        setWithAudio={(val) => { setWithAudio(val); persistParam('withAudio', val); }}
+                        cameraFixed={cameraFixed}
+                        setCameraFixed={(val) => { setCameraFixed(val); persistParam('cameraFixed', val); }}
+                        loras={loras}
+                        setLoras={setLoras}
+                        onLoRAUpload={async (file: File) => {
+                            try {
+                                const url = await falService.uploadFile(file);
+                                setLoras(prev => [...prev, { path: url, scale: 1.0 }]);
+                            } catch (e) {
+                                console.error("LoRA Upload Failed", e);
+                                alert("Failed to upload LoRA");
+                            }
+                        }}
+
+                        onGenerateI2V={async () => {
+                            if (!i2vTarget || !i2vPrompt) return;
+                            setIsGeneratingI2V(true);
+
+                            const historyId = generateUUID();
+                            const baseHistoryEntry: DBGenerationHistory = {
+                                id: historyId,
+                                timestamp: Date.now(),
+                                type: 'video',
+                                prompt: i2vPrompt,
+                                model: selectedModel,
+                                mediaUrls: [],
+                                service: (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) ? 'fal' : 'gemini',
+                                status: 'pending',
+                                inputImageUrl: i2vTarget?.url,
+                                videoResolution: videoResolution,
+                                videoDuration: videoDuration,
+                                aspectRatio: i2vAspectRatio,
+                                withAudio: withAudio,
+                                cameraFixed: cameraFixed,
+                                tab: 'animate'
+                            };
+                            try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { console.error(e); }
+
+                            try {
+                                const urlToBase64 = async (url: string) => {
+                                    if (url.startsWith('data:')) return url.split(',')[1];
+                                    const res = await fetch(url);
+                                    const blob = await res.blob();
+                                    return new Promise<string>(r => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => r((reader.result as string).split(',')[1]);
+                                        reader.readAsDataURL(blob);
+                                    });
+                                };
+                                const base64 = await urlToBase64(i2vTarget.url);
+                                const sourceMime = i2vTarget.url.split(';')[0].split(':')[1] || "image/jpeg";
+                                const contentParts = [{ inlineData: { mimeType: sourceMime, data: base64 } }];
+
+                                let url = "";
+                                if (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) {
+                                    // Fal Service
+                                    const req: FalGenerationRequest = {
+                                        model: selectedModel,
+                                        prompt: i2vPrompt,
+                                        aspectRatio: i2vAspectRatio,
+                                        contentParts,
+                                        loras,
+                                        videoConfig: {
+                                            resolution: videoResolution,
+                                            durationSeconds: videoDuration.replace('s', ''),
+                                            withAudio,
+                                            cameraFixed
+                                        },
+                                        editConfig: {
+                                            enableSafety: false
+                                        },
+                                        onEnqueue: async (requestId, endpoint) => {
+                                            baseHistoryEntry.requestId = requestId;
+                                            baseHistoryEntry.falEndpoint = endpoint;
+                                            try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { }
+                                        }
+                                    };
+                                    const results = await falService.generateMedia(req);
+                                    url = results[0];
+                                } else {
+                                    // Gemini / Veo Service
+                                    const req: GenerationRequest = {
+                                        type: 'video',
+                                        prompt: i2vPrompt,
+                                        model: selectedModel,
+                                        aspectRatio: i2vAspectRatio,
+                                        videoConfig: {
+                                            resolution: videoResolution,
+                                            durationSeconds: videoDuration.replace('s', ''),
+                                            withAudio: false
+                                        },
+                                        contentParts
+                                    };
+                                    const results = await geminiService.generateMedia(req);
+                                    url = results[0];
+                                }
+
+                                if (url) {
+                                    setI2VResultUrl(url);
+                                    // Save to History
+                                    try {
+                                        await dbService.saveGenerationHistory({
+                                            ...baseHistoryEntry,
+                                            mediaUrls: [url],
+                                            status: 'success'
+                                        });
+                                    } catch (err) { console.error("Failed to save history:", err); }
+                                }
+                            } catch (e: any) {
+                                console.error(e);
+                                alert(`Video gen failed: ${e.message || e}`);
+                                try {
+                                    await dbService.saveGenerationHistory({
+                                        ...baseHistoryEntry,
+                                        status: 'failed',
+                                        errorMessage: e?.message || 'Unknown error'
+                                    });
+                                } catch (err) { }
+                            } finally { setIsGeneratingI2V(false); }
+                        }}
+                        generatedI2VUrl={i2vResultUrl}
+                        onExit={() => setActiveTab('create')}
+                        onApproveI2V={() => {
+                            if (!i2vResultUrl) return;
+                            // Always add as new item, preserve original
+                            setGeneratedMediaUrls(prev => [...prev, i2vResultUrl]);
+
+                            setI2VTarget(null);
+                            setI2VResultUrl(null);
+                            setActiveTab('create');
+                        }}
+                        onDiscardI2V={() => {
+                            setI2VResultUrl(null);
+                        }}
+                        presetsDropdown={
+                            <PresetsDropdown
+                                isOpen={isPresetsOpen}
+                                setIsOpen={setIsPresetsOpen}
+                                showSaveForm={showSaveForm}
+                                setShowSaveForm={setShowSaveForm}
+                                currentPostData={{}}
+                                onSavePost={handleSavePreset}
+                                onLoadPreset={handleLoadPreset}
+                                presetsList={presets}
+                                onDeletePreset={handleDeletePreset}
+                                direction="down"
+                                tab="animate"
+                            />
+                        }
+                        onSaveToAssets={handleSaveToAssets}
+                        onPreview={(url) => handleOpenPreview(url)}
+                        onDownload={handleDownload}
+                        apiKeys={apiKeys}
+                    />
+                )}
+
+                {activeTab === 'scripts' && <ScriptsTab />}
+                {activeTab === 'settings' && (
+                    <SettingsTab
+                        themes={themes}
+                        setThemes={persistThemes}
+                        captionStyles={captionStyles}
+                        setCaptionStyles={persistCaptionStyles}
+                        profile={profile}
+                        setProfile={persistProfile}
+                        apiKeys={apiKeys}
+                        onUpdateApiKeys={handleUpdateApiKeys}
+                        onExit={() => setActiveTab('create')}
+                    />
+                )}
+
+                {activeTab === 'assets' && (
+                    <AssetLibraryTab
+                        onPreview={(url) => handleOpenPreview(url)}
+                        onRecall={handleRecall}
+                    />
+                )}
+            </div>
+
+            {/* Mobile Bottom Navigation */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-white/10 z-[100] px-4 pb-safe-area">
+                <nav className="flex items-center justify-around h-16">
+                    <button
+                        onClick={() => setActiveTab('create')}
+                        className={`flex flex-col items-center gap-1 transition-all active-scale ${activeTab === 'create' ? 'text-emerald-400' : 'text-white/40'}`}
+                    >
+                        <PenTool className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Create</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('edit')}
+                        className={`flex flex-col items-center gap-1 transition-all active-scale ${activeTab === 'edit' ? 'text-emerald-400' : 'text-white/40'}`}
+                    >
+                        <Edit2 className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Refine</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('animate')}
+                        className={`flex flex-col items-center gap-1 transition-all active-scale ${activeTab === 'animate' ? 'text-emerald-400' : 'text-white/40'}`}
+                    >
+                        <Play className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Animate</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('posts')}
+                        className={`flex flex-col items-center gap-1 transition-all active-scale ${activeTab === 'posts' ? 'text-emerald-400' : 'text-white/40'}`}
+                    >
+                        <Archive className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Posts</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('assets')}
+                        className={`flex flex-col items-center gap-1 transition-all active-scale ${activeTab === 'assets' ? 'text-emerald-400' : 'text-white/40'}`}
+                    >
+                        <Folder className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Assets</span>
+                    </button>
+                </nav>
+            </div>
+
+            {/* Media Preview Modal */}
+            {previewContext && previewUrl && (
+                <div
+                    className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-2 md:p-12 animate-in fade-in duration-300"
+                    onClick={() => setPreviewContext(null)}
+                >
+                    {/* Close Button */}
+                    <button
+                        className="absolute top-4 right-4 md:top-6 md:right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white/60 hover:text-white transition-all border border-white/10 z-[1001]"
+                        onClick={() => setPreviewContext(null)}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                    </button>
+
+                    {/* Navigation Buttons */}
+                    {previewContext.urls.length > 1 && (
+                        <>
+                            <button
+                                className="absolute left-4 md:left-8 p-4 bg-white/5 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-all border border-white/5 z-[1001]"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewContext(prev => prev ? { ...prev, index: (prev.index - 1 + prev.urls.length) % prev.urls.length } : null);
+                                }}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                            </button>
+                            <button
+                                className="absolute right-4 md:right-8 p-4 bg-white/5 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-all border border-white/5 z-[1001]"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewContext(prev => prev ? { ...prev, index: (prev.index + 1) % prev.urls.length } : null);
+                                }}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                            </button>
+                        </>
+                    )}
+
+                    <div
+                        className="relative w-full h-full flex flex-col items-center justify-center"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex-1 flex items-center justify-center min-h-0 w-full relative">
+                            {(() => {
+                                if (previewUrl.startsWith('data:video')) return true;
+                                const clean = previewUrl.split('?')[0].split('#')[0].toLowerCase();
+                                return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+                            })() ? (
+                                <video
+                                    src={previewUrl}
+                                    controls
+                                    autoPlay
+                                    className="max-w-full max-h-full rounded-xl md:rounded-2xl shadow-2xl border border-white/10"
+                                />
+                            ) : (
+                                <ImageWithLoader
+                                    src={previewUrl}
+                                    alt="Full Preview"
+                                    className="max-w-full max-h-full object-contain shadow-2xl"
+                                />
+                            )}
+
+                            {/* Counter */}
+                            <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-[10px] font-mono tracking-widest text-white/60">
+                                {previewContext.index + 1} / {previewContext.urls.length}
+                            </div>
+                        </div>
+
+                        <div className="mt-6 shrink-0 flex flex-wrap justify-center gap-3 md:gap-4 pb-4 px-4 w-full">
+                            {!previewUrl.startsWith('data:video') && (
+                                <>
+                                    <button
+                                        onClick={() => {
+                                            handleRefineEntry(previewUrl, previewContext.index);
+                                            setPreviewContext(null);
+                                        }}
+                                        className="px-4 md:px-6 py-2 bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/50 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-white/80 transition-all flex items-center gap-2"
+                                    >
+                                        <Edit2 className="w-3 md:w-4 h-3 md:h-4 text-emerald-400" />
+                                        Refine
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            handleI2VEntry(previewUrl, previewContext.index);
+                                            setPreviewContext(null);
+                                        }}
+                                        className="px-4 md:px-6 py-2 bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/50 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-white/80 transition-all flex items-center gap-2"
+                                    >
+                                        <Play className="w-3 md:w-4 h-3 md:h-4 text-emerald-400" />
+                                        Animate
+                                    </button>
+                                </>
+                            )}
+
+                            <button
+                                onClick={() => handleDownload(previewUrl!, 'simple_preview')}
+                                className="px-4 md:px-6 py-2 bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/50 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-black transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+                                Download
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    const isVideo = previewUrl.startsWith('data:video') || (() => {
+                                        const clean = previewUrl.split('?')[0].split('#')[0].toLowerCase();
+                                        return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+                                    })();
+                                    handleSaveToAssets(previewUrl, isVideo ? 'video' : 'image');
+                                }}
+                                className="px-4 md:px-6 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest text-emerald-400 transition-all flex items-center gap-2"
+                            >
+                                <Archive className="w-3 md:w-4 h-3 md:h-4" />
+                                Save to Library
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
