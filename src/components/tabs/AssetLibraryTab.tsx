@@ -468,19 +468,20 @@ Tab: ${item.tab || 'N/A'}
         <div className="max-w-[1600px] mx-auto w-full p-4 md:p-8 pb-4 flex flex-col h-full bg-[#050505] min-h-0">
             <div className="flex flex-col gap-4 mb-6">
                 <div className="flex justify-between items-center gap-4">
-                    <div className="flex items-center gap-2 md:gap-4 shrink-0 overflow-hidden">
-                        <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 md:gap-4 overflow-x-auto no-scrollbar">
+                        <div className="flex items-center gap-2 md:gap-4 shrink-0">
                             <button
                                 onClick={() => setSubTab('saved')}
-                                className={`text-lg md:text-2xl font-bold font-serif transition-all ${subTab === 'saved' ? 'text-white/90' : 'text-white/40 hover:text-white/70'}`}
+                                className={`text-lg md:text-2xl font-bold font-serif transition-all whitespace-nowrap shrink-0 ${subTab === 'saved' ? 'text-white/90' : 'text-white/40 hover:text-white/70'}`}
                             >
                                 Saved Assets
                             </button>
-                            <div className="h-6 w-px bg-white/10" />
+                            <div className="h-6 w-px bg-white/10 shrink-0" />
                             <button
                                 onClick={() => setSubTab('history')}
-                                className={`text-lg md:text-2xl font-bold font-serif transition-all ${subTab === 'history' ? 'text-white/90' : 'text-white/40 hover:text-white/70'}`}
+                                className={`text-lg md:text-2xl font-bold font-serif transition-all whitespace-nowrap shrink-0 ${subTab === 'history' ? 'text-white/90' : 'text-white/40 hover:text-white/70'}`}
                             >
+                                Generation History
                             </button>
                         </div>
                         {subTab === 'history' && history.length > 0 && (
@@ -592,173 +593,78 @@ Tab: ${item.tab || 'N/A'}
                 </div>
             </div>
 
-            {subTab === 'saved' ? (
-                <div className="flex-1 overflow-y-auto min-h-0">
-                    {filteredFolders.length === 0 && filteredAssets.length === 0 ? (
-                        <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
-                            <ImageIcon className="w-12 h-12 mb-4 opacity-10" />
-                            <p className="font-serif italic text-white/40">
-                                {searchQuery ? 'No assets match your search' : (currentFolderId ? 'This folder is empty' : 'Your library is empty')}
-                            </p>
-                        </div>
-                    ) : (
-                        <div className={viewMode === 'grid' ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4" : "flex flex-col gap-1"}>
-                            {filteredFolders.map(folder => (
-                                <div
-                                    key={folder.id}
-                                    onClick={() => handleNavigate(folder)}
-                                    onDragOver={(e) => handleDragEnterTarget(e, folder.id)}
-                                    onDragLeave={handleDragLeaveTarget}
-                                    onDrop={(e) => handleDrop(e, folder.id)}
-                                    className={viewMode === 'grid'
-                                        ? `group relative flex flex-col items-center justify-center aspect-square p-4 bg-white/[0.02] border rounded-2xl cursor-pointer transition-all ${dragOverTarget === folder.id ? 'border-emerald-500 bg-emerald-500/20' : 'border-white/5 hover:bg-white/5'}`
-                                        : `group flex items-center gap-4 p-3 bg-white/[0.02] border-b border-white/5 cursor-pointer transition-all ${dragOverTarget === folder.id ? 'border-emerald-500 bg-emerald-500/10' : 'hover:bg-white/5'}`
-                                    }
-                                >
-                                    <div className="relative">
-                                        {(() => {
-                                            const IconComponent = {
-                                                'folder': FolderIcon, 'star': Star, 'heart': Heart, 'camera': Camera,
-                                                'video': FileVideo, 'music': Music, 'briefcase': Briefcase, 'home': Home
-                                            }[folder.icon || 'folder'] || FolderIcon;
-                                            return <IconComponent className={viewMode === 'grid' ? "w-12 h-12 mb-3 text-emerald-500/60 group-hover:scale-110 transition-all" : "w-5 h-5 text-emerald-500/60"} style={folder.color ? { color: folder.color } : {}} />;
-                                        })()}
-                                    </div>
-                                    <span className={viewMode === 'grid' ? "text-[10px] md:text-xs font-bold text-white/50 group-hover:text-white uppercase tracking-widest text-center truncate w-full mt-4" : "text-sm text-white/70 flex-1 truncate"}>
-                                        {folder.name}
-                                    </span>
-                                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={(e) => { e.stopPropagation(); openEditFolder(folder); }} className="p-1.5 hover:bg-white/10 text-white/40 hover:text-white rounded-lg"><Edit3 className="w-3 h-3" /></button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id, folder.name); }} className="p-1.5 hover:bg-red-500/10 text-white/40 hover:text-red-500 rounded-lg"><Trash2 className="w-3 h-3" /></button>
-                                    </div>
-                                </div>
-                            ))}
-                            {filteredAssets.map(asset => (
-                                <div key={asset.id} draggable onDragStart={(e) => handleDragStart(e, asset.id)} className={viewMode === 'grid' ? "group relative aspect-square bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden hover:border-emerald-500/30 transition-all cursor-grab active:cursor-grabbing" : "group flex items-center gap-4 p-2 bg-white/[0.02] border-b border-white/5 hover:bg-white/5 transition-all cursor-grab"}>
-                                    {viewMode === 'grid' ? (
-                                        <>
-                                            {asset.type === 'video' ? <video src={asset.base64} className="w-full h-full object-cover opacity-60 group-hover:opacity-100" muted onClick={() => onPreview(asset.base64)} /> : asset.type === 'lora' ? <div className="w-full h-full flex flex-col items-center justify-center p-4" onClick={() => { navigator.clipboard.writeText(asset.base64); alert("Copied!"); }}><Layers className="w-12 h-12 mb-2 text-emerald-400 opacity-50" /><div className="text-[9px] uppercase tracking-widest text-emerald-400">Copy LoRA</div></div> : <img src={asset.base64} className="w-full h-full object-cover opacity-60 group-hover:opacity-100" onClick={() => onPreview(asset.base64)} />}
-                                            <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
-                                                <p className="text-[9px] text-white/90 truncate font-mono">{asset.name}</p>
-                                            </div>
-                                            <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => handleDeleteAsset(asset.id)} className="p-2 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
-                                                <button onClick={() => handleDownloadAsset(asset.base64, asset.name)} className="p-2 bg-white/10 text-white/60 hover:text-white rounded-xl"><Download className="w-3.5 h-3.5" /></button>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-black shrink-0 border border-white/5">
-                                                {asset.type === 'video' ? <video src={asset.base64} className="w-full h-full object-cover" /> : asset.type === 'lora' ? <div className="w-full h-10 flex items-center justify-center bg-emerald-900/20 text-emerald-400"><Layers className="w-5 h-5" /></div> : <img src={asset.base64} className="w-full h-full object-cover" />}
-                                            </div>
-                                            <span className="text-sm text-white/60 flex-1 truncate">{asset.name}</span>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => handleDownloadAsset(asset.base64, asset.name)} className="p-2 text-white/20 hover:text-white"><Download className="w-4 h-4" /></button>
-                                                <button onClick={() => handleDeleteAsset(asset.id)} className="p-2 text-white/20 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                    <div ref={assetObserverTarget} className="h-20 flex items-center justify-center">
-                        {isLoadingMore && (
-                            <div className="flex items-center gap-2 text-white/20">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span className="text-[10px] uppercase tracking-widest font-mono">Loading...</span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            ) : (
-                <div className="flex-1 overflow-y-auto min-h-0">
-                    <div className="grid grid-cols-1 gap-6">
-                        {filteredHistory.length === 0 ? (
+            {
+                subTab === 'saved' ? (
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                        {filteredFolders.length === 0 && filteredAssets.length === 0 ? (
                             <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
-                                <History className="w-12 h-12 mb-4 opacity-10" />
-                                <p className="font-serif italic text-white/40">{searchQuery ? 'No history matches your search' : 'No history yet'}</p>
+                                <ImageIcon className="w-12 h-12 mb-4 opacity-10" />
+                                <p className="font-serif italic text-white/40">
+                                    {searchQuery ? 'No assets match your search' : (currentFolderId ? 'This folder is empty' : 'Your library is empty')}
+                                </p>
                             </div>
                         ) : (
-                            filteredHistory.map(item => (
-                                <div
-                                    key={item.id}
-                                    onClick={() => isSelectionMode && toggleSelection(item.id)}
-                                    className={`bg-white/[0.02] border rounded-2xl p-4 transition-all relative ${isSelectionMode ? 'cursor-pointer group/item' : ''} ${selectedHistoryIds.has(item.id) ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/5 hover:border-white/10'}`}
-                                >
-                                    {isSelectionMode && (
-                                        <div className={`absolute top-4 left-4 z-10 w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedHistoryIds.has(item.id) ? 'bg-emerald-500 border-emerald-500 scale-110 shadow-lg shadow-emerald-500/20' : 'bg-black/40 border-white/20 group-hover/item:border-white/40'}`}>
-                                            {selectedHistoryIds.has(item.id) && <Check className="w-3 h-3 md:w-4 md:h-4 text-black stroke-[3px]" />}
+                            <div className={viewMode === 'grid' ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4" : "flex flex-col gap-1"}>
+                                {filteredFolders.map(folder => (
+                                    <div
+                                        key={folder.id}
+                                        onClick={() => handleNavigate(folder)}
+                                        onDragOver={(e) => handleDragEnterTarget(e, folder.id)}
+                                        onDragLeave={handleDragLeaveTarget}
+                                        onDrop={(e) => handleDrop(e, folder.id)}
+                                        className={viewMode === 'grid'
+                                            ? `group relative flex flex-col items-center justify-center aspect-square p-4 bg-white/[0.02] border rounded-2xl cursor-pointer transition-all ${dragOverTarget === folder.id ? 'border-emerald-500 bg-emerald-500/20' : 'border-white/5 hover:bg-white/5'}`
+                                            : `group flex items-center gap-4 p-3 bg-white/[0.02] border-b border-white/5 cursor-pointer transition-all ${dragOverTarget === folder.id ? 'border-emerald-500 bg-emerald-500/10' : 'hover:bg-white/5'}`
+                                        }
+                                    >
+                                        <div className="relative">
+                                            {(() => {
+                                                const IconComponent = {
+                                                    'folder': FolderIcon, 'star': Star, 'heart': Heart, 'camera': Camera,
+                                                    'video': FileVideo, 'music': Music, 'briefcase': Briefcase, 'home': Home
+                                                }[folder.icon || 'folder'] || FolderIcon;
+                                                return <IconComponent className={viewMode === 'grid' ? "w-12 h-12 mb-3 text-emerald-500/60 group-hover:scale-110 transition-all" : "w-5 h-5 text-emerald-500/60"} style={folder.color ? { color: folder.color } : {}} />;
+                                            })()}
                                         </div>
-                                    )}
-                                    <div className={`flex items-start justify-between gap-4 mb-4 ${isSelectionMode ? 'pl-8 md:pl-10' : ''}`}>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className={`text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded ${item.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500 animate-pulse flex items-center gap-1' : 'bg-red-500/20 text-red-400'}`}>
-                                                    {item.status === 'pending' && <Loader2 className="w-3 h-3 animate-spin" />}
-                                                    {item.status === 'pending' ? 'Generating...' : item.status}
-                                                </span>
-                                                <span className="text-xs text-white/40">{new Date(item.timestamp).toLocaleString()}</span>
-                                            </div>
-                                            <div className="mb-3">
-                                                <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-400/60 px-2 py-0.5 bg-emerald-500/5 rounded border border-emerald-500/10">
-                                                    {item.service} / {item.model}
-                                                </span>
-                                            </div>
-                                            <p className="text-sm text-white/90 line-clamp-2 mb-1">{item.prompt}</p>
+                                        <span className={viewMode === 'grid' ? "text-[10px] md:text-xs font-bold text-white/50 group-hover:text-white uppercase tracking-widest text-center truncate w-full mt-4" : "text-sm text-white/70 flex-1 truncate"}>
+                                            {folder.name}
+                                        </span>
+                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={(e) => { e.stopPropagation(); openEditFolder(folder); }} className="p-1.5 hover:bg-white/10 text-white/40 hover:text-white rounded-lg"><Edit3 className="w-3 h-3" /></button>
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id, folder.name); }} className="p-1.5 hover:bg-red-500/10 text-white/40 hover:text-red-500 rounded-lg"><Trash2 className="w-3 h-3" /></button>
                                         </div>
-                                        {!isSelectionMode && (
-                                            <div className="flex gap-2">
-                                                <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item.prompt); alert("Copied!"); }} className="p-2 text-white/20 hover:text-white" title="Copy Prompt"><Copy className="w-4 h-4" /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(item.id); }} className="p-2 text-white/20 hover:text-red-500" title="Delete"><Trash2 className="w-4 h-4" /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); onRecall && onRecall(item); }} className="p-2 text-white/20 hover:text-emerald-500" title="Recall"><RotateCcw className="w-4 h-4" /></button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleDownloadHistoryItem(item); }} className="p-2 text-white/20 hover:text-white" title="Download Zip"><Download className="w-4 h-4" /></button>
-                                            </div>
+                                    </div>
+                                ))}
+                                {filteredAssets.map(asset => (
+                                    <div key={asset.id} draggable onDragStart={(e) => handleDragStart(e, asset.id)} className={viewMode === 'grid' ? "group relative aspect-square bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden hover:border-emerald-500/30 transition-all cursor-grab active:cursor-grabbing" : "group flex items-center gap-4 p-2 bg-white/[0.02] border-b border-white/5 hover:bg-white/5 transition-all cursor-grab"}>
+                                        {viewMode === 'grid' ? (
+                                            <>
+                                                {asset.type === 'video' ? <video src={asset.base64} className="w-full h-full object-cover opacity-60 group-hover:opacity-100" muted onClick={() => onPreview(asset.base64)} /> : asset.type === 'lora' ? <div className="w-full h-full flex flex-col items-center justify-center p-4" onClick={() => { navigator.clipboard.writeText(asset.base64); alert("Copied!"); }}><Layers className="w-12 h-12 mb-2 text-emerald-400 opacity-50" /><div className="text-[9px] uppercase tracking-widest text-emerald-400">Copy LoRA</div></div> : <img src={asset.base64} className="w-full h-full object-cover opacity-60 group-hover:opacity-100" onClick={() => onPreview(asset.base64)} />}
+                                                <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
+                                                    <p className="text-[9px] text-white/90 truncate font-mono">{asset.name}</p>
+                                                </div>
+                                                <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => handleDeleteAsset(asset.id)} className="p-2 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                    <button onClick={() => handleDownloadAsset(asset.base64, asset.name)} className="p-2 bg-white/10 text-white/60 hover:text-white rounded-xl"><Download className="w-3.5 h-3.5" /></button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="w-10 h-10 rounded-lg overflow-hidden bg-black shrink-0 border border-white/5">
+                                                    {asset.type === 'video' ? <video src={asset.base64} className="w-full h-full object-cover" /> : asset.type === 'lora' ? <div className="w-full h-10 flex items-center justify-center bg-emerald-900/20 text-emerald-400"><Layers className="w-5 h-5" /></div> : <img src={asset.base64} className="w-full h-full object-cover" />}
+                                                </div>
+                                                <span className="text-sm text-white/60 flex-1 truncate">{asset.name}</span>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => handleDownloadAsset(asset.base64, asset.name)} className="p-2 text-white/20 hover:text-white"><Download className="w-4 h-4" /></button>
+                                                    <button onClick={() => handleDeleteAsset(asset.id)} className="p-2 text-white/20 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                                                </div>
+                                            </>
                                         )}
                                     </div>
-                                    {item.mediaUrls && item.mediaUrls.length > 0 && (
-                                        <div className={`grid gap-2 ${item.mediaUrls.length > 1 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'} ${isSelectionMode ? 'pl-8 md:pl-10' : ''}`}>
-                                            {item.mediaUrls.map((url, idx) => (
-                                                <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-black/50 border border-white/5 group">
-                                                    {item.type === 'video' ? (
-                                                        <video
-                                                            src={url}
-                                                            poster={item.thumbnailUrls?.[idx]}
-                                                            className={`w-full h-full object-cover ${isSelectionMode ? 'cursor-default' : 'cursor-pointer'}`}
-                                                            onClick={(e) => {
-                                                                if (isSelectionMode) return;
-                                                                e.stopPropagation();
-                                                                onPreview(url);
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <ImageWithLoader
-                                                            src={item.thumbnailUrls?.[idx] || url}
-                                                            className={`w-full h-full object-cover ${isSelectionMode ? 'cursor-default' : 'cursor-pointer'}`}
-                                                            onClick={(e) => {
-                                                                if (isSelectionMode) return;
-                                                                e.stopPropagation();
-                                                                onPreview(url);
-                                                            }}
-                                                            alt={`History ${idx}`}
-                                                        />
-                                                    )}
-                                                    {!isSelectionMode && (
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleDownloadAsset(url, `history-${idx}`); }}
-                                                            className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        >
-                                                            <Download className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            ))
+                                ))}
+                            </div>
                         )}
-                        <div ref={historyObserverTarget} className="h-20 flex items-center justify-center">
+                        <div ref={assetObserverTarget} className="h-20 flex items-center justify-center">
                             {isLoadingMore && (
                                 <div className="flex items-center gap-2 text-white/20">
                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -767,51 +673,150 @@ Tab: ${item.tab || 'N/A'}
                             )}
                         </div>
                     </div>
-                </div>
-            )}
-
-            {showNewFolderModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
-                    <div className="w-full max-w-sm bg-[#0a0a0a] border border-white/10 rounded-3xl p-8 shadow-2xl">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold font-serif text-white/90">{editingFolder ? 'Edit Folder' : 'New Folder'}</h2>
-                            <button onClick={() => setShowNewFolderModal(false)} className="text-white/40 hover:text-white"><X className="w-5 h-5" /></button>
-                        </div>
-                        <input
-                            type="text" autoFocus placeholder="Folder name..." value={newFolderName}
-                            onChange={(e) => setNewFolderName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
-                            className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 px-6 text-base text-white focus:border-emerald-500 transition-all mb-6"
-                        />
-
-                        <div className="space-y-4 mb-6">
-                            <div>
-                                <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold block mb-2">Color</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {FOLDER_COLORS.map(c => (
-                                        <button key={c} onClick={() => setNewFolderColor(c)} className={`w-6 h-6 rounded-full border-2 ${newFolderColor === c ? 'border-white' : 'border-transparent'}`} style={{ backgroundColor: c }} />
-                                    ))}
-                                    <button onClick={() => setNewFolderColor("")} className={`w-6 h-6 rounded-full border-2 bg-emerald-500/20 flex items-center justify-center ${!newFolderColor ? 'border-white' : 'border-transparent'}`}><div className="w-3 h-3 rounded-full bg-emerald-500" /></button>
+                ) : (
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                        <div className="grid grid-cols-1 gap-6">
+                            {filteredHistory.length === 0 ? (
+                                <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
+                                    <History className="w-12 h-12 mb-4 opacity-10" />
+                                    <p className="font-serif italic text-white/40">{searchQuery ? 'No history matches your search' : 'No history yet'}</p>
                                 </div>
+                            ) : (
+                                filteredHistory.map(item => (
+                                    <div
+                                        key={item.id}
+                                        onClick={() => isSelectionMode && toggleSelection(item.id)}
+                                        className={`bg-white/[0.02] border rounded-2xl p-4 transition-all relative ${isSelectionMode ? 'cursor-pointer group/item' : ''} ${selectedHistoryIds.has(item.id) ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/5 hover:border-white/10'}`}
+                                    >
+                                        {isSelectionMode && (
+                                            <div className={`absolute top-4 left-4 z-10 w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedHistoryIds.has(item.id) ? 'bg-emerald-500 border-emerald-500 scale-110 shadow-lg shadow-emerald-500/20' : 'bg-black/40 border-white/20 group-hover/item:border-white/40'}`}>
+                                                {selectedHistoryIds.has(item.id) && <Check className="w-3 h-3 md:w-4 md:h-4 text-black stroke-[3px]" />}
+                                            </div>
+                                        )}
+                                        <div className={`flex items-start justify-between gap-4 mb-4 ${isSelectionMode ? 'pl-8 md:pl-10' : ''}`}>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className={`text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded ${item.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500 animate-pulse flex items-center gap-1' : 'bg-red-500/20 text-red-400'}`}>
+                                                        {item.status === 'pending' && <Loader2 className="w-3 h-3 animate-spin" />}
+                                                        {item.status === 'pending' ? 'Generating...' : item.status}
+                                                    </span>
+                                                    <span className="text-xs text-white/40">{new Date(item.timestamp).toLocaleString()}</span>
+                                                </div>
+                                                <div className="mb-3">
+                                                    <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-400/60 px-2 py-0.5 bg-emerald-500/5 rounded border border-emerald-500/10">
+                                                        {item.service} / {item.model}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-white/90 line-clamp-2 mb-1">{item.prompt}</p>
+                                            </div>
+                                            {!isSelectionMode && (
+                                                <div className="flex gap-2">
+                                                    <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item.prompt); alert("Copied!"); }} className="p-2 text-white/20 hover:text-white" title="Copy Prompt"><Copy className="w-4 h-4" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(item.id); }} className="p-2 text-white/20 hover:text-red-500" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); onRecall && onRecall(item); }} className="p-2 text-white/20 hover:text-emerald-500" title="Recall"><RotateCcw className="w-4 h-4" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDownloadHistoryItem(item); }} className="p-2 text-white/20 hover:text-white" title="Download Zip"><Download className="w-4 h-4" /></button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {item.mediaUrls && item.mediaUrls.length > 0 && (
+                                            <div className={`grid gap-2 ${item.mediaUrls.length > 1 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'} ${isSelectionMode ? 'pl-8 md:pl-10' : ''}`}>
+                                                {item.mediaUrls.map((url, idx) => (
+                                                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-black/50 border border-white/5 group">
+                                                        {item.type === 'video' ? (
+                                                            <video
+                                                                src={url}
+                                                                poster={item.thumbnailUrls?.[idx]}
+                                                                className={`w-full h-full object-cover ${isSelectionMode ? 'cursor-default' : 'cursor-pointer'}`}
+                                                                onClick={(e) => {
+                                                                    if (isSelectionMode) return;
+                                                                    e.stopPropagation();
+                                                                    onPreview(url);
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <ImageWithLoader
+                                                                src={item.thumbnailUrls?.[idx] || url}
+                                                                className={`w-full h-full object-cover ${isSelectionMode ? 'cursor-default' : 'cursor-pointer'}`}
+                                                                onClick={(e) => {
+                                                                    if (isSelectionMode) return;
+                                                                    e.stopPropagation();
+                                                                    onPreview(url);
+                                                                }}
+                                                                alt={`History ${idx}`}
+                                                            />
+                                                        )}
+                                                        {!isSelectionMode && (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDownloadAsset(url, `history-${idx}`); }}
+                                                                className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                <Download className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                            <div ref={historyObserverTarget} className="h-20 flex items-center justify-center">
+                                {isLoadingMore && (
+                                    <div className="flex items-center gap-2 text-white/20">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span className="text-[10px] uppercase tracking-widest font-mono">Loading...</span>
+                                    </div>
+                                )}
                             </div>
-                            <div>
-                                <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold block mb-2">Icon</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {FOLDER_ICONS.map(icon => {
-                                        const IC = { 'folder': FolderIcon, 'star': Star, 'heart': Heart, 'camera': Camera, 'video': FileVideo, 'music': Music, 'briefcase': Briefcase, 'home': Home }[icon] || FolderIcon;
-                                        return <button key={icon} onClick={() => setNewFolderIcon(icon)} className={`p-2 rounded-lg border ${newFolderIcon === icon ? 'bg-white/10 border-white' : 'bg-white/5 border-transparent'}`}><IC className="w-4 h-4 text-white" /></button>
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-4">
-                            <button onClick={() => setShowNewFolderModal(false)} className="flex-1 py-4 text-xs font-bold uppercase text-white/40">Cancel</button>
-                            <button onClick={handleCreateFolder} className="flex-1 py-4 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold uppercase rounded-2xl transition-all">{editingFolder ? 'Update' : 'Create'}</button>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+
+            {
+                showNewFolderModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+                        <div className="w-full max-w-sm bg-[#0a0a0a] border border-white/10 rounded-3xl p-8 shadow-2xl">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-bold font-serif text-white/90">{editingFolder ? 'Edit Folder' : 'New Folder'}</h2>
+                                <button onClick={() => setShowNewFolderModal(false)} className="text-white/40 hover:text-white"><X className="w-5 h-5" /></button>
+                            </div>
+                            <input
+                                type="text" autoFocus placeholder="Folder name..." value={newFolderName}
+                                onChange={(e) => setNewFolderName(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+                                className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 px-6 text-base text-white focus:border-emerald-500 transition-all mb-6"
+                            />
+
+                            <div className="space-y-4 mb-6">
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold block mb-2">Color</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {FOLDER_COLORS.map(c => (
+                                            <button key={c} onClick={() => setNewFolderColor(c)} className={`w-6 h-6 rounded-full border-2 ${newFolderColor === c ? 'border-white' : 'border-transparent'}`} style={{ backgroundColor: c }} />
+                                        ))}
+                                        <button onClick={() => setNewFolderColor("")} className={`w-6 h-6 rounded-full border-2 bg-emerald-500/20 flex items-center justify-center ${!newFolderColor ? 'border-white' : 'border-transparent'}`}><div className="w-3 h-3 rounded-full bg-emerald-500" /></button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold block mb-2">Icon</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {FOLDER_ICONS.map(icon => {
+                                            const IC = { 'folder': FolderIcon, 'star': Star, 'heart': Heart, 'camera': Camera, 'video': FileVideo, 'music': Music, 'briefcase': Briefcase, 'home': Home }[icon] || FolderIcon;
+                                            return <button key={icon} onClick={() => setNewFolderIcon(icon)} className={`p-2 rounded-lg border ${newFolderIcon === icon ? 'bg-white/10 border-white' : 'bg-white/5 border-transparent'}`}><IC className="w-4 h-4 text-white" /></button>
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4">
+                                <button onClick={() => setShowNewFolderModal(false)} className="flex-1 py-4 text-xs font-bold uppercase text-white/40">Cancel</button>
+                                <button onClick={handleCreateFolder} className="flex-1 py-4 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold uppercase rounded-2xl transition-all">{editingFolder ? 'Update' : 'Create'}</button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 }
