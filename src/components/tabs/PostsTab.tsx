@@ -529,6 +529,7 @@ Total Media Items: ${post.mediaUrls.length}
                                         isVideo ?
                                             <video
                                                 src={currentMedia}
+                                                poster={post.thumbnailUrls?.[currentIndex]}
                                                 className="w-full h-full object-cover"
                                                 muted
                                                 playsInline
@@ -539,7 +540,7 @@ Total Media Items: ${post.mediaUrls.length}
                                                 }}
                                             /> :
                                             <ImageWithLoader
-                                                src={currentMedia}
+                                                src={post.thumbnailUrls?.[currentIndex] || currentMedia}
                                                 alt={post.topic}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                             />

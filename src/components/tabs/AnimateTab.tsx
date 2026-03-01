@@ -580,15 +580,17 @@ export function AnimateTab({
                                     </div>
                                 </div>
 
-                                {isGeneratingI2V ? (
-                                    <div className="py-12">
-                                        <LoadingIndicator
-                                            title="Animating Video"
-                                            modelName={selectedModel}
-                                            type="video"
-                                        />
-                                    </div>
-                                ) : (
+                                <div className="space-y-6">
+                                    {isGeneratingI2V && (
+                                        <div className="flex flex-col items-center justify-center p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl animate-in fade-in zoom-in duration-300">
+                                            <LoadingIndicator
+                                                title="Animating Video"
+                                                modelName={selectedModel}
+                                                type="video"
+                                            />
+                                        </div>
+                                    )}
+
                                     <div className="flex flex-col items-center gap-2">
                                         <button
                                             onClick={onGenerateI2V}
@@ -596,8 +598,8 @@ export function AnimateTab({
                                             className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all active-scale ${!i2vPrompt || (selectedModel.toLowerCase().match(/grok|seedance|wan/i) ? !apiKeys.fal : !apiKeys.gemini) ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
                                                 }`}
                                         >
-                                            <VideoIcon className="w-5 h-5" />
-                                            GENERATE VIDEO
+                                            <VideoIcon className={`w-5 h-5 ${isGeneratingI2V ? 'animate-pulse' : ''}`} />
+                                            {isGeneratingI2V ? "ANIMATE ANOTHER VERSION" : "GENERATE VIDEO"}
                                         </button>
 
                                         {/* API Key Warning */}
@@ -611,7 +613,7 @@ export function AnimateTab({
                                             return null;
                                         })()}
                                     </div>
-                                )}
+                                </div>
                             </>
                         ) : (
                             <div className="space-y-6">

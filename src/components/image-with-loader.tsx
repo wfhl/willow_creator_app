@@ -9,10 +9,24 @@ export function ImageWithLoader({ className, fallbackIcon, ...props }: ImageWith
     const [isLoaded, setIsLoaded] = useState(false);
     const [hasError, setHasError] = useState(false);
 
+    const imgRef = React.useRef<HTMLImageElement>(null);
+
+    // Initial check on mount
+    React.useEffect(() => {
+        if (imgRef.current?.complete) {
+            setIsLoaded(true);
+        }
+    }, []);
+
     // Reset state when src changes
     React.useEffect(() => {
-        setIsLoaded(false);
-        setHasError(false);
+        if (imgRef.current?.complete) {
+            setIsLoaded(true);
+            setHasError(false);
+        } else {
+            setIsLoaded(false);
+            setHasError(false);
+        }
     }, [props.src]);
 
     return (
@@ -34,6 +48,7 @@ export function ImageWithLoader({ className, fallbackIcon, ...props }: ImageWith
             {/* Actual Image */}
             <img
                 {...props}
+                ref={imgRef}
                 decoding="async"
                 loading="lazy"
                 onLoad={(e) => {

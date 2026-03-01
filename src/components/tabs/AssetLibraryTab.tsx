@@ -586,10 +586,15 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
                                             {item.mediaUrls.map((url, idx) => (
                                                 <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-black/50 border border-white/5 group">
                                                     {item.type === 'video' ? (
-                                                        <video src={url} className="w-full h-full object-cover cursor-pointer" onClick={() => onPreview(url)} />
+                                                        <video
+                                                            src={url}
+                                                            poster={item.thumbnailUrls?.[idx]}
+                                                            className="w-full h-full object-cover cursor-pointer"
+                                                            onClick={() => onPreview(url)}
+                                                        />
                                                     ) : (
                                                         <ImageWithLoader
-                                                            src={url}
+                                                            src={item.thumbnailUrls?.[idx] || url}
                                                             className="w-full h-full object-cover cursor-pointer"
                                                             onClick={() => onPreview(url)}
                                                             alt={`History ${idx}`}

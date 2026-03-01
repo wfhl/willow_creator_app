@@ -915,8 +915,8 @@ export function CreateTab({
                                     transition-all flex items-center gap-2 shrink-0
                                 `}
                         >
-                            {(isGeneratingMedia || isGeneratingCaption) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-purple-300" />}
-                            {(isGeneratingMedia || isGeneratingCaption) ? "Working..." : "Generate"}
+                            {isGeneratingMedia ? <Loader2 className="w-4 h-4 animate-spin" /> : isGeneratingCaption ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-purple-300" />}
+                            {isGeneratingMedia ? "Generate More" : isGeneratingCaption ? "Working..." : "Generate"}
                         </button>
 
                         {/* API Key Warning */}

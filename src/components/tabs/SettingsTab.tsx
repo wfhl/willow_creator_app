@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Settings, Plus, Trash2, Save, X, ChevronDown, ChevronUp, Cloud, RefreshCw, Key, Eye, EyeOff } from 'lucide-react';
+import { Settings, Plus, Trash2, Save, X, ChevronDown, ChevronUp, Cloud, RefreshCw, Key, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { migrationService } from '../../lib/migrationService';
 import { syncService } from '../../lib/syncService';
+import { dbService } from '../../lib/dbService';
+import { createThumbnails } from '../../lib/imageUtils';
 import { generateUUID } from '../../lib/uuid';
 import { useAuth } from '../AuthProvider';
 
@@ -43,11 +45,49 @@ interface SettingsTabProps {
 
 export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles, profile, setProfile, apiKeys, onUpdateApiKeys, onExit }: SettingsTabProps) {
     const { user } = useAuth();
-    const [activeSection, setActiveSection] = useState<'themes' | 'captions' | 'persona' | 'sync' | 'credentials'>('credentials');
+    const [activeSection, setActiveSection] = useState<'themes' | 'captions' | 'persona' | 'sync' | 'credentials' | 'maintenance'>('credentials');
     const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
     const [editingStyleId, setEditingStyleId] = useState<string | null>(null);
     const [migrationStatus, setMigrationStatus] = useState<string>('');
     const [isMigrating, setIsMigrating] = useState(false);
+    const [isOptimizing, setIsOptimizing] = useState(false);
+    const [optProgress, setOptProgress] = useState("");
+
+    const handleOptimizeLibrary = async () => {
+        setIsOptimizing(true);
+        setOptProgress("Starting optimization...");
+        try {
+            const posts = await dbService.getRecentPostsBatch(1000, 0, 'prev');
+            setOptProgress(`Optimizing ${posts.length} posts...`);
+            for (let i = 0; i < posts.length; i++) {
+                const post = posts[i];
+                if (!post.thumbnailUrls || post.thumbnailUrls.length === 0) {
+                    setOptProgress(`Processing post ${i + 1}/${posts.length}...`);
+                    post.thumbnailUrls = await createThumbnails(post.mediaUrls);
+                    await dbService.savePost(post);
+                }
+            }
+
+            const history = await dbService.getRecentHistoryBatch(1000, 0, 'prev');
+            setOptProgress(`Optimizing ${history.length} history items...`);
+            for (let i = 0; i < history.length; i++) {
+                const item = history[i];
+                if (item.status === 'success' && (!item.thumbnailUrls || item.thumbnailUrls.length === 0)) {
+                    setOptProgress(`Processing history ${i + 1}/${history.length}...`);
+                    item.thumbnailUrls = await createThumbnails(item.mediaUrls);
+                    await dbService.saveGenerationHistory(item);
+                }
+            }
+            setOptProgress("Optimization complete!");
+            alert("Library optimization complete! All images now have fast-loading thumbnails.");
+        } catch (e) {
+            console.error(e);
+            alert("Optimization failed.");
+        } finally {
+            setIsOptimizing(false);
+            setOptProgress("");
+        }
+    };
 
     // API Keys Local State for editing
     const [localKeys, setLocalKeys] = useState(apiKeys);
@@ -221,6 +261,15 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                             }`}
                     >
                         Data Sync
+                    </button>
+                    <button
+                        onClick={() => setActiveSection('maintenance')}
+                        className={`flex-1 md:flex-none shrink-0 whitespace-nowrap snap-center text-center md:text-left px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-bold text-[10px] md:text-sm uppercase tracking-wider ${activeSection === 'maintenance'
+                            ? 'bg-emerald-500 text-black md:bg-emerald-500/10 md:text-emerald-400 md:border md:border-emerald-500/20 shadow-lg shadow-emerald-500/10'
+                            : 'text-white/40 hover:bg-white/5 hover:text-white'
+                            }`}
+                    >
+                        Maintenance
                     </button>
                 </div>
 
@@ -724,6 +773,58 @@ export function SettingsTab({ themes, setThemes, captionStyles, setCaptionStyles
                                         : "You are currently in **Local-Only Mode**. Your keys are saved exclusively in your browser's private IndexedDB instance. Login to enable Cross-Device synchronization."
                                     }
                                 </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeSection === 'maintenance' && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-lg font-bold text-white">System Maintenance</h3>
+                            </div>
+
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-6">
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-bold text-white">Optimize Library Performance</h4>
+                                    <p className="text-xs text-white/40 leading-relaxed">
+                                        Generates small, fast-loading thumbnails for all your existing saved posts and generation history.
+                                        This significantly improves performance when browsing your library and history pages.
+                                    </p>
+                                </div>
+
+                                <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl space-y-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-lg ${isOptimizing ? 'bg-emerald-500/20 text-emerald-400 animate-spin' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                                            <RefreshCw className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-white">Thumbnail Optimization</p>
+                                            <p className="text-[10px] text-white/40 uppercase tracking-widest">{optProgress || "System Ready"}</p>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={handleOptimizeLibrary}
+                                        disabled={isOptimizing}
+                                        className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold uppercase tracking-widest rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        {isOptimizing ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Optimizing...
+                                            </>
+                                        ) : (
+                                            "Run Optimization"
+                                        )}
+                                    </button>
+                                </div>
+
+                                <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                                    <p className="text-[10px] text-white/30 leading-relaxed italic">
+                                        Note: This process may take a few minutes depending on the size of your library.
+                                        Once complete, your generation history and saved posts will load noticeably faster.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     )}

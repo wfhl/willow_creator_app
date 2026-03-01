@@ -284,20 +284,17 @@ export const falService = {
                     return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
                 };
 
-                const resolvedUrls = await Promise.all(
+                await Promise.all(
                     mediaUrls.map(async (url) => {
-                        if (isVideo(url)) return url; // Don't pre-fetch videos
+                        if (isVideo(url)) return;
                         try {
-                            const res = await fetch(url);
-                            const blob = await res.blob();
-                            return URL.createObjectURL(blob);
+                            await fetch(url);
                         } catch {
-                            console.warn('[FalService] Could not pre-fetch image, falling back to CDN URL:', url);
-                            return url;
+                            console.warn('[FalService] Could not pre-fetch image cache:', url);
                         }
                     })
                 );
-                return resolvedUrls;
+                return mediaUrls;
             }
 
             throw new Error(`No media URL in Fal response. Result status: ${result.status || 'unknown'}`);

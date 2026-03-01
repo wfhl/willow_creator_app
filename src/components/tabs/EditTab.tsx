@@ -449,24 +449,26 @@ export function EditTab({
                                     </div>
                                 </div>
 
-                                {isRefining ? (
-                                    <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                                        <LoadingIndicator />
-                                        <div className="text-center">
-                                            <p className="text-emerald-400 font-bold text-xs uppercase tracking-widest animate-pulse">
-                                                Refining variation...
-                                            </p>
-                                            {refineProgress > 0 && (
-                                                <div className="mt-4 w-48 h-1 bg-white/5 rounded-full overflow-hidden mx-auto">
-                                                    <div
-                                                        className="h-full bg-emerald-500 transition-all duration-500 ease-out"
-                                                        style={{ width: `${refineProgress}%` }}
-                                                    />
-                                                </div>
-                                            )}
+                                <div className="space-y-6">
+                                    {isRefining && (
+                                        <div className="flex flex-col items-center justify-center p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl animate-in fade-in zoom-in duration-300">
+                                            <LoadingIndicator />
+                                            <div className="text-center mt-4">
+                                                <p className="text-emerald-400 font-bold text-[10px] md:text-xs uppercase tracking-[0.2em] animate-pulse">
+                                                    Refining variation...
+                                                </p>
+                                                {refineProgress > 0 && (
+                                                    <div className="mt-4 w-48 h-1.5 bg-white/5 rounded-full overflow-hidden mx-auto border border-white/5">
+                                                        <div
+                                                            className="h-full bg-emerald-500 transition-all duration-500 ease-out"
+                                                            style={{ width: `${refineProgress}%` }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
+                                    )}
+
                                     <div className="flex flex-col items-center gap-2">
                                         <button
                                             onClick={onRefineSubmit}
@@ -474,8 +476,8 @@ export function EditTab({
                                             className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all active-scale ${!refinePrompt || (selectedModel.toLowerCase().match(/grok|seedream|wan|fal/i) ? !apiKeys.fal : !apiKeys.gemini) ? 'bg-white/5 text-white/20' : 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
                                                 }`}
                                         >
-                                            <Sparkles className="w-5 h-5" />
-                                            GENERATE REFINED VERSION
+                                            <Sparkles className={`w-5 h-5 ${isRefining ? 'animate-pulse' : ''}`} />
+                                            {isRefining ? "GENERATE ANOTHER VERSION" : "GENERATE REFINED VERSION"}
                                         </button>
 
                                         {/* API Key Warning */}
@@ -489,7 +491,7 @@ export function EditTab({
                                             return null;
                                         })()}
                                     </div>
-                                )}
+                                </div>
                             </>
                         ) : refineResultUrls.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12">

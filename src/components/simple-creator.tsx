@@ -6,6 +6,7 @@ import type { GenerationRequest } from '../lib/geminiService';
 import { falService, updateFalApiKey, type FalGenerationRequest } from '../lib/falService';
 import { dbService } from '../lib/dbService';
 import type { DBAsset as Asset, DBSavedPost as SavedPost, DBPromptPreset, DBGenerationHistory } from '../lib/dbService';
+import { createThumbnails } from '../lib/imageUtils';
 import { SIMPLE_PROFILE, SIMPLE_THEMES, CAPTION_TEMPLATES } from './creator-presets';
 
 // Component Imports
@@ -70,14 +71,17 @@ export default function SimpleCreator() {
     const [isDreaming, setIsDreaming] = useState(false);
 
     // Media Output State
-    const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
+    const [activeMediaGenerations, setActiveMediaGenerations] = useState(0);
+    const isGeneratingMedia = activeMediaGenerations > 0;
+    const [isSavingPost, setIsSavingPost] = useState(false);
     const [generatedMediaUrls, setGeneratedMediaUrls] = useState<string[]>([]);
     const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
 
     // Refinement / I2V States
     const [refineTarget, setRefineTarget] = useState<{ url: string, index: number } | null>(null);
     const [refinePrompt, setRefinePrompt] = useState("");
-    const [isRefining, setIsRefining] = useState(false);
+    const [activeRefinements, setActiveRefinements] = useState(0);
+    const isRefining = activeRefinements > 0;
     const [refineResultUrls, setRefineResultUrls] = useState<string[]>([]);
     const [refineProgress, setRefineProgress] = useState(0);
     const [refineAdditionalImages, setRefineAdditionalImages] = useState<Asset[]>([]);
@@ -88,7 +92,8 @@ export default function SimpleCreator() {
 
     const [i2vTarget, setI2VTarget] = useState<{ url: string, index: number } | null>(null);
     const [i2vPrompt, setI2VPrompt] = useState("");
-    const [isGeneratingI2V, setIsGeneratingI2V] = useState(false);
+    const [activeAnimations, setActiveAnimations] = useState(0);
+    const isGeneratingI2V = activeAnimations > 0;
     const [i2vResultUrl, setI2VResultUrl] = useState<string | null>(null);
 
     // Control State
@@ -500,7 +505,7 @@ export default function SimpleCreator() {
     const handleGenerateMedia = async (promptOverride?: string) => {
         const finalPromptToUse = promptOverride || generatedPrompt;
         if (!finalPromptToUse) return;
-        setIsGeneratingMedia(true);
+        setActiveMediaGenerations(prev => prev + 1);
         setGeneratedMediaUrls([]);
 
         // Determine service type early for history tracking
@@ -686,13 +691,15 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
             generationError = error?.message || 'Unknown error';
             alert("Media generation failed.");
         } finally {
-            setIsGeneratingMedia(false);
+            setActiveMediaGenerations(prev => Math.max(0, prev - 1));
 
             // --- Save to Generation History ---
             try {
+                const thumbnailUrls = generationSucceeded ? await createThumbnails(resultUrls) : undefined;
                 await dbService.saveGenerationHistory({
                     ...baseHistoryEntry,
                     mediaUrls: resultUrls,
+                    thumbnailUrls,
                     status: generationSucceeded ? 'success' : 'failed',
                     errorMessage: generationError || undefined
                 });
@@ -767,25 +774,28 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
     // --- SAVE / PRESET HANDLERS ---
 
     const handleSavePost = async () => {
-        const newPost: SavedPost = {
-            id: Date.now().toString(),
-            timestamp: Date.now(),
-            topic,
-            caption: generatedCaption,
-            captionType,
-            mediaUrls: generatedMediaUrls,
-            mediaType: generatedMediaUrls.some(url => {
-                if (url.startsWith('data:video')) return true;
-                const clean = url.split('?')[0].split('#')[0].toLowerCase();
-                return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
-            }) ? 'video' : 'image',
-            themeId: selectedThemeId,
-            visuals: specificVisuals,
-            outfit: specificOutfit,
-            prompt: generatedPrompt,
-            tags: []
-        };
+        setIsSavingPost(true); // Added if not present
         try {
+            const thumbnailUrls = await createThumbnails(generatedMediaUrls);
+            const newPost: SavedPost = {
+                id: Date.now().toString(),
+                timestamp: Date.now(),
+                topic,
+                caption: generatedCaption,
+                captionType,
+                mediaUrls: generatedMediaUrls,
+                thumbnailUrls: thumbnailUrls,
+                mediaType: generatedMediaUrls.some(url => {
+                    if (url.startsWith('data:video')) return true;
+                    const clean = url.split('?')[0].split('#')[0].toLowerCase();
+                    return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+                }) ? 'video' : 'image',
+                themeId: selectedThemeId,
+                visuals: specificVisuals,
+                outfit: specificOutfit,
+                prompt: generatedPrompt,
+                tags: []
+            };
             await dbService.savePost(newPost);
             setSavedPosts(prev => [newPost, ...prev]);
             setTotalSavedCount(prev => prev + 1);
@@ -793,6 +803,8 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
         } catch (e) {
             console.error(e);
             alert("Save failed.");
+        } finally {
+            setIsSavingPost(false);
         }
     };
 
@@ -1257,7 +1269,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                             // Indicate loading state for specific item? 
                             // For simplicity, use global loading or we'd need a map of loading indices.
                             // Using global isGeneratingMedia is safest for now to block other actions.
-                            setIsGeneratingMedia(true);
+                            setActiveMediaGenerations(prev => prev + 1);
 
                             try {
                                 let newUrl: string[] | null = null;
@@ -1314,13 +1326,13 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                 console.error("Reroll failed", e);
                                 alert("Reroll failed.");
                             } finally {
-                                setIsGeneratingMedia(false);
+                                setActiveMediaGenerations(prev => Math.max(0, prev - 1));
                             }
                         }}
                         onSaveToAssets={handleSaveToAssets}
                         handleCopy={(t) => navigator.clipboard.writeText(t)}
                         handleSavePost={handleSavePost}
-                        isSaving={false} // Can add loading state for saving later if needed
+                        isSaving={isSavingPost}
                         showSaveForm={showSaveForm}
                         setShowSaveForm={setShowSaveForm}
                         loras={loras}
@@ -1436,7 +1448,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                         refineProgress={refineProgress}
                         onRefineSubmit={async () => {
                             if (!refineTarget || !refinePrompt) return;
-                            setIsRefining(true);
+                            setActiveRefinements(prev => prev + 1);
                             setRefineProgress(10); // Start progress
 
                             const isVideo = (() => {
@@ -1507,7 +1519,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                             req.image_url = imgUrl;
                                         } else {
                                             alert("Subject image required for this model.");
-                                            setIsRefining(false);
+                                            setActiveRefinements(prev => Math.max(0, prev - 1));
                                             return;
                                         }
                                     }
@@ -1563,9 +1575,11 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                     setRefineResultUrls(urlUrls);
                                     setRefineProgress(100);
                                     try {
+                                        const thumbnailUrls = await createThumbnails(urlUrls);
                                         await dbService.saveGenerationHistory({
                                             ...baseHistoryEntry,
                                             mediaUrls: urlUrls,
+                                            thumbnailUrls,
                                             status: 'success'
                                         });
                                     } catch (err) { console.error("Failed to save history:", err); }
@@ -1581,7 +1595,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                     });
                                 } catch (err) { }
                             } finally {
-                                setIsRefining(false);
+                                setActiveRefinements(prev => Math.max(0, prev - 1));
                                 setRefineProgress(0);
                             }
                         }}
@@ -1657,7 +1671,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
 
                         onGenerateI2V={async () => {
                             if (!i2vTarget || !i2vPrompt) return;
-                            setIsGeneratingI2V(true);
+                            setActiveAnimations(prev => prev + 1);
 
                             const historyId = generateUUID();
                             const baseHistoryEntry: DBGenerationHistory = {
@@ -1759,7 +1773,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                         errorMessage: e?.message || 'Unknown error'
                                     });
                                 } catch (err) { }
-                            } finally { setIsGeneratingI2V(false); }
+                            } finally { setActiveAnimations(prev => Math.max(0, prev - 1)); }
                         }}
                         generatedI2VUrl={i2vResultUrl}
                         onExit={() => setActiveTab('create')}
