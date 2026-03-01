@@ -357,17 +357,6 @@ Total Media Items: ${post.mediaUrls.length}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex items-center gap-4">
                         <h2 className="text-xl font-bold font-serif text-white/90">Saved Library</h2>
-                        {displayPosts.length > 0 && (
-                            <button
-                                onClick={() => {
-                                    setIsSelectionMode(!isSelectionMode);
-                                    if (!isSelectionMode) setSelectedPostIds(new Set());
-                                }}
-                                className={`text-[10px] uppercase font-bold tracking-widest px-3 py-1.5 rounded-lg border transition-all ${isSelectionMode ? 'bg-emerald-500 text-black border-emerald-500' : 'bg-white/5 text-white/40 border-white/10 hover:text-white'}`}
-                            >
-                                {isSelectionMode ? 'Cancel' : 'Multi-Select'}
-                            </button>
-                        )}
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {isSelectionMode && (
@@ -439,6 +428,31 @@ Total Media Items: ${post.mediaUrls.length}
                         </button>
                     </div>
                 </div>
+
+                {/* Sub-search row for Multi-Select */}
+                {displayPosts.length > 0 && (
+                    <div className="flex items-center justify-between gap-2 mt-2">
+                        <button
+                            onClick={() => {
+                                setIsSelectionMode(!isSelectionMode);
+                                if (!isSelectionMode) setSelectedPostIds(new Set());
+                            }}
+                            className={`text-[10px] uppercase font-bold tracking-widest px-2.5 py-1.5 rounded-lg border transition-all flex items-center gap-2 ${isSelectionMode ? 'bg-emerald-500 text-black border-emerald-500' : 'bg-white/5 text-white/40 border-white/10 hover:text-white'}`}
+                        >
+                            <Check className="w-3 h-3" />
+                            {isSelectionMode ? 'Exit Select' : 'Multi-Select'}
+                        </button>
+                        {isSelectionMode && (
+                            <button
+                                type="button"
+                                onClick={handleSelectAll}
+                                className="text-[10px] uppercase font-bold tracking-widest px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded flex items-center gap-2 transition-all text-white/60 hover:text-white"
+                            >
+                                {selectedPostIds.size === displayPosts.length ? 'Deselect All' : 'Select All'}
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Visual Lasso Box (Moved outside the grid to not mess with gridRef.children indexing) */}
@@ -695,29 +709,29 @@ Total Media Items: ${post.mediaUrls.length}
 
             {/* Bulk Actions Modal/Bar */}
             {selectedPostIds.size > 0 && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <div className="bg-black/80 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl p-2 px-4 flex items-center gap-4">
-                        <div className="pr-4 border-r border-white/10">
+                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-bottom-4 duration-300 w-[calc(100%-2rem)] max-w-lg">
+                    <div className="bg-black/95 backdrop-blur-2xl border border-emerald-500/20 rounded-2xl shadow-2xl p-2 px-4 flex items-center justify-between gap-4">
+                        <div className="flex flex-col">
                             <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-400">
-                                {selectedPostIds.size} {selectedPostIds.size === 1 ? 'Post' : 'Posts'} Selected
+                                {selectedPostIds.size} Selected
                             </span>
+                            <span className="text-[9px] text-white/40 uppercase tracking-tighter">Saved Posts</span>
                         </div>
                         <div className="flex gap-2">
                             <button
                                 onClick={handleBulkDownload}
                                 disabled={isProcessingBulk}
-                                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] uppercase font-bold tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-black rounded-xl text-[10px] uppercase font-bold tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
                             >
                                 {isProcessingBulk ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                                Download Sequential Zips
+                                Download Selected
                             </button>
                             <button
                                 onClick={handleBulkDelete}
                                 disabled={isProcessingBulk}
-                                className="px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] uppercase font-bold tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
+                                className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all disabled:opacity-50"
                             >
-                                <X className="w-3 h-3" />
-                                Delete Selected
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
                     </div>

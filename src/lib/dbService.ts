@@ -539,7 +539,7 @@ export const dbService = {
         });
     },
 
-    async getAssetsBatch(folderId: string | null, limit: number, offset: number, sortOrder: 'prev' | 'next' = 'prev'): Promise<DBAsset[]> {
+    async getAssetsBatch(folderId: string | null, limit: number, offset: number = 0, sortOrder: 'prev' | 'next' = 'prev', beforeTimestamp?: number): Promise<DBAsset[]> {
         const db = await openDB();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('assets', 'readonly');
@@ -548,7 +548,11 @@ export const dbService = {
 
             const items: DBAsset[] = [];
             let skipped = 0;
-            const request = index.openCursor(null, sortOrder);
+            let range = null;
+            if (beforeTimestamp) {
+                range = sortOrder === 'prev' ? IDBKeyRange.upperBound(beforeTimestamp, false) : IDBKeyRange.lowerBound(beforeTimestamp, false);
+            }
+            const request = index.openCursor(range, sortOrder);
 
             request.onsuccess = (event) => {
                 const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
@@ -639,7 +643,7 @@ export const dbService = {
         });
     },
 
-    async getRecentHistoryBatch(limit: number, offset: number, sortOrder: 'prev' | 'next' = 'prev'): Promise<DBGenerationHistory[]> {
+    async getRecentHistoryBatch(limit: number, offset: number = 0, sortOrder: 'prev' | 'next' = 'prev', beforeTimestamp?: number): Promise<DBGenerationHistory[]> {
         const db = await openDB();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('generation_history', 'readonly');
@@ -648,7 +652,11 @@ export const dbService = {
 
             const items: DBGenerationHistory[] = [];
             let skipped = 0;
-            const request = index.openCursor(null, sortOrder);
+            let range = null;
+            if (beforeTimestamp) {
+                range = sortOrder === 'prev' ? IDBKeyRange.upperBound(beforeTimestamp, false) : IDBKeyRange.lowerBound(beforeTimestamp, false);
+            }
+            const request = index.openCursor(range, sortOrder);
 
             request.onsuccess = (event) => {
                 const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
