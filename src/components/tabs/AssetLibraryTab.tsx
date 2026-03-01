@@ -24,10 +24,12 @@ import {
     Copy,
     RotateCcw,
     Download,
-    Loader2
+    Loader2,
+    Check
 } from 'lucide-react';
 import { dbService } from '../../lib/dbService';
 import { generateUUID } from '../../lib/uuid';
+import JSZip from 'jszip';
 import type { DBAsset, DBFolder, DBGenerationHistory } from '../../lib/dbService';
 
 interface AssetLibraryTabProps {
@@ -58,6 +60,9 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
     const [hasMoreAssets, setHasMoreAssets] = useState(true);
     const [hasMoreHistory, setHasMoreHistory] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [isProcessingBulk, setIsProcessingBulk] = useState(false);
 
     const assetObserverTarget = useRef<HTMLDivElement>(null);
     const historyObserverTarget = useRef<HTMLDivElement>(null);
@@ -180,6 +185,94 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
         });
         return () => { unsubscribe(); };
     }, [subTab, loadContent, loadHistory, history.length, assets.length]);
+
+    const toggleSelection = (id: string) => {
+        const newSelected = new Set(selectedHistoryIds);
+        if (newSelected.has(id)) newSelected.delete(id);
+        else newSelected.add(id);
+        setSelectedHistoryIds(newSelected);
+    };
+
+    const handleSelectAll = (filteredHistory: DBGenerationHistory[]) => {
+        if (selectedHistoryIds.size === filteredHistory.length && filteredHistory.length > 0) {
+            setSelectedHistoryIds(new Set());
+        } else {
+            setSelectedHistoryIds(new Set(filteredHistory.map(h => h.id)));
+        }
+    };
+
+    const handleDownloadHistoryItem = async (item: DBGenerationHistory) => {
+        const zip = new JSZip();
+        const date = new Date(item.timestamp).toLocaleString();
+
+        const metadata = `GENERATION METADATA
+===================
+
+Date: ${date}
+Service: ${item.service}
+Model: ${item.model}
+Type: ${item.type}
+Status: ${item.status}
+
+PROMPT
+===================
+${item.prompt}
+
+TECHNICAL DETAILS
+===================
+Image Size: ${item.imageSize || 'N/A'}
+Num Images: ${item.numImages || 'N/A'}
+Request ID: ${item.requestId || 'N/A'}
+Tab: ${item.tab || 'N/A'}
+`;
+
+        zip.file("metadata.txt", metadata);
+
+        if (item.mediaUrls && item.mediaUrls.length > 0) {
+            for (let i = 0; i < item.mediaUrls.length; i++) {
+                const url = item.mediaUrls[i];
+                try {
+                    const response = await fetch(url);
+                    const blob = await response.blob();
+                    const ext = url.match(/\.(png|jpg|jpeg|webp|gif|mp4|mov|webm)($|\?)/i)?.[1] || (item.type === 'video' ? 'mp4' : 'png');
+                    zip.file(`media_${i + 1}.${ext}`, blob);
+                } catch (err) {
+                    console.error("Failed to fetch media for zip:", err);
+                }
+            }
+        }
+
+        const content = await zip.generateAsync({ type: "blob" });
+        const zipUrl = window.URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = zipUrl;
+        const safePrompt = (item.prompt || 'generation').slice(0, 30).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.download = `gen_${safePrompt}_${item.id.slice(0, 8)}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(zipUrl);
+    };
+
+    const handleBulkDownloadHistory = async (filteredHistory: DBGenerationHistory[]) => {
+        if (selectedHistoryIds.size === 0) return;
+        setIsProcessingBulk(true);
+        try {
+            const selectedItems = filteredHistory.filter(h => selectedHistoryIds.has(h.id));
+            for (const item of selectedItems) {
+                await handleDownloadHistoryItem(item);
+                // Pause slightly to not choke the browser
+                await new Promise(r => setTimeout(r, 600));
+            }
+        } catch (err) {
+            console.error("Bulk download failed:", err);
+            alert("Bulk download encountered an error.");
+        } finally {
+            setIsProcessingBulk(false);
+            setIsSelectionMode(false);
+            setSelectedHistoryIds(new Set());
+        }
+    };
 
     // Polling for pending generations
     useEffect(() => {
@@ -388,9 +481,39 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
                                 onClick={() => setSubTab('history')}
                                 className={`text-lg md:text-2xl font-bold font-serif transition-all ${subTab === 'history' ? 'text-white/90' : 'text-white/40 hover:text-white/70'}`}
                             >
-                                Generation History
                             </button>
                         </div>
+                        {subTab === 'history' && history.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => {
+                                        setIsSelectionMode(!isSelectionMode);
+                                        if (!isSelectionMode) setSelectedHistoryIds(new Set());
+                                    }}
+                                    className={`text-[10px] uppercase font-bold tracking-widest px-3 py-1.5 rounded-lg border transition-all ${isSelectionMode ? 'bg-emerald-500 text-black border-emerald-500' : 'bg-white/5 text-white/40 border-white/10 hover:text-white'}`}
+                                >
+                                    {isSelectionMode ? 'Cancel' : 'Multi-Select'}
+                                </button>
+                                {isSelectionMode && (
+                                    <>
+                                        <button
+                                            onClick={() => handleSelectAll(filteredHistory)}
+                                            className="text-[10px] uppercase font-bold tracking-widest px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/60 hover:text-white transition-all overflow-hidden whitespace-nowrap"
+                                        >
+                                            {selectedHistoryIds.size === filteredHistory.length && filteredHistory.length > 0 ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                        <button
+                                            onClick={() => handleBulkDownloadHistory(filteredHistory)}
+                                            disabled={selectedHistoryIds.size === 0 || isProcessingBulk}
+                                            className="text-[10px] uppercase font-bold tracking-widest px-3 py-1.5 rounded-lg bg-emerald-600 text-black hover:bg-emerald-500 disabled:opacity-50 transition-all flex items-center gap-2 overflow-hidden whitespace-nowrap"
+                                        >
+                                            {isProcessingBulk ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                                            {selectedHistoryIds.size > 0 ? `Download (${selectedHistoryIds.size})` : 'Download'}
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
                         {subTab === 'saved' && (
                             <>
                                 <div className="h-6 w-px bg-white/10 mx-1 md:mx-2 shrink-0" />
@@ -558,8 +681,17 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
                             </div>
                         ) : (
                             filteredHistory.map(item => (
-                                <div key={item.id} className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-all">
-                                    <div className="flex items-start justify-between gap-4 mb-4">
+                                <div
+                                    key={item.id}
+                                    onClick={() => isSelectionMode && toggleSelection(item.id)}
+                                    className={`bg-white/[0.02] border rounded-2xl p-4 transition-all relative ${isSelectionMode ? 'cursor-pointer group/item' : ''} ${selectedHistoryIds.has(item.id) ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/5 hover:border-white/10'}`}
+                                >
+                                    {isSelectionMode && (
+                                        <div className={`absolute top-4 left-4 z-10 w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedHistoryIds.has(item.id) ? 'bg-emerald-500 border-emerald-500 scale-110 shadow-lg shadow-emerald-500/20' : 'bg-black/40 border-white/20 group-hover/item:border-white/40'}`}>
+                                            {selectedHistoryIds.has(item.id) && <Check className="w-3 h-3 md:w-4 md:h-4 text-black stroke-[3px]" />}
+                                        </div>
+                                    )}
+                                    <div className={`flex items-start justify-between gap-4 mb-4 ${isSelectionMode ? 'pl-8 md:pl-10' : ''}`}>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-2">
                                                 <span className={`text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded ${item.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500 animate-pulse flex items-center gap-1' : 'bg-red-500/20 text-red-400'}`}>
@@ -575,32 +707,50 @@ export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
                                             </div>
                                             <p className="text-sm text-white/90 line-clamp-2 mb-1">{item.prompt}</p>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => { navigator.clipboard.writeText(item.prompt); alert("Copied!"); }} className="p-2 text-white/20 hover:text-white" title="Copy Prompt"><Copy className="w-4 h-4" /></button>
-                                            <button onClick={() => handleDeleteHistory(item.id)} className="p-2 text-white/20 hover:text-red-500" title="Delete"><Trash2 className="w-4 h-4" /></button>
-                                            <button onClick={() => onRecall && onRecall(item)} className="p-2 text-white/20 hover:text-emerald-500" title="Recall"><RotateCcw className="w-4 h-4" /></button>
-                                        </div>
+                                        {!isSelectionMode && (
+                                            <div className="flex gap-2">
+                                                <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item.prompt); alert("Copied!"); }} className="p-2 text-white/20 hover:text-white" title="Copy Prompt"><Copy className="w-4 h-4" /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(item.id); }} className="p-2 text-white/20 hover:text-red-500" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); onRecall && onRecall(item); }} className="p-2 text-white/20 hover:text-emerald-500" title="Recall"><RotateCcw className="w-4 h-4" /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleDownloadHistoryItem(item); }} className="p-2 text-white/20 hover:text-white" title="Download Zip"><Download className="w-4 h-4" /></button>
+                                            </div>
+                                        )}
                                     </div>
                                     {item.mediaUrls && item.mediaUrls.length > 0 && (
-                                        <div className={`grid gap-2 ${item.mediaUrls.length > 1 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'}`}>
+                                        <div className={`grid gap-2 ${item.mediaUrls.length > 1 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'} ${isSelectionMode ? 'pl-8 md:pl-10' : ''}`}>
                                             {item.mediaUrls.map((url, idx) => (
                                                 <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-black/50 border border-white/5 group">
                                                     {item.type === 'video' ? (
                                                         <video
                                                             src={url}
                                                             poster={item.thumbnailUrls?.[idx]}
-                                                            className="w-full h-full object-cover cursor-pointer"
-                                                            onClick={() => onPreview(url)}
+                                                            className={`w-full h-full object-cover ${isSelectionMode ? 'cursor-default' : 'cursor-pointer'}`}
+                                                            onClick={(e) => {
+                                                                if (isSelectionMode) return;
+                                                                e.stopPropagation();
+                                                                onPreview(url);
+                                                            }}
                                                         />
                                                     ) : (
                                                         <ImageWithLoader
                                                             src={item.thumbnailUrls?.[idx] || url}
-                                                            className="w-full h-full object-cover cursor-pointer"
-                                                            onClick={() => onPreview(url)}
+                                                            className={`w-full h-full object-cover ${isSelectionMode ? 'cursor-default' : 'cursor-pointer'}`}
+                                                            onClick={(e) => {
+                                                                if (isSelectionMode) return;
+                                                                e.stopPropagation();
+                                                                onPreview(url);
+                                                            }}
                                                             alt={`History ${idx}`}
                                                         />
                                                     )}
-                                                    <button onClick={() => handleDownloadAsset(url, `history-${idx}`)} className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Download className="w-3.5 h-3.5" /></button>
+                                                    {!isSelectionMode && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDownloadAsset(url, `history-${idx}`); }}
+                                                            className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        >
+                                                            <Download className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
