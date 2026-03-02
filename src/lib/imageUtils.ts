@@ -79,6 +79,32 @@ export async function createThumbnail(src: string, maxWidth: number = 400, quali
 }
 
 /**
+ * Converts a remote URL to a Base64 string.
+ */
+export async function urlToBase64(url: string): Promise<string> {
+    const isVideo = (u: string) => {
+        const clean = u.split('?')[0].split('#')[0].toLowerCase();
+        return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].some(ext => clean.endsWith(ext));
+    };
+
+    if (isVideo(url)) return url; // Don't base64 encode videos for DB storage
+
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (e) {
+        console.warn('[ImageUtils] Failed to convert URL to base64:', url, e);
+        return url; // Fallback to original URL
+    }
+}
+
+/**
  * Creates thumbnails for an array of URLs.
  */
 export async function createThumbnails(urls: string[]): Promise<string[]> {

@@ -6,7 +6,7 @@ import type { GenerationRequest } from '../lib/geminiService';
 import { falService, updateFalApiKey, type FalGenerationRequest } from '../lib/falService';
 import { dbService } from '../lib/dbService';
 import type { DBAsset as Asset, DBSavedPost as SavedPost, DBPromptPreset, DBGenerationHistory } from '../lib/dbService';
-import { createThumbnails } from '../lib/imageUtils';
+import { createThumbnails, urlToBase64 } from '../lib/imageUtils';
 import { SIMPLE_PROFILE, SIMPLE_THEMES, CAPTION_TEMPLATES } from './creator-presets';
 
 // Component Imports
@@ -697,10 +697,16 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
 
             // --- Save to Generation History ---
             try {
-                const thumbnailUrls = generationSucceeded ? await createThumbnails(resultUrls) : undefined;
+                // Ensure media items are converted to persistent base64 if they are images
+                const persistentMediaUrls = generationSucceeded
+                    ? await Promise.all(resultUrls.map(u => urlToBase64(u)))
+                    : resultUrls;
+
+                const thumbnailUrls = generationSucceeded ? await createThumbnails(persistentMediaUrls) : undefined;
+
                 await dbService.saveGenerationHistory({
                     ...baseHistoryEntry,
-                    mediaUrls: resultUrls,
+                    mediaUrls: persistentMediaUrls,
                     thumbnailUrls,
                     status: generationSucceeded ? 'success' : 'failed',
                     errorMessage: generationError || undefined

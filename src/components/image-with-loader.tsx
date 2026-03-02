@@ -65,7 +65,7 @@ export function ImageWithLoader({ className, fallbackIcon, ...props }: ImageWith
                 {...props}
                 ref={imgRef}
                 decoding="async"
-                loading="eager" // Preference for Asset Library images to show ASAP
+                loading="lazy" // Prioritize browser-native lazy loading for lists
                 onLoad={(e) => {
                     if (props.src) loadedImagesCache.add(props.src);
                     setIsLoaded(true);

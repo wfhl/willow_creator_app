@@ -70,11 +70,20 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
     const FOLDER_COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1'];
     const FOLDER_ICONS = ['folder', 'star', 'heart', 'camera', 'video', 'music', 'briefcase', 'home'];
 
-    const isLoadingRef = useRef(false);
+    // Separate in-flight guards so assets and history can't interfere with each other
+    const isLoadingAssetsRef = useRef(false);
+    const isLoadingHistoryRef = useRef(false);
+
+    // Stable refs to latest state – used inside callbacks to avoid stale closures
+    // that would otherwise force recreation of loadContent/loadHistory on every render
+    const assetsRef = useRef<DBAsset[]>(assets);
+    const historyRef = useRef<DBGenerationHistory[]>(history);
+    useEffect(() => { assetsRef.current = assets; }, [assets]);
+    useEffect(() => { historyRef.current = history; }, [history]);
 
     const loadContent = useCallback(async (isLoadMore = false) => {
-        if (isLoadingRef.current) return;
-        isLoadingRef.current = true;
+        if (isLoadingAssetsRef.current) return;
+        isLoadingAssetsRef.current = true;
         setIsLoadingMore(true);
         try {
             if (!isLoadMore) {
@@ -82,8 +91,9 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
                 setFolders(f.sort((x, y) => x.name.localeCompare(y.name)));
             }
 
-            // Using cursor-based pagination: find the timestamp of the last asset
-            const lastAsset = isLoadMore && assets.length > 0 ? assets[assets.length - 1] : null;
+            // Read from ref to avoid stale closure (and avoid this fn recreating on every assets change)
+            const currentAssets = assetsRef.current;
+            const lastAsset = isLoadMore && currentAssets.length > 0 ? currentAssets[currentAssets.length - 1] : null;
             const beforeTimestamp = lastAsset?.timestamp;
 
             const a = await dbService.getAssetsBatch(currentFolderId, BATCH_SIZE, 0, 'prev', beforeTimestamp);
@@ -105,18 +115,20 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
         } catch (err) {
             console.error("Failed to load library content:", err);
         } finally {
-            isLoadingRef.current = false;
+            isLoadingAssetsRef.current = false;
             setIsLoadingMore(false);
         }
-    }, [currentFolderId, assets, BATCH_SIZE]);
+        // Only recreate when folder changes – assetsRef gives us the latest assets without being a dep
+    }, [currentFolderId]);
 
     const loadHistory = useCallback(async (isLoadMore = false) => {
-        if (isLoadingRef.current) return;
-        isLoadingRef.current = true;
+        if (isLoadingHistoryRef.current) return;
+        isLoadingHistoryRef.current = true;
         setIsLoadingMore(true);
         try {
-            // Using cursor-based pagination: find the timestamp of the last history item
-            const lastItem = isLoadMore && history.length > 0 ? history[history.length - 1] : null;
+            // Read from ref to avoid stale closure
+            const currentHistory = historyRef.current;
+            const lastItem = isLoadMore && currentHistory.length > 0 ? currentHistory[currentHistory.length - 1] : null;
             const beforeTimestamp = lastItem?.timestamp;
 
             const h = await dbService.getRecentHistoryBatch(BATCH_SIZE, 0, 'prev', beforeTimestamp);
@@ -135,10 +147,11 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
         } catch (err) {
             console.error("Failed to load history:", err);
         } finally {
-            isLoadingRef.current = false;
+            isLoadingHistoryRef.current = false;
             setIsLoadingMore(false);
         }
-    }, [history, BATCH_SIZE]);
+        // Stable – no state deps needed since we use historyRef
+    }, []);
 
     useEffect(() => {
         loadContent(false);
@@ -155,12 +168,12 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
     useEffect(() => {
         const observer = new IntersectionObserver(
             entries => {
-                if (entries[0].isIntersecting && !isLoadingMore) {
-                    if (subTab === 'saved' && hasMoreAssets) {
-                        loadContent(true);
-                    } else if (subTab === 'history' && hasMoreHistory) {
-                        loadHistory(true);
-                    }
+                if (!entries[0].isIntersecting) return;
+                // Check live refs so we don't need them as effect deps
+                if (subTab === 'saved' && hasMoreAssets && !isLoadingAssetsRef.current) {
+                    loadContent(true);
+                } else if (subTab === 'history' && hasMoreHistory && !isLoadingHistoryRef.current) {
+                    loadHistory(true);
                 }
             },
             { threshold: 0.1, rootMargin: '200px' }
@@ -170,14 +183,15 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
         if (target) observer.observe(target);
 
         return () => observer.disconnect();
-    }, [subTab, hasMoreAssets, hasMoreHistory, isLoadingMore, loadContent, loadHistory]);
+        // loadContent/loadHistory are now stable; hasMoreAssets/hasMoreHistory tell us when to re-bind
+    }, [subTab, hasMoreAssets, hasMoreHistory, loadContent, loadHistory]);
 
     useEffect(() => {
         const unsubscribe = dbService.subscribe((store, type, data) => {
             if (store === 'assets' || store === 'folders') {
                 if (type === 'insert' || type === 'delete' || type === 'update') {
-                    // Only reload if we are on the relevant subtab or it's empty
-                    if (subTab === 'saved' || assets.length === 0) loadContent(false);
+                    // Use ref so we don't need assets/subTab as deps (avoids re-subscribing constantly)
+                    if (subTab === 'saved' || assetsRef.current.length === 0) loadContent(false);
                 }
             } else if (store === 'generation_history') {
                 // If a specific history item was updated (e.g. status changed from pending to success)
@@ -186,14 +200,19 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
                     setHistory(prev => prev.map(h => h.id === data.id ? { ...h, ...data } : h));
                 } else if (type === 'insert') {
                     // Prepend new items to history for instant feedback
-                    setHistory(prev => [data, ...prev]);
+                    setHistory(prev => {
+                        // Avoid duplicate if the item is already present
+                        if (prev.some(h => h.id === data.id)) return prev;
+                        return [data, ...prev];
+                    });
                 } else {
-                    if (subTab === 'history' || history.length === 0) loadHistory(false);
+                    if (subTab === 'history' || historyRef.current.length === 0) loadHistory(false);
                 }
             }
         });
         return () => { unsubscribe(); };
-    }, [subTab, loadContent, loadHistory, history.length, assets.length]);
+        // loadContent/loadHistory are stable; subTab is the only real trigger to re-bind
+    }, [subTab, loadContent, loadHistory]);
 
     const toggleSelection = (id: string) => {
         const newSelected = new Set(selectedHistoryIds);
@@ -283,27 +302,39 @@ Tab: ${item.tab || 'N/A'}
         }
     };
 
-    // Polling for pending generations
     useEffect(() => {
-        if (subTab !== 'history' || history.length === 0) return;
+        if (subTab !== 'history') return;
 
         let isPolling = true;
         const checkPending = async () => {
             if (!isPolling) return;
-            const pendingItems = history.filter(h => h.status === 'pending' && h.requestId && h.falEndpoint);
+            // Use the stable ref for the latest history array
+            const pendingItems = historyRef.current.filter(h => h.status === 'pending' && h.requestId && h.falEndpoint);
             if (pendingItems.length === 0) return;
 
             try {
                 const { falService } = await import('../../lib/falService');
+                const { createThumbnails, urlToBase64 } = await import('../../lib/imageUtils');
                 for (const item of pendingItems) {
                     if (!isPolling) break;
                     try {
                         const result = await falService.checkGenerationStatus(item.requestId!, item.falEndpoint!);
                         if (result.status !== 'pending') {
+                            const mediaUrls = result.mediaUrls || [];
+
+                            // 1. Generate persistent thumbnails (Base64)
+                            const thumbnailUrls = mediaUrls.length > 0 ? await createThumbnails(mediaUrls) : undefined;
+
+                            // 2. Converrt images to Base64 for permanent history persistence
+                            const persistentMediaUrls = mediaUrls.length > 0
+                                ? await Promise.all(mediaUrls.map(u => urlToBase64(u)))
+                                : [];
+
                             await dbService.saveGenerationHistory({
                                 ...item,
                                 status: result.status,
-                                mediaUrls: result.mediaUrls || [],
+                                mediaUrls: persistentMediaUrls,
+                                thumbnailUrls: thumbnailUrls,
                                 errorMessage: result.error
                             });
                         }
@@ -323,7 +354,9 @@ Tab: ${item.tab || 'N/A'}
             isPolling = false;
             clearInterval(interval);
         };
-    }, [subTab, history]);
+        // Break the loop by removing 'history' dependency. 
+        // historyRef is kept in sync via another effect and provides latest state.
+    }, [subTab]);
 
     // Derived filtered states for search
     const filteredFolders = folders.filter(f =>

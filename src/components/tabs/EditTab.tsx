@@ -391,11 +391,18 @@ export function EditTab({
                                                         onChange={(e) => setRefineImageSize(e.target.value)}
                                                         className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-base md:text-xs text-white focus:border-emerald-500/50 outline-none cursor-pointer hover:bg-white/5 transition-colors"
                                                     >
-                                                        {selectedModel.includes('banana') || selectedModel.includes('gemini-3.1-flash-image') ? (
+                                                        {selectedModel.includes('banana') || selectedModel.includes('gemini-3') ? (
                                                             <>
                                                                 <option value="1:1">1:1 Square</option>
-                                                                <option value="4:3">4:3 Landscape(ish)</option>
-                                                                <option value="16:9">16:9 Landscape</option>
+                                                                <option value="4:3">4:3 Landscape</option>
+                                                                <option value="3:4">3:4 Portrait</option>
+                                                                <option value="16:9">16:9 Cinematic</option>
+                                                                <option value="9:16">9:16 Vertical</option>
+                                                                <option value="2:3">2:3 Social</option>
+                                                                <option value="3:2">3:2 Photographic</option>
+                                                                <option value="4:5">4:5 Portrait</option>
+                                                                <option value="5:4">5:4 Landscape</option>
+                                                                <option value="21:9">21:9 Ultrawide</option>
                                                             </>
                                                         ) : selectedModel.includes('v4.5') || selectedModel.includes('v5/lite') ? (
                                                             <>
