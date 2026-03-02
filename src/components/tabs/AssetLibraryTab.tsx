@@ -35,9 +35,10 @@ import type { DBAsset, DBFolder, DBGenerationHistory } from '../../lib/dbService
 interface AssetLibraryTabProps {
     onPreview: (url: string) => void;
     onRecall?: (item: DBGenerationHistory) => void;
+    onDownload?: (url: string, prefix?: string) => void;
 }
 
-export function AssetLibraryTab({ onPreview, onRecall }: AssetLibraryTabProps) {
+export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibraryTabProps) {
     const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
     const [path, setPath] = useState<DBFolder[]>([]);
     const [folders, setFolders] = useState<DBFolder[]>([]);
@@ -748,7 +749,7 @@ Tab: ${item.tab || 'N/A'}
                                                         )}
                                                         {!isSelectionMode && (
                                                             <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDownloadAsset(url, `history-${idx}`); }}
+                                                                onClick={(e) => { e.stopPropagation(); onDownload ? onDownload(url, `history_${idx}`) : handleDownloadAsset(url, `history-${idx}`); }}
                                                                 className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-100 transition-opacity"
                                                             >
                                                                 <Download className="w-3.5 h-3.5" />

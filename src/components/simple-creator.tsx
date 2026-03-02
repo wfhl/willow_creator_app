@@ -1834,6 +1834,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                     <AssetLibraryTab
                         onPreview={(url) => handleOpenPreview(url)}
                         onRecall={handleRecall}
+                        onDownload={handleDownload}
                     />
                 </div>
             </div>
