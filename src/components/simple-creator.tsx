@@ -192,16 +192,18 @@ export default function SimpleCreator() {
         };
         loadInitialLocalData();
 
-        // Subscribe to DB changes to keep UI in sync
+        // Subscribe to DB changes to keep UI in sync (including cross-device sync)
         const unsubscribe = dbService.subscribe((store, type, _data) => {
             if (store === 'posts') {
-                // Reload posts for simplicity, or optimistically update
                 dbService.getRecentPostsBatch(24, 0, sortOrder).then(setSavedPosts);
                 dbService.getPostsCount().then(setTotalSavedCount);
             } else if (store === 'assets') {
                 if (type === 'insert' || type === 'update' || type === 'delete') {
                     dbService.getSelectedAssets().then(setAssets).catch(console.error);
                 }
+            } else if (store === 'presets') {
+                // Reload presets so cross-device sync is reflected in all dropdowns
+                dbService.getAllPresets().then(setPresets).catch(console.error);
             }
         });
 
@@ -1826,12 +1828,14 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                     />
                 )}
 
-                {activeTab === 'assets' && (
+                {/* AssetLibraryTab is ALWAYS mounted to preserve loaded image state.
+                    CSS hides it when on another tab. This prevents spinner on every return visit. */}
+                <div className={activeTab === 'assets' ? 'block' : 'hidden'}>
                     <AssetLibraryTab
                         onPreview={(url) => handleOpenPreview(url)}
                         onRecall={handleRecall}
                     />
-                )}
+                </div>
             </div>
 
             {/* Mobile Bottom Navigation */}

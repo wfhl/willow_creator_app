@@ -5,22 +5,37 @@ interface ImageWithLoaderProps extends React.ImgHTMLAttributes<HTMLImageElement>
     fallbackIcon?: React.ReactNode;
 }
 
+// Global session cache for already loaded URLs to prevent flickering during tab navigation
+const loadedImagesCache = new Set<string>();
+
 export function ImageWithLoader({ className, fallbackIcon, ...props }: ImageWithLoaderProps) {
-    const [isLoaded, setIsLoaded] = useState(false);
+    const [isLoaded, setIsLoaded] = useState(() => props.src ? loadedImagesCache.has(props.src) : false);
     const [hasError, setHasError] = useState(false);
 
     const imgRef = React.useRef<HTMLImageElement>(null);
 
     // Initial check on mount
     React.useEffect(() => {
+        if (props.src && loadedImagesCache.has(props.src)) {
+            setIsLoaded(true);
+            return;
+        }
         if (imgRef.current?.complete) {
+            if (props.src) loadedImagesCache.add(props.src);
             setIsLoaded(true);
         }
-    }, []);
+    }, [props.src]);
 
     // Reset state when src changes
     React.useEffect(() => {
+        if (props.src && loadedImagesCache.has(props.src)) {
+            setIsLoaded(true);
+            setHasError(false);
+            return;
+        }
+
         if (imgRef.current?.complete) {
+            if (props.src) loadedImagesCache.add(props.src);
             setIsLoaded(true);
             setHasError(false);
         } else {
@@ -50,12 +65,14 @@ export function ImageWithLoader({ className, fallbackIcon, ...props }: ImageWith
                 {...props}
                 ref={imgRef}
                 decoding="async"
-                loading="lazy"
+                loading="eager" // Preference for Asset Library images to show ASAP
                 onLoad={(e) => {
+                    if (props.src) loadedImagesCache.add(props.src);
                     setIsLoaded(true);
                     if (props.onLoad) props.onLoad(e);
                 }}
                 onError={(e) => {
+                    if (props.src) loadedImagesCache.delete(props.src);
                     setHasError(true);
                     if (props.onError) props.onError(e);
                 }}

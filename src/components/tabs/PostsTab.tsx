@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Download, ImagePlus, Search, Loader2, X, ChevronLeft, ChevronRight, Image as ImageIcon, RotateCcw, Check } from 'lucide-react';
+import { Download, ImagePlus, Search, Loader2, X, ChevronLeft, ChevronRight, Image as ImageIcon, RotateCcw, Check, Trash2 } from 'lucide-react';
 import { ImageWithLoader } from '../image-with-loader';
 import type { DBSavedPost as SavedPost } from '../../lib/dbService';
 import { SIMPLE_THEMES } from '../creator-presets';
@@ -359,15 +359,7 @@ Total Media Items: ${post.mediaUrls.length}
                         <h2 className="text-xl font-bold font-serif text-white/90">Saved Library</h2>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {isSelectionMode && (
-                            <button
-                                type="button"
-                                onClick={handleSelectAll}
-                                className="text-[10px] md:text-xs px-2 md:px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded flex items-center gap-2 transition-all text-emerald-400 font-bold uppercase tracking-widest"
-                            >
-                                {selectedPostIds.size === displayPosts.length ? 'Deselect All' : 'Select All'}
-                            </button>
-                        )}
+
                         <button
                             type="button"
                             onClick={onImportReferences}
@@ -431,7 +423,7 @@ Total Media Items: ${post.mediaUrls.length}
 
                 {/* Sub-search row for Multi-Select */}
                 {displayPosts.length > 0 && (
-                    <div className="flex items-center justify-between gap-2 mt-2">
+                    <div className="flex items-center gap-2 mt-2">
                         <button
                             onClick={() => {
                                 setIsSelectionMode(!isSelectionMode);
@@ -446,7 +438,7 @@ Total Media Items: ${post.mediaUrls.length}
                             <button
                                 type="button"
                                 onClick={handleSelectAll}
-                                className="text-[10px] uppercase font-bold tracking-widest px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded flex items-center gap-2 transition-all text-white/60 hover:text-white"
+                                className="text-[10px] uppercase font-bold tracking-widest px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded flex items-center gap-2 transition-all text-white/40 hover:text-white"
                             >
                                 {selectedPostIds.size === displayPosts.length ? 'Deselect All' : 'Select All'}
                             </button>
@@ -602,7 +594,7 @@ Total Media Items: ${post.mediaUrls.length}
                                     )}
 
                                     {!isSelectionMode && (
-                                        <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex gap-1 z-20">
+                                        <div className="absolute top-2 right-2 opacity-100 transition-opacity flex gap-1 z-20">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -731,7 +723,7 @@ Total Media Items: ${post.mediaUrls.length}
                                 disabled={isProcessingBulk}
                                 className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all disabled:opacity-50"
                             >
-                                <X className="w-4 h-4" />
+                                <Trash2 className="w-4 h-4" />
                             </button>
                         </div>
                     </div>

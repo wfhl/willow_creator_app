@@ -202,6 +202,35 @@ export const dbService = {
         listeners = [];
     },
 
+    async getById(storeName: DBStore, id: string): Promise<any> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            try {
+                const transaction = db.transaction(storeName, 'readonly');
+                const store = transaction.objectStore(storeName);
+                const request = store.get(id);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            } catch (e) { reject(e); }
+        });
+    },
+
+    async deleteById(storeName: DBStore, id: string): Promise<void> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            try {
+                const transaction = db.transaction(storeName, 'readwrite');
+                const store = transaction.objectStore(storeName);
+                const request = store.delete(id);
+                request.onsuccess = () => {
+                    this.notify(storeName, 'delete', { id });
+                    resolve();
+                };
+                request.onerror = () => reject(request.error);
+            } catch (e) { reject(e); }
+        });
+    },
+
     async getConfig<T = any>(id: string): Promise<T | undefined> {
         const db = await openDB();
         return new Promise((resolve, reject) => {

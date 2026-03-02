@@ -630,7 +630,7 @@ Tab: ${item.tab || 'N/A'}
                                         <span className={viewMode === 'grid' ? "text-[10px] md:text-xs font-bold text-white/50 group-hover:text-white uppercase tracking-widest text-center truncate w-full mt-4" : "text-sm text-white/70 flex-1 truncate"}>
                                             {folder.name}
                                         </span>
-                                        <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity">
                                             <button onClick={(e) => { e.stopPropagation(); openEditFolder(folder); }} className="p-1.5 bg-black/40 hover:bg-white/10 text-white/40 hover:text-white rounded-lg backdrop-blur-sm"><Edit3 className="w-3 h-3" /></button>
                                             <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id, folder.name); }} className="p-1.5 bg-black/40 hover:bg-red-500/10 text-white/40 hover:text-red-500 rounded-lg backdrop-blur-sm"><Trash2 className="w-3 h-3" /></button>
                                         </div>
@@ -644,7 +644,7 @@ Tab: ${item.tab || 'N/A'}
                                                 <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
                                                     <p className="text-[9px] text-white/90 truncate font-mono">{asset.name}</p>
                                                 </div>
-                                                <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-100 transition-opacity">
                                                     <button onClick={() => handleDeleteAsset(asset.id)} className="p-2 bg-black/40 text-red-400 hover:bg-red-500 hover:text-white rounded-xl backdrop-blur-sm"><Trash2 className="w-3.5 h-3.5" /></button>
                                                     <button onClick={() => handleDownloadAsset(asset.base64, asset.name)} className="p-2 bg-black/40 text-white/60 hover:text-white rounded-xl backdrop-blur-sm"><Download className="w-3.5 h-3.5" /></button>
                                                 </div>
@@ -711,7 +711,7 @@ Tab: ${item.tab || 'N/A'}
                                                 <p className="text-sm text-white/90 line-clamp-2 mb-1">{item.prompt}</p>
                                             </div>
                                             {!isSelectionMode && (
-                                                <div className="flex gap-1 opacity-100 md:opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                                <div className="flex gap-1 opacity-100 transition-opacity">
                                                     <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item.prompt); alert("Copied!"); }} className="p-1.5 text-white/40 hover:text-white bg-white/5 rounded-lg" title="Copy Prompt"><Copy className="w-3.5 h-3.5" /></button>
                                                     <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(item.id); }} className="p-1.5 text-white/40 hover:text-red-500 bg-white/5 rounded-lg" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
                                                     <button onClick={(e) => { e.stopPropagation(); onRecall && onRecall(item); }} className="p-1.5 text-white/40 hover:text-emerald-500 bg-white/5 rounded-lg" title="Recall"><RotateCcw className="w-3.5 h-3.5" /></button>
@@ -749,7 +749,7 @@ Tab: ${item.tab || 'N/A'}
                                                         {!isSelectionMode && (
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleDownloadAsset(url, `history-${idx}`); }}
-                                                                className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-100 transition-opacity"
                                                             >
                                                                 <Download className="w-3.5 h-3.5" />
                                                             </button>

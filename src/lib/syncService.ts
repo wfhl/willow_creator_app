@@ -40,6 +40,62 @@ export const syncService = {
 
         // Perform initial full sync in background
         this.fullSync();
+
+        // Subscribe to remote changes (Realtime)
+        this.subscribeToRealtime();
+    },
+
+    unsubscribeRealtime: null as (() => void) | null,
+
+    subscribeToRealtime() {
+        if (!this.user) return;
+        console.log("[Sync] Setting up realtime subscriptions");
+
+        const channels = ['assets', 'posts', 'presets', 'folders', 'generation_history'].map(table => {
+            return supabase
+                .channel(`remote-${table}-${this.user!.id}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: table,
+                    filter: `user_id=eq.${this.user!.id}`
+                }, async (payload) => {
+                    if (this.isSyncing) return; // Ignore our own pushes if they somehow loop back
+
+                    const store = table === 'generation_history' ? 'generation_history' : table as DBStore;
+
+                    if (payload.eventType === 'DELETE') {
+                        const id = (payload.old as any).id;
+                        if (id) {
+                            console.log(`[Sync] Remote DELETE on ${store}: ${id}`);
+                            await dbService.deleteById(store, id);
+                        }
+                    } else {
+                        const cloud = payload.new as any;
+                        const mapped = this.mapFromCloud(store, cloud);
+
+                        // Check if we already have it identical (avoid loops)
+                        const exists = await dbService.getById(store, mapped.id);
+                        if (exists && JSON.stringify(exists) === JSON.stringify(mapped)) return;
+
+                        console.log(`[Sync] Remote ${payload.eventType} on ${store}: ${mapped.id}`);
+
+                        if (store === 'assets') {
+                            const dlAsset = await this.downloadAssetFromStorage(mapped);
+                            await dbService.saveAsset(dlAsset);
+                        }
+                        else if (store === 'posts') await dbService.savePost(mapped);
+                        else if (store === 'presets') await dbService.savePreset(mapped);
+                        else if (store === 'folders') await dbService.saveFolder(mapped);
+                        else if (store === 'generation_history') await dbService.saveGenerationHistory(mapped);
+                    }
+                })
+                .subscribe();
+        });
+
+        this.unsubscribeRealtime = () => {
+            channels.forEach(ch => supabase.removeChannel(ch));
+        };
     },
 
     async saveUserConfig(id: string, data: any) {
