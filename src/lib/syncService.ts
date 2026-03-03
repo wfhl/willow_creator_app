@@ -22,7 +22,7 @@ export const syncService = {
             try {
                 if (type === 'delete') {
                     if (data.id === 'ALL') {
-                        // Handle clear all logic if needed, but for now just clear cloud?
+                        // Handle clear all logic if needed
                         return;
                     }
                     this.recentlyDeleted.add(data.id);
@@ -60,7 +60,7 @@ export const syncService = {
                     table: table,
                     filter: `user_id=eq.${this.user!.id}`
                 }, async (payload) => {
-                    if (this.isSyncing) return; // Ignore our own pushes if they somehow loop back
+                    if (this.isSyncing) return;
 
                     const store = table === 'generation_history' ? 'generation_history' : table as DBStore;
 
@@ -116,7 +116,7 @@ export const syncService = {
             await this.syncTable('presets');
             await this.syncTable('posts');
             await this.syncTable('generation_history');
-            await this.syncTable('assets'); // Assets last as they might trigger storage uploads
+            await this.syncTable('assets');
         } catch (e) {
             console.error("[Sync] Full sync failed:", e);
         } finally {
@@ -131,7 +131,6 @@ export const syncService = {
 
         console.log(`[Sync] Syncing table: ${table}`);
 
-        // 1. Get Local Items
         let localItems: any[] = [];
         if (store === 'assets') localItems = await dbService.getAllAssets();
         else if (store === 'posts') localItems = await dbService.getAllPosts();
@@ -139,7 +138,6 @@ export const syncService = {
         else if (store === 'folders') localItems = await dbService.getAllFolders();
         else if (store === 'generation_history') localItems = await dbService.getAllGenerationHistory();
 
-        // 2. Get Cloud Items
         const { data: cloudItems, error } = await supabase
             .from(table)
             .select('*')
@@ -147,14 +145,10 @@ export const syncService = {
 
         if (error) throw error;
 
-        // 3. Merging Logic
         // Push local-only to cloud
         for (const local of localItems) {
             const existsInCloud = cloudItems.some(c => c.id === local.id);
             if (!existsInCloud) {
-                // Before pushing, check if this item was intentionally deleted in cloud but exists locally
-                // This can happen if user deletes in cloud but not local (unlikely in this unidirectional flow).
-                // Actually, if it's local but not in cloud, we assume it's NEW and push it.
                 console.log(`[Sync] Pushing local-only ${store}: ${local.id}`);
                 await this.syncToCloud(store, local);
             }
@@ -163,37 +157,17 @@ export const syncService = {
         // Pull cloud-only to local
         for (const cloud of cloudItems) {
             const isDeleted = await dbService.isDeleted(cloud.id);
-            if (this.recentlyDeleted.has(cloud.id) || isDeleted) {
-                console.log(`[Sync] Skipping pull for recently/persistently deleted ${store}: ${cloud.id}`);
-                continue;
-            }
+            if (this.recentlyDeleted.has(cloud.id) || isDeleted) continue;
 
             const mapped = this.mapFromCloud(store, cloud);
             const existsLocally = localItems.find(l => l.id === cloud.id);
 
-            if (existsLocally) {
-                // If cloud is newer, update local? For now, we favor local as truth if IDs match
-                // but we could sync cloud changes to local here if timestamp > existsLocally.timestamp
-                continue;
-            }
+            if (existsLocally) continue;
 
-            // DEDUPLICATION MERGE: If ID is different but content exists locally, remove orphaned cloud copy
+            // Simple merging for unique content
             if (store === 'folders') {
                 const sameName = localItems.find(l => l.name === mapped.name && l.parentId === mapped.parentId);
                 if (sameName) {
-                    console.log(`[Sync] Folder with same name already exists in cloud with different ID, removing orphaned cloud copy: ${mapped.id}`);
-                    await this.removeFromCloud(store, mapped.id);
-                    continue;
-                }
-            }
-
-            if (store === 'assets') {
-                const sameContent = localItems.find(l =>
-                    (l.publicUrl && l.publicUrl === mapped.publicUrl) ||
-                    (l.name === mapped.name && l.timestamp === mapped.timestamp)
-                );
-                if (sameContent) {
-                    console.log(`[Sync] Asset already exists under different ID, removing orphaned cloud copy: ${mapped.id}`);
                     await this.removeFromCloud(store, mapped.id);
                     continue;
                 }
@@ -223,149 +197,106 @@ export const syncService = {
         let payload = this.mapToCloud(store, data);
         payload.user_id = this.user.id;
 
-        // --- ASSETS LOGIC ---
+        // Assets Logic
         if (store === 'assets') {
             if (data.base64) {
                 try {
                     const { publicUrl, storagePath } = await this.uploadAssetToStorage(data);
                     payload.public_url = publicUrl;
                     payload.storage_path = storagePath;
-                    payload.width = 0;
-                    payload.height = 0;
                     delete payload.base64;
                 } catch (e) {
                     console.error("Failed to upload asset to storage", e);
                     throw e;
                 }
             } else {
-                console.warn("Asset missing base64, skipping upload", data.id);
                 delete payload.base64;
             }
         }
 
-        // --- POSTS & HISTORY LOGIC ---
+        // Posts & History Logic: Upload base64 content to storage
         if (store === 'posts' || store === 'generation_history') {
-            // Check for base64 in media_urls
+            // Handle mediaUrls
             if (payload.media_urls && Array.isArray(payload.media_urls)) {
                 try {
                     const updatedUrls = await Promise.all(payload.media_urls.map(async (url: string, index: number) => {
-                        if (url.startsWith('data:')) {
-                            // Upload base64 post/history media
+                        if (url && url.startsWith('data:')) {
                             const fileExt = url.startsWith('data:video') ? 'mp4' : 'jpeg';
                             const folder = store === 'posts' ? 'posts' : 'history';
                             const fileName = `${folder}/${this.user!.id}/${data.id}_${index}_${Date.now()}.${fileExt}`;
-
-                            // Convert base64 to Blob
                             const res = await fetch(url);
                             const blob = await res.blob();
-
-                            const { error: uploadError } = await supabase.storage
-                                .from('user-library')
-                                .upload(fileName, blob, {
-                                    contentType: blob.type,
-                                    upsert: true
-                                });
-
+                            const { error: uploadError } = await supabase.storage.from('user-library').upload(fileName, blob, { contentType: blob.type, upsert: true });
                             if (uploadError) throw uploadError;
-
-                            const { data: { publicUrl } } = supabase.storage
-                                .from('user-library')
-                                .getPublicUrl(fileName);
-
+                            const { data: { publicUrl } } = supabase.storage.from('user-library').getPublicUrl(fileName);
                             return publicUrl;
                         }
-                        return url; // Already a URL
+                        return url;
                     }));
                     payload.media_urls = updatedUrls;
-                } catch (e) {
-                    console.error(`[Sync] Failed to upload ${store} media`, e);
-                    throw e;
-                }
+                } catch (e) { console.error(`[Sync] Failed to upload ${store} media`, e); }
             }
 
-            // Also check for input_image_url in generation_history
-            if (store === 'generation_history' && payload.input_image_url && payload.input_image_url.startsWith('data:')) {
+            // Handle thumbnailUrls
+            if (payload.thumbnail_urls && Array.isArray(payload.thumbnail_urls)) {
+                try {
+                    const updatedThumbs = await Promise.all(payload.thumbnail_urls.map(async (url: string, index: number) => {
+                        if (url && url.startsWith('data:')) {
+                            const folder = store === 'posts' ? 'posts' : 'history';
+                            const fileName = `${folder}/${this.user!.id}/${data.id}_thumb_${index}_${Date.now()}.jpeg`;
+                            const res = await fetch(url);
+                            const blob = await res.blob();
+                            const { error: uploadError } = await supabase.storage.from('user-library').upload(fileName, blob, { contentType: 'image/jpeg', upsert: true });
+                            if (uploadError) throw uploadError;
+                            const { data: { publicUrl } } = supabase.storage.from('user-library').getPublicUrl(fileName);
+                            return publicUrl;
+                        }
+                        return url;
+                    }));
+                    payload.thumbnail_urls = updatedThumbs;
+                } catch (e) { console.error(`[Sync] Failed to upload ${store} thumbnails`, e); }
+            }
+
+            // Handle inputImageUrl
+            if (payload.input_image_url && payload.input_image_url.startsWith('data:')) {
                 try {
                     const url = payload.input_image_url;
                     const fileExt = url.startsWith('data:video') ? 'mp4' : 'jpeg';
                     const fileName = `history/${this.user!.id}/${data.id}_input_${Date.now()}.${fileExt}`;
-
                     const res = await fetch(url);
                     const blob = await res.blob();
-
-                    const { error: uploadError } = await supabase.storage
-                        .from('user-library')
-                        .upload(fileName, blob, {
-                            contentType: blob.type,
-                            upsert: true
-                        });
-
+                    const { error: uploadError } = await supabase.storage.from('user-library').upload(fileName, blob, { contentType: blob.type, upsert: true });
                     if (uploadError) throw uploadError;
-
-                    const { data: { publicUrl } } = supabase.storage
-                        .from('user-library')
-                        .getPublicUrl(fileName);
-
+                    const { data: { publicUrl } } = supabase.storage.from('user-library').getPublicUrl(fileName);
                     payload.input_image_url = publicUrl;
-                } catch (e) {
-                    console.error("[Sync] Failed to upload history input image", e);
-                    // Don't throw, just let it fail silently or nullify? If we let it pass, DB might reject validation?
-                    // Safe to strip it if upload fails to prevent sync block?
-                    delete payload.input_image_url;
-                }
+                } catch (e) { console.error("[Sync] Failed to upload history input image", e); delete payload.input_image_url; }
             }
         }
 
-        const { error } = await supabase
-            .from(table)
-            .upsert(payload, { onConflict: 'id' });
-
+        const { error } = await supabase.from(table).upsert(payload, { onConflict: 'id' });
         if (error) throw error;
     },
 
-    // --- ASSET STORAGE HELPERS ---
-
     async uploadAssetToStorage(asset: any): Promise<{ publicUrl: string, storagePath: string }> {
-        const fileExt = asset.type === 'video' ? 'mp4' : 'jpeg'; // simple guess
+        const fileExt = asset.type === 'video' ? 'mp4' : 'jpeg';
         const fileName = `${this.user!.id}/${asset.id}.${fileExt}`;
-
-        // Convert base64 to Blob
         const base64Response = await fetch(asset.base64);
         const blob = await base64Response.blob();
-
-        const { error: uploadError } = await supabase.storage
-            .from('user-library')
-            .upload(fileName, blob, {
-                contentType: asset.type === 'video' ? 'video/mp4' : 'image/jpeg',
-                upsert: true
-            });
-
+        const { error: uploadError } = await supabase.storage.from('user-library').upload(fileName, blob, { contentType: asset.type === 'video' ? 'video/mp4' : 'image/jpeg', upsert: true });
         if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-            .from('user-library')
-            .getPublicUrl(fileName);
-
+        const { data: { publicUrl } } = supabase.storage.from('user-library').getPublicUrl(fileName);
         return { publicUrl, storagePath: fileName };
     },
 
     async downloadAssetFromStorage(assetFromCloud: any): Promise<any> {
         const url = assetFromCloud.publicUrl || assetFromCloud.public_url;
         if (!url) throw new Error("No public URL for asset");
-
-        // Fetch blob
         const response = await fetch(url);
         const blob = await response.blob();
-
-        // Convert to base64
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => {
-                const base64 = reader.result as string;
-                resolve({
-                    ...assetFromCloud,
-                    base64: base64
-                });
+                resolve({ ...assetFromCloud, base64: reader.result as string });
             };
             reader.onerror = reject;
             reader.readAsDataURL(blob);
@@ -375,207 +306,66 @@ export const syncService = {
     async removeFromCloud(store: DBStore, id: string) {
         if (!this.user) return;
         const table = store === 'generation_history' ? 'generation_history' : store;
-
-        const { error } = await supabase
-            .from(table)
-            .delete()
-            .eq('id', id)
-            .eq('user_id', this.user.id);
-
-        if (error) {
-            console.error(`[Sync] Failed to remove ${id} from cloud ${table}:`, error);
-            throw error;
-        }
-        console.log(`[Sync] Successfully removed ${id} from cloud ${table}`);
+        const { error } = await supabase.from(table).delete().eq('id', id).eq('user_id', this.user.id);
+        if (error) throw error;
     },
-
-    // --- MAPPING UTILS ---
 
     mapToCloud(_store: DBStore, data: any): any {
         const mapped: any = { ...data };
-
-        // Handle common snake_case conversions
-        if (data.folderId !== undefined) {
-            mapped.folder_id = data.folderId;
-            delete mapped.folderId;
-        }
-        if (data.parentId !== undefined) {
-            mapped.parent_id = data.parentId;
-            delete mapped.parentId;
-        }
-        if (data.timestamp !== undefined) {
-            mapped.timestamp = new Date(data.timestamp).toISOString();
-        }
-        // New mappings
-        if (data.color !== undefined) mapped.color = data.color;
-        if (data.icon !== undefined) mapped.icon = data.icon;
-        if (data.tab !== undefined) mapped.tab = data.tab;
-
-        if (data.withAudio !== undefined) {
-            mapped.with_audio = data.withAudio;
-            delete mapped.withAudio;
-        }
-        if (data.cameraFixed !== undefined) {
-            mapped.camera_fixed = data.cameraFixed;
-            delete mapped.cameraFixed;
-        }
-
-        if (data.mediaUrls !== undefined) {
-            mapped.media_urls = data.mediaUrls;
-            delete mapped.mediaUrls;
-        }
-        if (data.mediaType !== undefined) {
-            mapped.media_type = data.mediaType;
-            delete mapped.mediaType;
-        }
-        if (data.themeId !== undefined) {
-            mapped.theme_id = data.themeId;
-            delete mapped.themeId;
-        }
-        if (data.captionType !== undefined) {
-            mapped.caption_type = data.captionType;
-            delete mapped.captionType;
-        }
-        if (data.videoResolution !== undefined) {
-            mapped.video_resolution = data.videoResolution;
-            delete mapped.videoResolution;
-        }
-        if (data.videoDuration !== undefined) {
-            mapped.video_duration = data.videoDuration;
-            delete mapped.videoDuration;
-        }
-        if (data.imageSize !== undefined) {
-            mapped.image_size = data.imageSize;
-            delete mapped.imageSize;
-        }
-        if (data.numImages !== undefined) {
-            mapped.num_images = data.numImages;
-            delete mapped.numImages;
-        }
-        if (data.errorMessage !== undefined) {
-            mapped.error_message = data.errorMessage;
-            delete mapped.errorMessage;
-        }
-        if (data.themeName !== undefined) {
-            mapped.theme_name = data.themeName;
-            delete mapped.themeName;
-        }
-        if (data.basePrompt !== undefined) {
-            mapped.base_prompt = data.basePrompt;
-            delete mapped.basePrompt;
-        }
-        if (data.negativePrompt !== undefined) {
-            mapped.negative_prompt = data.negativePrompt;
-            delete mapped.negativePrompt;
-        }
-        if (data.aspectRatio !== undefined) {
-            mapped.aspect_ratio = data.aspectRatio;
-            delete mapped.aspectRatio;
-        }
-        if (data.inputImageUrl !== undefined) {
-            mapped.input_image_url = data.inputImageUrl;
-            delete mapped.inputImageUrl;
-        }
-
+        if (data.folderId !== undefined) { mapped.folder_id = data.folderId; delete mapped.folderId; }
+        if (data.parentId !== undefined) { mapped.parent_id = data.parentId; delete mapped.parentId; }
+        if (data.timestamp !== undefined) { mapped.timestamp = new Date(data.timestamp).toISOString(); }
+        if (data.withAudio !== undefined) { mapped.with_audio = data.withAudio; delete mapped.withAudio; }
+        if (data.cameraFixed !== undefined) { mapped.camera_fixed = data.cameraFixed; delete mapped.cameraFixed; }
+        if (data.mediaUrls !== undefined) { mapped.media_urls = data.mediaUrls; delete mapped.mediaUrls; }
+        if (data.mediaType !== undefined) { mapped.media_type = data.mediaType; delete mapped.mediaType; }
+        if (data.themeId !== undefined) { mapped.theme_id = data.themeId; delete mapped.themeId; }
+        if (data.captionType !== undefined) { mapped.caption_type = data.captionType; delete mapped.captionType; }
+        if (data.videoResolution !== undefined) { mapped.video_resolution = data.videoResolution; delete mapped.videoResolution; }
+        if (data.videoDuration !== undefined) { mapped.video_duration = data.videoDuration; delete mapped.videoDuration; }
+        if (data.imageSize !== undefined) { mapped.image_size = data.imageSize; delete mapped.imageSize; }
+        if (data.numImages !== undefined) { mapped.num_images = data.numImages; delete mapped.numImages; }
+        if (data.errorMessage !== undefined) { mapped.error_message = data.errorMessage; delete mapped.errorMessage; }
+        if (data.themeName !== undefined) { mapped.theme_name = data.themeName; delete mapped.themeName; }
+        if (data.basePrompt !== undefined) { mapped.base_prompt = data.basePrompt; delete mapped.basePrompt; }
+        if (data.negativePrompt !== undefined) { mapped.negative_prompt = data.negativePrompt; delete mapped.negativePrompt; }
+        if (data.aspectRatio !== undefined) { mapped.aspect_ratio = data.aspectRatio; delete mapped.aspectRatio; }
+        if (data.inputImageUrl !== undefined) { mapped.input_image_url = data.inputImageUrl; delete mapped.inputImageUrl; }
+        if (data.thumbnailUrls !== undefined) { mapped.thumbnail_urls = data.thumbnailUrls; delete mapped.thumbnailUrls; }
+        if (data.requestId !== undefined) { mapped.request_id = data.requestId; delete mapped.requestId; }
+        if (data.falEndpoint !== undefined) { mapped.fal_endpoint = data.falEndpoint; delete mapped.falEndpoint; }
+        if (data.enhancePromptMode !== undefined) { mapped.enhance_prompt_mode = data.enhancePromptMode; delete mapped.enhancePromptMode; }
         return mapped;
     },
 
     mapFromCloud(_store: DBStore, data: any): any {
         const mapped: any = { ...data };
-
-        // Convert back to camelCase
-        if (data.folder_id !== undefined) {
-            mapped.folderId = data.folder_id;
-            delete mapped.folder_id;
-        }
-        if (data.parent_id !== undefined) {
-            mapped.parentId = data.parent_id;
-            delete mapped.parent_id;
-        }
-        if (data.timestamp !== undefined) {
-            mapped.timestamp = new Date(data.timestamp).getTime();
-        }
-
-        // New mappings
-        if (data.public_url !== undefined) {
-            mapped.publicUrl = data.public_url;
-            delete mapped.public_url;
-        }
-        if (data.storage_path !== undefined) {
-            mapped.storagePath = data.storage_path;
-            delete mapped.storage_path;
-        }
-        if (data.color !== undefined) mapped.color = data.color;
-        if (data.icon !== undefined) mapped.icon = data.icon;
-        if (data.tab !== undefined) mapped.tab = data.tab;
-
-        if (data.with_audio !== undefined) {
-            mapped.withAudio = data.with_audio;
-            delete mapped.with_audio;
-        }
-        if (data.camera_fixed !== undefined) {
-            mapped.cameraFixed = data.camera_fixed;
-            delete mapped.camera_fixed;
-        }
-
-        if (data.media_urls !== undefined) {
-            mapped.mediaUrls = data.media_urls;
-            delete mapped.media_urls;
-        }
-        if (data.media_type !== undefined) {
-            mapped.mediaType = data.media_type;
-            delete mapped.media_type;
-        }
-        if (data.theme_id !== undefined) {
-            mapped.themeId = data.theme_id;
-            delete mapped.theme_id;
-        }
-        if (data.caption_type !== undefined) {
-            mapped.captionType = data.caption_type;
-            delete mapped.caption_type;
-        }
-        if (data.video_resolution !== undefined) {
-            mapped.videoResolution = data.video_resolution;
-            delete mapped.video_resolution;
-        }
-        if (data.video_duration !== undefined) {
-            mapped.videoDuration = data.video_duration;
-            delete mapped.video_duration;
-        }
-        if (data.image_size !== undefined) {
-            mapped.imageSize = data.image_size;
-            delete mapped.image_size;
-        }
-        if (data.num_images !== undefined) {
-            mapped.numImages = data.num_images;
-            delete mapped.num_images;
-        }
-        if (data.error_message !== undefined) {
-            mapped.errorMessage = data.error_message;
-            delete mapped.error_message;
-        }
-        if (data.theme_name !== undefined) {
-            mapped.themeName = data.theme_name;
-            delete mapped.theme_name;
-        }
-        if (data.base_prompt !== undefined) {
-            mapped.basePrompt = data.base_prompt;
-            delete mapped.base_prompt;
-        }
-        if (data.negative_prompt !== undefined) {
-            mapped.negativePrompt = data.negative_prompt;
-            delete mapped.negative_prompt;
-        }
-        if (data.aspect_ratio !== undefined) {
-            mapped.aspectRatio = data.aspect_ratio;
-            delete mapped.aspect_ratio;
-        }
-        if (data.input_image_url !== undefined) {
-            mapped.inputImageUrl = data.input_image_url;
-            delete mapped.input_image_url;
-        }
-
-        delete mapped.user_id; // Don't store user_id locally
+        if (data.folder_id !== undefined) { mapped.folderId = data.folder_id; delete mapped.folder_id; }
+        if (data.parent_id !== undefined) { mapped.parentId = data.parent_id; delete mapped.parent_id; }
+        if (data.timestamp !== undefined) { mapped.timestamp = new Date(data.timestamp).getTime(); }
+        if (data.public_url !== undefined) { mapped.publicUrl = data.public_url; delete data.public_url; }
+        if (data.storage_path !== undefined) { mapped.storagePath = data.storage_path; delete data.storage_path; }
+        if (data.with_audio !== undefined) { mapped.withAudio = data.with_audio; delete mapped.with_audio; }
+        if (data.camera_fixed !== undefined) { mapped.cameraFixed = data.camera_fixed; delete mapped.camera_fixed; }
+        if (data.media_urls !== undefined) { mapped.mediaUrls = data.media_urls; delete mapped.media_urls; }
+        if (data.media_type !== undefined) { mapped.mediaType = data.media_type; delete mapped.media_type; }
+        if (data.theme_id !== undefined) { mapped.themeId = data.theme_id; delete mapped.theme_id; }
+        if (data.caption_type !== undefined) { mapped.captionType = data.caption_type; delete mapped.caption_type; }
+        if (data.video_resolution !== undefined) { mapped.videoResolution = data.video_resolution; delete mapped.video_resolution; }
+        if (data.video_duration !== undefined) { mapped.videoDuration = data.video_duration; delete mapped.video_duration; }
+        if (data.image_size !== undefined) { mapped.imageSize = data.image_size; delete mapped.image_size; }
+        if (data.num_images !== undefined) { mapped.numImages = data.num_images; delete mapped.num_images; }
+        if (data.error_message !== undefined) { mapped.errorMessage = data.error_message; delete mapped.error_message; }
+        if (data.theme_name !== undefined) { mapped.themeName = data.theme_name; delete mapped.theme_name; }
+        if (data.base_prompt !== undefined) { mapped.basePrompt = data.base_prompt; delete mapped.base_prompt; }
+        if (data.negative_prompt !== undefined) { mapped.negativePrompt = data.negative_prompt; delete mapped.negative_prompt; }
+        if (data.aspect_ratio !== undefined) { mapped.aspectRatio = data.aspect_ratio; delete mapped.aspect_ratio; }
+        if (data.input_image_url !== undefined) { mapped.inputImageUrl = data.input_image_url; delete mapped.input_image_url; }
+        if (data.thumbnail_urls !== undefined) { mapped.thumbnailUrls = data.thumbnail_urls; delete mapped.thumbnail_urls; }
+        if (data.request_id !== undefined) { mapped.requestId = data.request_id; delete mapped.request_id; }
+        if (data.fal_endpoint !== undefined) { mapped.falEndpoint = data.fal_endpoint; delete mapped.fal_endpoint; }
+        if (data.enhance_prompt_mode !== undefined) { mapped.enhancePromptMode = data.enhance_prompt_mode; delete mapped.enhance_prompt_mode; }
+        delete mapped.user_id;
         return mapped;
     }
 };

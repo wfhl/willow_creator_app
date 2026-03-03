@@ -248,6 +248,68 @@ export default function SimpleCreator() {
         syncCloudMetadata();
     }, [user]);
 
+    // Generation Status Recovery Effect
+    useEffect(() => {
+        const recoverPendingGenerations = async () => {
+            try {
+                const pending = await dbService.getPendingGenerationHistory();
+                if (pending.length === 0) return;
+
+                console.log(`[Recovery] Found ${pending.length} pending generations.`);
+
+                for (const item of pending) {
+                    const ageMs = Date.now() - item.timestamp;
+                    const oneHour = 60 * 60 * 1000;
+                    const fourHours = 4 * 60 * 60 * 1000;
+
+                    // 1. Handle Timeouts (Local or unreachable)
+                    if (ageMs > fourHours) {
+                        console.log(`[Recovery] Timing out old generation: ${item.id}`);
+                        await dbService.saveGenerationHistory({ ...item, status: 'failed', errorMessage: 'Generation timed out (4h+)' });
+                        continue;
+                    }
+
+                    // 2. Handle Fal Recoverable Items
+                    if (item.requestId && item.falEndpoint) {
+                        console.log(`[Recovery] Checking status for Fal ID: ${item.requestId}`);
+                        const result = await falService.checkGenerationStatus(item.requestId, item.falEndpoint);
+
+                        if (result.status === 'success' && result.mediaUrls) {
+                            console.log(`[Recovery] Fal status SUCCESS for: ${item.id}`);
+                            // Sequential processing to save memory
+                            const persistentUrls: string[] = [];
+                            for (const url of result.mediaUrls) {
+                                const b64 = await urlToBase64(url);
+                                persistentUrls.push(b64);
+                            }
+                            const thumbnailUrls = await createThumbnails(persistentUrls);
+                            await dbService.saveGenerationHistory({
+                                ...item,
+                                status: 'success',
+                                mediaUrls: persistentUrls,
+                                thumbnailUrls
+                            });
+                        } else if (result.status === 'failed') {
+                            console.log(`[Recovery] Fal status FAILED for: ${item.id}`);
+                            await dbService.saveGenerationHistory({ ...item, status: 'failed', errorMessage: result.error || 'Fal generation failed' });
+                        }
+                    } else if (ageMs > oneHour) {
+                        // Mark local/unlabeled pendings as failed if older than 1 hour
+                        console.log(`[Recovery] Failing untracked old generation: ${item.id}`);
+                        await dbService.saveGenerationHistory({ ...item, status: 'failed', errorMessage: 'Generation aborted or lost connectivity' });
+                    }
+                }
+            } catch (err) {
+                console.error("[Recovery] Error during generation recovery:", err);
+            }
+        };
+
+        // Run recovery on mount and every 5 minutes
+        recoverPendingGenerations();
+        const interval = setInterval(recoverPendingGenerations, 5 * 60 * 1000);
+        return () => clearInterval(interval);
+    }, []);
+
     // Persist Parameters Helper
     const persistParam = async (key: string, value: any) => {
         try {
@@ -698,9 +760,14 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
             // --- Save to Generation History ---
             try {
                 // Ensure media items are converted to persistent base64 if they are images
-                const persistentMediaUrls = generationSucceeded
-                    ? await Promise.all(resultUrls.map(u => urlToBase64(u)))
-                    : resultUrls;
+                // Process sequentially to avoid memory spikes (crashing on mobile)
+                const persistentMediaUrls: string[] = [];
+                if (generationSucceeded) {
+                    for (const url of resultUrls) {
+                        const b64 = await urlToBase64(url);
+                        persistentMediaUrls.push(b64);
+                    }
+                }
 
                 const thumbnailUrls = generationSucceeded ? await createThumbnails(persistentMediaUrls) : undefined;
 
@@ -1117,20 +1184,8 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
             const filename = `${prefix}_${Date.now()}.${extension}`;
 
             let blob: Blob;
-            if (url.startsWith('data:')) {
-                const parts = url.split(',');
-                const mime = parts[0].match(/:(.*?);/)![1];
-                const bstr = atob(parts[1]);
-                let n = bstr.length;
-                const u8arr = new Uint8Array(n);
-                while (n--) {
-                    u8arr[n] = bstr.charCodeAt(n);
-                }
-                blob = new Blob([u8arr], { type: mime });
-            } else {
-                const response = await fetch(url);
-                blob = await response.blob();
-            }
+            const response = await fetch(url);
+            blob = await response.blob();
 
             const file = new File([blob], filename, { type: blob.type });
 

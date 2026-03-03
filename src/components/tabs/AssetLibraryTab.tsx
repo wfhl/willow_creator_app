@@ -131,7 +131,7 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
             const lastItem = isLoadMore && currentHistory.length > 0 ? currentHistory[currentHistory.length - 1] : null;
             const beforeTimestamp = lastItem?.timestamp;
 
-            const h = await dbService.getRecentHistoryBatch(BATCH_SIZE, 0, 'prev', beforeTimestamp);
+            const h = await dbService.getRecentHistoryBatch(BATCH_SIZE, 0, 'prev', beforeTimestamp, true);
 
             if (isLoadMore) {
                 setHistory(prev => {
@@ -230,39 +230,46 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
     };
 
     const handleDownloadHistoryItem = async (item: DBGenerationHistory) => {
+        // Fetch full record if slim
+        let fullItem = item;
+        if (!item.mediaUrls || item.mediaUrls.length === 0) {
+            const fetched = await dbService.getGenerationHistoryItem(item.id);
+            if (fetched) fullItem = fetched;
+        }
+
         const zip = new JSZip();
-        const date = new Date(item.timestamp).toLocaleString();
+        const date = new Date(fullItem.timestamp).toLocaleString();
 
         const metadata = `GENERATION METADATA
 ===================
 
 Date: ${date}
-Service: ${item.service}
-Model: ${item.model}
-Type: ${item.type}
-Status: ${item.status}
+Service: ${fullItem.service}
+Model: ${fullItem.model}
+Type: ${fullItem.type}
+Status: ${fullItem.status}
 
 PROMPT
 ===================
-${item.prompt}
+${fullItem.prompt}
 
 TECHNICAL DETAILS
 ===================
-Image Size: ${item.imageSize || 'N/A'}
-Num Images: ${item.numImages || 'N/A'}
-Request ID: ${item.requestId || 'N/A'}
-Tab: ${item.tab || 'N/A'}
+Image Size: ${fullItem.imageSize || 'N/A'}
+Num Images: ${fullItem.numImages || 'N/A'}
+Request ID: ${fullItem.requestId || 'N/A'}
+Tab: ${fullItem.tab || 'N/A'}
 `;
 
         zip.file("metadata.txt", metadata);
 
-        if (item.mediaUrls && item.mediaUrls.length > 0) {
-            for (let i = 0; i < item.mediaUrls.length; i++) {
-                const url = item.mediaUrls[i];
+        if (fullItem.mediaUrls && fullItem.mediaUrls.length > 0) {
+            for (let i = 0; i < fullItem.mediaUrls.length; i++) {
+                const url = fullItem.mediaUrls[i];
                 try {
                     const response = await fetch(url);
                     const blob = await response.blob();
-                    const ext = url.match(/\.(png|jpg|jpeg|webp|gif|mp4|mov|webm)($|\?)/i)?.[1] || (item.type === 'video' ? 'mp4' : 'png');
+                    const ext = url.match(/\.(png|jpg|jpeg|webp|gif|mp4|mov|webm)($|\?)/i)?.[1] || (fullItem.type === 'video' ? 'mp4' : 'png');
                     zip.file(`media_${i + 1}.${ext}`, blob);
                 } catch (err) {
                     console.error("Failed to fetch media for zip:", err);
@@ -274,8 +281,8 @@ Tab: ${item.tab || 'N/A'}
         const zipUrl = window.URL.createObjectURL(content);
         const a = document.createElement('a');
         a.href = zipUrl;
-        const safePrompt = (item.prompt || 'generation').slice(0, 30).replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        a.download = `gen_${safePrompt}_${item.id.slice(0, 8)}.zip`;
+        const safePrompt = (fullItem.prompt || 'generation').slice(0, 30).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.download = `gen_${safePrompt}_${fullItem.id.slice(0, 8)}.zip`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -674,23 +681,23 @@ Tab: ${item.tab || 'N/A'}
                                     <div key={asset.id} draggable onDragStart={(e) => handleDragStart(e, asset.id)} className={viewMode === 'grid' ? "group relative aspect-square bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden hover:border-emerald-500/30 transition-all cursor-grab active:cursor-grabbing" : "group flex items-center gap-4 p-2 bg-white/[0.02] border-b border-white/5 hover:bg-white/5 transition-all cursor-grab"}>
                                         {viewMode === 'grid' ? (
                                             <>
-                                                {asset.type === 'video' ? <video src={asset.base64} className="w-full h-full object-cover opacity-60 group-hover:opacity-100" muted onClick={() => onPreview(asset.base64)} /> : asset.type === 'lora' ? <div className="w-full h-full flex flex-col items-center justify-center p-4" onClick={() => { navigator.clipboard.writeText(asset.base64); alert("Copied!"); }}><Layers className="w-12 h-12 mb-2 text-emerald-400 opacity-50" /><div className="text-[9px] uppercase tracking-widest text-emerald-400">Copy LoRA</div></div> : <img src={asset.base64} className="w-full h-full object-cover opacity-60 group-hover:opacity-100" onClick={() => onPreview(asset.base64)} />}
+                                                {asset.type === 'video' ? <video src={asset.base64} className="w-full h-full object-cover opacity-60 group-hover:opacity-100" muted onClick={() => asset.base64 && onPreview(asset.base64 as string)} /> : asset.type === 'lora' ? <div className="w-full h-full flex flex-col items-center justify-center p-4" onClick={() => { asset.base64 && navigator.clipboard.writeText(asset.base64 as string); alert("Copied!"); }}><Layers className="w-12 h-12 mb-2 text-emerald-400 opacity-50" /><div className="text-[9px] uppercase tracking-widest text-emerald-400">Copy LoRA</div></div> : <img src={asset.base64} className="w-full h-full object-cover opacity-60 group-hover:opacity-100" onClick={() => asset.base64 && onPreview(asset.base64 as string)} />}
                                                 <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
                                                     <p className="text-[9px] text-white/90 truncate font-mono">{asset.name}</p>
                                                 </div>
                                                 <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-100 transition-opacity">
                                                     <button onClick={() => handleDeleteAsset(asset.id)} className="p-2 bg-black/40 text-red-400 hover:bg-red-500 hover:text-white rounded-xl backdrop-blur-sm"><Trash2 className="w-3.5 h-3.5" /></button>
-                                                    <button onClick={() => handleDownloadAsset(asset.base64, asset.name)} className="p-2 bg-black/40 text-white/60 hover:text-white rounded-xl backdrop-blur-sm"><Download className="w-3.5 h-3.5" /></button>
+                                                    <button onClick={() => asset.base64 && handleDownloadAsset(asset.base64, asset.name)} className="p-2 bg-black/40 text-white/60 hover:text-white rounded-xl backdrop-blur-sm"><Download className="w-3.5 h-3.5" /></button>
                                                 </div>
                                             </>
                                         ) : (
                                             <>
                                                 <div className="w-10 h-10 rounded-lg overflow-hidden bg-black shrink-0 border border-white/5">
-                                                    {asset.type === 'video' ? <video src={asset.base64} className="w-full h-full object-cover" /> : asset.type === 'lora' ? <div className="w-full h-10 flex items-center justify-center bg-emerald-900/20 text-emerald-400"><Layers className="w-5 h-5" /></div> : <img src={asset.base64} className="w-full h-full object-cover" />}
+                                                    {asset.type === 'video' ? <video src={asset.base64 || ""} className="w-full h-full object-cover" /> : asset.type === 'lora' ? <div className="w-full h-10 flex items-center justify-center bg-emerald-900/20 text-emerald-400"><Layers className="w-5 h-5" /></div> : <img src={asset.base64 || ""} className="w-full h-full object-cover" />}
                                                 </div>
                                                 <span className="text-sm text-white/60 flex-1 truncate">{asset.name}</span>
                                                 <div className="flex gap-2">
-                                                    <button onClick={() => handleDownloadAsset(asset.base64, asset.name)} className="p-2 text-white/40 hover:text-white"><Download className="w-4 h-4" /></button>
+                                                    <button onClick={() => asset.base64 && handleDownloadAsset(asset.base64, asset.name)} className="p-2 text-white/40 hover:text-white"><Download className="w-4 h-4" /></button>
                                                     <button onClick={() => handleDeleteAsset(asset.id)} className="p-2 text-white/40 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                                                 </div>
                                             </>
@@ -753,43 +760,69 @@ Tab: ${item.tab || 'N/A'}
                                                 </div>
                                             )}
                                         </div>
-                                        {item.mediaUrls && item.mediaUrls.length > 0 && (
-                                            <div className={`grid gap-2 ${item.mediaUrls.length > 1 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'} ${isSelectionMode ? 'pl-8 md:pl-10' : ''}`}>
-                                                {item.mediaUrls.map((url, idx) => (
-                                                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-black/50 border border-white/5 group">
-                                                        {item.type === 'video' ? (
-                                                            <video
-                                                                src={url}
-                                                                poster={item.thumbnailUrls?.[idx]}
-                                                                className={`w-full h-full object-cover ${isSelectionMode ? 'cursor-default' : 'cursor-pointer'}`}
-                                                                onClick={(e) => {
-                                                                    if (isSelectionMode) return;
-                                                                    e.stopPropagation();
-                                                                    onPreview(url);
-                                                                }}
-                                                            />
-                                                        ) : (
-                                                            <ImageWithLoader
-                                                                src={item.thumbnailUrls?.[idx] || url}
-                                                                className={`w-full h-full object-cover ${isSelectionMode ? 'cursor-default' : 'cursor-pointer'}`}
-                                                                onClick={(e) => {
-                                                                    if (isSelectionMode) return;
-                                                                    e.stopPropagation();
-                                                                    onPreview(url);
-                                                                }}
-                                                                alt={`History ${idx}`}
-                                                            />
-                                                        )}
-                                                        {!isSelectionMode && (
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); onDownload ? onDownload(url, `history_${idx}`) : handleDownloadAsset(url, `history-${idx}`); }}
-                                                                className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-100 transition-opacity"
-                                                            >
-                                                                <Download className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                        {(item.mediaUrls || item.thumbnailUrls) && (
+                                            <div className={`grid gap-2 ${(item.mediaUrls?.length || item.thumbnailUrls?.length || 0) > 1 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'} ${isSelectionMode ? 'pl-8 md:pl-10' : ''}`}>
+                                                {(item.thumbnailUrls || item.mediaUrls || []).map((_, idx) => {
+                                                    const thumbUrl = item.thumbnailUrls?.[idx];
+                                                    const fullUrlArr = item.mediaUrls;
+
+                                                    const handleImageClick = async (e: React.MouseEvent) => {
+                                                        if (isSelectionMode) return;
+                                                        e.stopPropagation();
+                                                        let targetUrl = fullUrlArr?.[idx];
+                                                        if (!targetUrl) {
+                                                            const full = await dbService.getGenerationHistoryItem(item.id);
+                                                            targetUrl = full?.mediaUrls?.[idx];
+                                                        }
+                                                        const finalUrl = targetUrl;
+                                                        if (finalUrl) {
+                                                            onPreview(finalUrl as string);
+                                                        }
+                                                    };
+
+                                                    const handleImageDownload = async (e: React.MouseEvent) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        let targetUrl = fullUrlArr?.[idx];
+                                                        if (!targetUrl) {
+                                                            const full = await dbService.getGenerationHistoryItem(item.id);
+                                                            targetUrl = full?.mediaUrls?.[idx];
+                                                        }
+                                                        const finalUrl = targetUrl;
+                                                        if (finalUrl) {
+                                                            if (onDownload) onDownload(finalUrl as string, `history_${idx}`);
+                                                            else handleDownloadAsset(finalUrl as string, `history-${idx}`);
+                                                        }
+                                                    };
+
+                                                    return (
+                                                        <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-black/50 border border-white/5 group">
+                                                            {item.type === 'video' ? (
+                                                                <video
+                                                                    src={thumbUrl}
+                                                                    poster={thumbUrl}
+                                                                    className={`w-full h-full object-cover ${isSelectionMode ? 'cursor-default' : 'cursor-pointer'}`}
+                                                                    onClick={handleImageClick}
+                                                                />
+                                                            ) : (
+                                                                <ImageWithLoader
+                                                                    src={thumbUrl || (fullUrlArr?.[idx]) || ""}
+                                                                    className={`w-full h-full object-cover ${isSelectionMode ? 'cursor-default' : 'cursor-pointer'}`}
+                                                                    onClick={handleImageClick}
+                                                                    alt={`History ${idx}`}
+                                                                />
+                                                            )}
+                                                            {!isSelectionMode && (
+                                                                <button
+                                                                    onClick={handleImageDownload}
+                                                                    className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-100 transition-opacity"
+                                                                >
+                                                                    <Download className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>

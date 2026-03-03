@@ -672,7 +672,7 @@ export const dbService = {
         });
     },
 
-    async getRecentHistoryBatch(limit: number, offset: number = 0, sortOrder: 'prev' | 'next' = 'prev', beforeTimestamp?: number): Promise<DBGenerationHistory[]> {
+    async getRecentHistoryBatch(limit: number, offset: number = 0, sortOrder: 'prev' | 'next' = 'prev', beforeTimestamp?: number, slim: boolean = false): Promise<DBGenerationHistory[]> {
         const db = await openDB();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('generation_history', 'readonly');
@@ -700,13 +700,31 @@ export const dbService = {
                     return;
                 }
 
-                items.push(cursor.value);
+                if (slim) {
+                    const val = cursor.value;
+                    const { mediaUrls, inputImageUrl, ...slimItem } = val;
+                    items.push(slimItem as DBGenerationHistory);
+                } else {
+                    items.push(cursor.value);
+                }
+
                 if (items.length < limit) {
                     cursor.continue();
                 } else {
                     resolve(items);
                 }
             };
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async getGenerationHistoryItem(id: string): Promise<DBGenerationHistory | null> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('generation_history', 'readonly');
+            const store = transaction.objectStore('generation_history');
+            const request = store.get(id);
+            request.onsuccess = () => resolve(request.result || null);
             request.onerror = () => reject(request.error);
         });
     },
@@ -727,6 +745,29 @@ export const dbService = {
                     return;
                 }
                 items.push(cursor.value);
+                cursor.continue();
+            };
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async getPendingGenerationHistory(): Promise<DBGenerationHistory[]> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('generation_history', 'readonly');
+            const store = transaction.objectStore('generation_history');
+            const items: DBGenerationHistory[] = [];
+            const request = store.openCursor();
+
+            request.onsuccess = (event) => {
+                const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+                if (!cursor) {
+                    resolve(items);
+                    return;
+                }
+                if (cursor.value.status === 'pending') {
+                    items.push(cursor.value);
+                }
                 cursor.continue();
             };
             request.onerror = () => reject(request.error);
