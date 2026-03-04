@@ -1046,7 +1046,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
             setEditSelectedModel(item.model);
             if (item.imageSize) setRefineImageSize(item.imageSize);
             if (item.numImages) setRefineNumImages(item.numImages);
-            setRefineResultUrls([]); // Clear old results
+            setRefineResultUrls(item.mediaUrls || []);
             if (item.inputImageUrl) {
                 setRefineTarget({ url: item.inputImageUrl, index: -1 });
             }

@@ -317,8 +317,6 @@ Tab: ${fullItem.tab || 'N/A'}
     };
 
     useEffect(() => {
-        if (subTab !== 'history') return;
-
         let isPolling = true;
         const checkPending = async () => {
             if (!isPolling) return;
@@ -368,9 +366,8 @@ Tab: ${fullItem.tab || 'N/A'}
             isPolling = false;
             clearInterval(interval);
         };
-        // Break the loop by removing 'history' dependency. 
-        // historyRef is kept in sync via another effect and provides latest state.
-    }, [subTab]);
+        // Polling loop now runs unconditionally in background, historyRef provides latest state.
+    }, []);
 
     // Derived filtered states for search
     const filteredFolders = folders.filter(f =>
