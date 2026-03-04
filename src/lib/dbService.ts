@@ -659,6 +659,12 @@ export const dbService = {
 
     // --- GENERATION HISTORY ---
     async saveGenerationHistory(entry: DBGenerationHistory): Promise<void> {
+        const isDeleted = await this.isDeleted(entry.id);
+        if (isDeleted) {
+            console.log(`[DB] Ignoring save for deleted history item: ${entry.id}`);
+            return;
+        }
+
         const db = await openDB();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('generation_history', 'readwrite');
@@ -785,6 +791,22 @@ export const dbService = {
                 resolve();
             };
             request.onerror = () => reject(request.error);
+        });
+    },
+
+    async deleteGenerationHistoryBatch(ids: string[]): Promise<void> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            try {
+                const transaction = db.transaction('generation_history', 'readwrite');
+                const store = transaction.objectStore('generation_history');
+                ids.forEach(id => store.delete(id));
+                transaction.oncomplete = () => {
+                    this.notify('generation_history', 'delete', { id: 'BATCH', ids });
+                    resolve();
+                };
+                transaction.onerror = () => reject(transaction.error);
+            } catch (e) { reject(e); }
         });
     },
 

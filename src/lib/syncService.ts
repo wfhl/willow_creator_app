@@ -22,12 +22,21 @@ export const syncService = {
             try {
                 if (type === 'delete') {
                     if (data.id === 'ALL') {
-                        // Handle clear all logic if needed
+                        // Handle clear all logic (optional)
                         return;
                     }
-                    this.recentlyDeleted.add(data.id);
-                    dbService.trackDeletion(data.id).catch(console.error);
-                    await this.removeFromCloud(store, data.id);
+
+                    if (data.id === 'BATCH' && data.ids && Array.isArray(data.ids)) {
+                        for (const id of data.ids) {
+                            this.recentlyDeleted.add(id);
+                            dbService.trackDeletion(id).catch(console.error);
+                            await this.removeFromCloud(store, id);
+                        }
+                    } else {
+                        this.recentlyDeleted.add(data.id);
+                        dbService.trackDeletion(data.id).catch(console.error);
+                        await this.removeFromCloud(store, data.id);
+                    }
                 } else {
                     await this.syncToCloud(store, data);
                     // Remove from recently deleted if it was re-added
@@ -136,36 +145,66 @@ export const syncService = {
         else if (store === 'posts') localItems = await dbService.getAllPosts();
         else if (store === 'presets') localItems = await dbService.getAllPresets();
         else if (store === 'folders') localItems = await dbService.getAllFolders();
-        else if (store === 'generation_history') localItems = await dbService.getAllGenerationHistory();
+        else if (store === 'generation_history') {
+            // Load slim versions to avoid memory crashes on mobile devices with large histories
+            localItems = await dbService.getRecentHistoryBatch(10000, 0, 'prev', undefined, true);
+        }
 
+        const selectQuery = store === 'folders' ? 'id, name, parent_id, user_id' : 'id, user_id';
         const { data: cloudItems, error } = await supabase
             .from(table)
-            .select('*')
+            .select(selectQuery)
             .eq('user_id', this.user.id);
 
         if (error) throw error;
 
         // Push local-only to cloud
         for (const local of localItems) {
-            const existsInCloud = cloudItems.some(c => c.id === local.id);
+            const existsInCloud = (cloudItems as any[])?.some(c => c.id === local.id);
             if (!existsInCloud) {
                 console.log(`[Sync] Pushing local-only ${store}: ${local.id}`);
-                await this.syncToCloud(store, local);
+                let fullLocal = local;
+                try {
+                    // If it's a slim generation_history item, get the full data (with base64 media) for upload
+                    if (store === 'generation_history') {
+                        const fetchedFull = await dbService.getGenerationHistoryItem(local.id);
+                        if (fetchedFull) fullLocal = fetchedFull;
+                    }
+                    await this.syncToCloud(store, fullLocal);
+                } catch (pushErr) {
+                    console.error(`[Sync] Skipping failed push for ${local.id}:`, pushErr);
+                }
             }
         }
 
-        // Pull cloud-only to local
-        for (const cloud of cloudItems) {
+        // Pull cloud-only to local. We need to fetch the FULL data from Supabase for those we don't have.
+        // It's better to fetch them in a new batched query or one-by-one, but we can just query them all now.
+        const { data: fullCloudItems, error: fullError } = await supabase
+            .from(table)
+            .select('*')
+            .eq('user_id', this.user.id);
+
+        if (fullError) throw fullError;
+
+        for (const cloud of fullCloudItems) {
             const isDeleted = await dbService.isDeleted(cloud.id);
             if (this.recentlyDeleted.has(cloud.id) || isDeleted) continue;
 
             const mapped = this.mapFromCloud(store, cloud);
             const existsLocally = localItems.find(l => l.id === cloud.id);
 
-            if (existsLocally) continue;
+            if (existsLocally) {
+                // For generation history, we must update the local item if the cloud status has changed (e.g. pending -> success)
+                if (store === 'generation_history' && existsLocally.status !== cloud.status) {
+                    console.log(`[Sync] Updating local history item ${cloud.id} status: ${existsLocally.status} -> ${cloud.status}`);
+                    // Fallthrough to update
+                } else {
+                    continue;
+                }
+            }
 
             // Simple merging for unique content
-            if (store === 'folders') {
+            if (store === 'folders' && !existsLocally) {
                 const sameName = localItems.find(l => l.name === mapped.name && l.parentId === mapped.parentId);
                 if (sameName) {
                     await this.removeFromCloud(store, mapped.id);
@@ -274,7 +313,10 @@ export const syncService = {
         }
 
         const { error } = await supabase.from(table).upsert(payload, { onConflict: 'id' });
-        if (error) throw error;
+        if (error) {
+            console.error(`[Sync] Supabase Upsert Error for ${table}:`, error.message, error.details);
+            throw error;
+        }
     },
 
     async uploadAssetToStorage(asset: any): Promise<{ publicUrl: string, storagePath: string }> {

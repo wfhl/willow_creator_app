@@ -769,29 +769,27 @@ Tab: ${fullItem.tab || 'N/A'}
                                                     const handleImageClick = async (e: React.MouseEvent) => {
                                                         if (isSelectionMode) return;
                                                         e.stopPropagation();
-                                                        let targetUrl = fullUrlArr?.[idx];
-                                                        if (!targetUrl) {
+                                                        let urlToPreview: string | undefined = fullUrlArr?.[idx];
+                                                        if (!urlToPreview) {
                                                             const full = await dbService.getGenerationHistoryItem(item.id);
-                                                            targetUrl = full?.mediaUrls?.[idx];
+                                                            urlToPreview = (full?.mediaUrls || [])[idx];
                                                         }
-                                                        const finalUrl = targetUrl;
-                                                        if (finalUrl) {
-                                                            onPreview(finalUrl as string);
+                                                        if (urlToPreview) {
+                                                            onPreview(urlToPreview);
                                                         }
                                                     };
 
                                                     const handleImageDownload = async (e: React.MouseEvent) => {
                                                         e.preventDefault();
                                                         e.stopPropagation();
-                                                        let targetUrl = fullUrlArr?.[idx];
-                                                        if (!targetUrl) {
+                                                        let urlToDownload: string | undefined = fullUrlArr?.[idx];
+                                                        if (!urlToDownload) {
                                                             const full = await dbService.getGenerationHistoryItem(item.id);
-                                                            targetUrl = full?.mediaUrls?.[idx];
+                                                            urlToDownload = (full?.mediaUrls || [])[idx];
                                                         }
-                                                        const finalUrl = targetUrl;
-                                                        if (finalUrl) {
-                                                            if (onDownload) onDownload(finalUrl as string, `history_${idx}`);
-                                                            else handleDownloadAsset(finalUrl as string, `history-${idx}`);
+                                                        if (urlToDownload) {
+                                                            if (onDownload) onDownload(urlToDownload, `history_${idx}`);
+                                                            else handleDownloadAsset(urlToDownload, `history-${idx}`);
                                                         }
                                                     };
 
@@ -909,10 +907,15 @@ Tab: ${fullItem.tab || 'N/A'}
                                     if (confirm(`Delete ${selectedHistoryIds.size} history items?`)) {
                                         setIsProcessingBulk(true);
                                         try {
-                                            await Promise.all(Array.from(selectedHistoryIds).map(id => dbService.deleteGenerationHistory(id)));
+                                            const ids = Array.from(selectedHistoryIds);
+                                            await dbService.deleteGenerationHistoryBatch(ids);
                                             loadHistory(false);
                                             setSelectedHistoryIds(new Set());
                                             setIsSelectionMode(false);
+                                        } catch (err) {
+                                            console.error("Bulk delete failed:", err);
+                                            alert("Bulk delete failed.");
+                                            loadHistory(false);
                                         } finally {
                                             setIsProcessingBulk(false);
                                         }
