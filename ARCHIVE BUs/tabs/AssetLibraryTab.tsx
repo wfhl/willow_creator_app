@@ -1,0 +1,941 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ImageWithLoader } from '../image-with-loader';
+import {
+    Folder as FolderIcon,
+    FileVideo,
+    ChevronRight,
+    Trash2,
+    Search,
+    Upload,
+    FolderPlus,
+    X,
+    LayoutGrid,
+    List,
+    Image as ImageIcon,
+    Edit3,
+    Star,
+    Heart,
+    Camera,
+    Music,
+    Briefcase,
+    Home,
+    History,
+    Layers,
+    Copy,
+    RotateCcw,
+    Download,
+    Loader2,
+    Check
+} from 'lucide-react';
+import { dbService } from '../../lib/dbService';
+import { generateUUID } from '../../lib/uuid';
+import JSZip from 'jszip';
+import type { DBAsset, DBFolder, DBGenerationHistory } from '../../lib/dbService';
+
+interface AssetLibraryTabProps {
+    onPreview: (url: string) => void;
+    onRecall?: (item: DBGenerationHistory) => void;
+    onDownload?: (url: string, prefix?: string) => void;
+}
+
+export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibraryTabProps) {
+    const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+    const [path, setPath] = useState<DBFolder[]>([]);
+    const [folders, setFolders] = useState<DBFolder[]>([]);
+    const [assets, setAssets] = useState<DBAsset[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+    const [editingFolder, setEditingFolder] = useState<DBFolder | null>(null);
+    const [newFolderName, setNewFolderName] = useState("");
+    const [newFolderColor, setNewFolderColor] = useState("");
+    const [newFolderIcon, setNewFolderIcon] = useState("");
+    const [draggedAssetId, setDraggedAssetId] = useState<string | null>(null);
+    const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+
+    // Tab & Pagination State
+    const [subTab, setSubTab] = useState<'saved' | 'history'>('saved');
+    const [history, setHistory] = useState<DBGenerationHistory[]>([]);
+    const [hasMoreAssets, setHasMoreAssets] = useState(true);
+    const [hasMoreHistory, setHasMoreHistory] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [isProcessingBulk, setIsProcessingBulk] = useState(false);
+
+    const assetObserverTarget = useRef<HTMLDivElement>(null);
+    const historyObserverTarget = useRef<HTMLDivElement>(null);
+    const BATCH_SIZE = 24;
+
+    const FOLDER_COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1'];
+    const FOLDER_ICONS = ['folder', 'star', 'heart', 'camera', 'video', 'music', 'briefcase', 'home'];
+
+    // Separate in-flight guards so assets and history can't interfere with each other
+    const isLoadingAssetsRef = useRef(false);
+    const isLoadingHistoryRef = useRef(false);
+
+    // Stable refs to latest state – used inside callbacks to avoid stale closures
+    // that would otherwise force recreation of loadContent/loadHistory on every render
+    const assetsRef = useRef<DBAsset[]>(assets);
+    const historyRef = useRef<DBGenerationHistory[]>(history);
+    useEffect(() => { assetsRef.current = assets; }, [assets]);
+    useEffect(() => { historyRef.current = history; }, [history]);
+
+    const loadContent = useCallback(async (isLoadMore = false) => {
+        if (isLoadingAssetsRef.current) return;
+        isLoadingAssetsRef.current = true;
+        setIsLoadingMore(true);
+        try {
+            if (!isLoadMore) {
+                const f = await dbService.getFoldersByParent(currentFolderId);
+                setFolders(f.sort((x, y) => x.name.localeCompare(y.name)));
+            }
+
+            // Read from ref to avoid stale closure (and avoid this fn recreating on every assets change)
+            const currentAssets = assetsRef.current;
+            const lastAsset = isLoadMore && currentAssets.length > 0 ? currentAssets[currentAssets.length - 1] : null;
+            const beforeTimestamp = lastAsset?.timestamp;
+
+            const a = await dbService.getAssetsBatch(currentFolderId, BATCH_SIZE, 0, 'prev', beforeTimestamp);
+
+            // Filter out face_reference assets
+            const newAssets = a.filter(asset => asset.type !== 'face_reference');
+
+            if (isLoadMore) {
+                setAssets(prev => {
+                    const existingIds = new Set(prev.map(item => item.id));
+                    const uniqueNew = newAssets.filter(item => !existingIds.has(item.id));
+                    return [...prev, ...uniqueNew];
+                });
+            } else {
+                setAssets(newAssets);
+            }
+
+            setHasMoreAssets(a.length === BATCH_SIZE);
+        } catch (err) {
+            console.error("Failed to load library content:", err);
+        } finally {
+            isLoadingAssetsRef.current = false;
+            setIsLoadingMore(false);
+        }
+        // Only recreate when folder changes – assetsRef gives us the latest assets without being a dep
+    }, [currentFolderId]);
+
+    const loadHistory = useCallback(async (isLoadMore = false) => {
+        if (isLoadingHistoryRef.current) return;
+        isLoadingHistoryRef.current = true;
+        setIsLoadingMore(true);
+        try {
+            // Read from ref to avoid stale closure
+            const currentHistory = historyRef.current;
+            const lastItem = isLoadMore && currentHistory.length > 0 ? currentHistory[currentHistory.length - 1] : null;
+            const beforeTimestamp = lastItem?.timestamp;
+
+            const h = await dbService.getRecentHistoryBatch(BATCH_SIZE, 0, 'prev', beforeTimestamp, true);
+
+            if (isLoadMore) {
+                setHistory(prev => {
+                    const existingIds = new Set(prev.map(item => item.id));
+                    const uniqueNew = h.filter(item => !existingIds.has(item.id));
+                    return [...prev, ...uniqueNew];
+                });
+            } else {
+                setHistory(h);
+            }
+
+            setHasMoreHistory(h.length === BATCH_SIZE);
+        } catch (err) {
+            console.error("Failed to load history:", err);
+        } finally {
+            isLoadingHistoryRef.current = false;
+            setIsLoadingMore(false);
+        }
+        // Stable – no state deps needed since we use historyRef
+    }, []);
+
+    useEffect(() => {
+        loadContent(false);
+    }, [currentFolderId]);
+
+    useEffect(() => {
+        if (subTab === 'history' && history.length === 0) {
+            loadHistory(false);
+        } else if (subTab === 'saved' && assets.length === 0) {
+            loadContent(false);
+        }
+    }, [subTab]);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            entries => {
+                if (!entries[0].isIntersecting) return;
+                // Check live refs so we don't need them as effect deps
+                if (subTab === 'saved' && hasMoreAssets && !isLoadingAssetsRef.current) {
+                    loadContent(true);
+                } else if (subTab === 'history' && hasMoreHistory && !isLoadingHistoryRef.current) {
+                    loadHistory(true);
+                }
+            },
+            { threshold: 0.1, rootMargin: '200px' }
+        );
+
+        const target = subTab === 'saved' ? assetObserverTarget.current : historyObserverTarget.current;
+        if (target) observer.observe(target);
+
+        return () => observer.disconnect();
+        // loadContent/loadHistory are now stable; hasMoreAssets/hasMoreHistory tell us when to re-bind
+    }, [subTab, hasMoreAssets, hasMoreHistory, loadContent, loadHistory]);
+
+    useEffect(() => {
+        const unsubscribe = dbService.subscribe((store, type, data) => {
+            if (store === 'assets' || store === 'folders') {
+                if (type === 'insert' || type === 'delete' || type === 'update') {
+                    // Use ref so we don't need assets/subTab as deps (avoids re-subscribing constantly)
+                    if (subTab === 'saved' || assetsRef.current.length === 0) loadContent(false);
+                }
+            } else if (store === 'generation_history') {
+                // If a specific history item was updated (e.g. status changed from pending to success)
+                if (type === 'update' && data && data.id) {
+                    setHistory(prev => prev.map(h => h.id === data.id ? { ...h, ...data } : h));
+                } else if (type === 'insert') {
+                    // Prepend new items to history for instant feedback
+                    setHistory(prev => {
+                        // Avoid duplicate if the item is already present
+                        if (prev.some(h => h.id === data.id)) return prev;
+                        return [data, ...prev];
+                    });
+                } else if (type === 'delete' && data) {
+                    if (data.id === 'ALL') {
+                        setHistory([]);
+                    } else if (data.id === 'BATCH' && data.ids) {
+                        setHistory(prev => prev.filter(h => !data.ids.includes(h.id)));
+                    } else if (data.id) {
+                        setHistory(prev => prev.filter(h => h.id !== data.id));
+                    }
+                } else {
+                    if (subTab === 'history' || historyRef.current.length === 0) loadHistory(false);
+                }
+            }
+        });
+        return () => { unsubscribe(); };
+        // loadContent/loadHistory are stable; subTab is the only real trigger to re-bind
+    }, [subTab, loadContent, loadHistory]);
+
+    const toggleSelection = (id: string) => {
+        const newSelected = new Set(selectedHistoryIds);
+        if (newSelected.has(id)) newSelected.delete(id);
+        else newSelected.add(id);
+        setSelectedHistoryIds(newSelected);
+    };
+
+    const handleSelectAll = (filteredHistory: DBGenerationHistory[]) => {
+        if (selectedHistoryIds.size === filteredHistory.length && filteredHistory.length > 0) {
+            setSelectedHistoryIds(new Set());
+        } else {
+            setSelectedHistoryIds(new Set(filteredHistory.map(h => h.id)));
+        }
+    };
+
+    const handleDownloadHistoryItem = async (item: DBGenerationHistory) => {
+        // Fetch full record if slim
+        let fullItem = item;
+        if (!item.mediaUrls || item.mediaUrls.length === 0) {
+            const fetched = await dbService.getGenerationHistoryItem(item.id);
+            if (fetched) fullItem = fetched;
+        }
+
+        const zip = new JSZip();
+        const date = new Date(fullItem.timestamp).toLocaleString();
+
+        const metadata = `GENERATION METADATA
+===================
+
+Date: ${date}
+Service: ${fullItem.service}
+Model: ${fullItem.model}
+Type: ${fullItem.type}
+Status: ${fullItem.status}
+
+PROMPT
+===================
+${fullItem.prompt}
+
+TECHNICAL DETAILS
+===================
+Image Size: ${fullItem.imageSize || 'N/A'}
+Num Images: ${fullItem.numImages || 'N/A'}
+Request ID: ${fullItem.requestId || 'N/A'}
+Tab: ${fullItem.tab || 'N/A'}
+`;
+
+        zip.file("metadata.txt", metadata);
+
+        if (fullItem.mediaUrls && fullItem.mediaUrls.length > 0) {
+            for (let i = 0; i < fullItem.mediaUrls.length; i++) {
+                const url = fullItem.mediaUrls[i];
+                try {
+                    const response = await fetch(url);
+                    const blob = await response.blob();
+                    const ext = url.match(/\.(png|jpg|jpeg|webp|gif|mp4|mov|webm)($|\?)/i)?.[1] || (fullItem.type === 'video' ? 'mp4' : 'png');
+                    zip.file(`media_${i + 1}.${ext}`, blob);
+                } catch (err) {
+                    console.error("Failed to fetch media for zip:", err);
+                }
+            }
+        }
+
+        const content = await zip.generateAsync({ type: "blob" });
+        const zipUrl = window.URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = zipUrl;
+        const safePrompt = (fullItem.prompt || 'generation').slice(0, 30).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.download = `gen_${safePrompt}_${fullItem.id.slice(0, 8)}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(zipUrl);
+    };
+
+    const handleBulkDownloadHistory = async (filteredHistory: DBGenerationHistory[]) => {
+        if (selectedHistoryIds.size === 0) return;
+        setIsProcessingBulk(true);
+        try {
+            const selectedItems = filteredHistory.filter(h => selectedHistoryIds.has(h.id));
+            for (const item of selectedItems) {
+                await handleDownloadHistoryItem(item);
+                // Pause slightly to not choke the browser
+                await new Promise(r => setTimeout(r, 600));
+            }
+        } catch (err) {
+            console.error("Bulk download failed:", err);
+            alert("Bulk download encountered an error.");
+        } finally {
+            setIsProcessingBulk(false);
+            setIsSelectionMode(false);
+            setSelectedHistoryIds(new Set());
+        }
+    };
+
+    useEffect(() => {
+        if (subTab !== 'history') return;
+
+        let isPolling = true;
+        const checkPending = async () => {
+            if (!isPolling) return;
+            // Use the stable ref for the latest history array
+            const pendingItems = historyRef.current.filter(h => h.status === 'pending' && h.requestId && h.falEndpoint);
+            if (pendingItems.length === 0) return;
+
+            try {
+                const { falService } = await import('../../lib/falService');
+                const { createThumbnails, urlToBase64 } = await import('../../lib/imageUtils');
+                for (const item of pendingItems) {
+                    if (!isPolling) break;
+                    try {
+                        const result = await falService.checkGenerationStatus(item.requestId!, item.falEndpoint!);
+                        if (result.status !== 'pending') {
+                            const mediaUrls = result.mediaUrls || [];
+
+                            // 1. Generate persistent thumbnails (Base64)
+                            const thumbnailUrls = mediaUrls.length > 0 ? await createThumbnails(mediaUrls) : undefined;
+
+                            // 2. Converrt images to Base64 for permanent history persistence
+                            const persistentMediaUrls = mediaUrls.length > 0
+                                ? await Promise.all(mediaUrls.map(u => urlToBase64(u)))
+                                : [];
+
+                            await dbService.saveGenerationHistory({
+                                ...item,
+                                status: result.status,
+                                mediaUrls: persistentMediaUrls,
+                                thumbnailUrls: thumbnailUrls,
+                                errorMessage: result.error
+                            });
+                        }
+                    } catch (e) {
+                        console.error("Error polling history item", item.id, e);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to import falService for polling", e);
+            }
+        };
+
+        const interval = setInterval(checkPending, 5000); // Poll every 5s
+        checkPending();
+
+        return () => {
+            isPolling = false;
+            clearInterval(interval);
+        };
+        // Break the loop by removing 'history' dependency. 
+        // historyRef is kept in sync via another effect and provides latest state.
+    }, [subTab]);
+
+    // Derived filtered states for search
+    const filteredFolders = folders.filter(f =>
+        f.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    const filteredAssets = assets.filter(a =>
+        a.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    const filteredHistory = history.filter(h =>
+        h.prompt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (h.topic && h.topic.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        h.model.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const handleNavigate = async (folder: DBFolder | null) => {
+        if (!folder) {
+            setCurrentFolderId(null);
+            setPath([]);
+        } else {
+            setCurrentFolderId(folder.id);
+            setPath(prev => {
+                const idx = prev.findIndex(p => p.id === folder.id);
+                if (idx !== -1) return prev.slice(0, idx + 1);
+                return [...prev, folder];
+            });
+        }
+    };
+
+    const handleCreateFolder = async () => {
+        if (!newFolderName.trim()) return;
+        if (editingFolder) {
+            const updated = { ...editingFolder, name: newFolderName.trim(), color: newFolderColor, icon: newFolderIcon };
+            await dbService.saveFolder(updated);
+        } else {
+            const newFolder: DBFolder = {
+                id: generateUUID(),
+                name: newFolderName.trim(),
+                parentId: currentFolderId,
+                timestamp: Date.now(),
+                color: newFolderColor,
+                icon: newFolderIcon
+            };
+            await dbService.saveFolder(newFolder);
+        }
+        setNewFolderName("");
+        setNewFolderColor("");
+        setNewFolderIcon("");
+        setEditingFolder(null);
+        setShowNewFolderModal(false);
+        loadContent();
+    };
+
+    const openEditFolder = (folder: DBFolder) => {
+        setEditingFolder(folder);
+        setNewFolderName(folder.name);
+        setNewFolderColor(folder.color || "");
+        setNewFolderIcon(folder.icon || "");
+        setShowNewFolderModal(true);
+    };
+
+    const handleDragStart = (e: React.DragEvent, assetId: string) => {
+        setDraggedAssetId(assetId);
+        e.dataTransfer.setData('text/plain', assetId);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragEnterTarget = (e: React.DragEvent, targetId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragOverTarget(targetId);
+    };
+
+    const handleDragLeaveTarget = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragOverTarget(null);
+    };
+
+    const handleDrop = async (e: React.DragEvent, targetFolderId: string | null) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragOverTarget(null);
+        const assetId = draggedAssetId;
+        if (!assetId) return;
+        try {
+            const assetToMove = assets.find(a => a.id === assetId);
+            if (assetToMove) {
+                if (assetToMove.folderId === targetFolderId) return;
+                const updatedAsset = { ...assetToMove, folderId: targetFolderId };
+                setAssets(prev => prev.filter(a => a.id !== assetId));
+                await dbService.saveAsset(updatedAsset);
+            }
+        } catch (error) {
+            console.error("Failed to move asset:", error);
+            loadContent();
+        } finally {
+            setDraggedAssetId(null);
+        }
+    };
+
+    const handleUploadAssets = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files) return;
+        const files = Array.from(e.target.files);
+        for (const file of files) {
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                const base64 = event.target?.result as string;
+                const newAsset: DBAsset = {
+                    id: generateUUID(),
+                    name: file.name,
+                    type: file.type.startsWith('video') ? 'video' : 'image',
+                    base64,
+                    folderId: currentFolderId,
+                    timestamp: Date.now()
+                };
+                await dbService.saveAsset(newAsset);
+                loadContent();
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleDeleteAsset = async (id: string) => {
+        if (!confirm("Delete this asset?")) return;
+        await dbService.deleteAsset(id);
+        loadContent();
+    };
+
+    const handleDeleteFolder = async (id: string, name: string) => {
+        if (!confirm(`Delete folder "${name}"?`)) return;
+        await dbService.deleteFolder(id);
+        loadContent();
+    };
+
+    const handleDeleteHistory = async (id: string) => {
+        if (!confirm("Delete this history entry?")) return;
+        await dbService.deleteGenerationHistory(id);
+        // deletion state is cleanly picked up by dbService.subscribe now
+    };
+
+    const handleDownloadAsset = (url: string, name: string) => {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    return (
+        <div className="max-w-[1600px] mx-auto w-full p-4 md:p-8 pb-4 flex flex-col h-full bg-[#050505] min-h-0">
+            <div className="flex flex-col gap-4 mb-6">
+                <div className="flex justify-between items-center gap-4">
+                    <div className="flex items-center gap-2 md:gap-4 overflow-x-auto no-scrollbar">
+                        <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                            <button
+                                onClick={() => setSubTab('saved')}
+                                className={`text-lg md:text-2xl font-bold font-serif transition-all whitespace-nowrap shrink-0 ${subTab === 'saved' ? 'text-white/90' : 'text-white/40 hover:text-white/70'}`}
+                            >
+                                Saved Assets
+                            </button>
+                            <div className="h-6 w-px bg-white/10 shrink-0" />
+                            <button
+                                onClick={() => setSubTab('history')}
+                                className={`text-lg md:text-2xl font-bold font-serif transition-all whitespace-nowrap shrink-0 ${subTab === 'history' ? 'text-white/90' : 'text-white/40 hover:text-white/70'}`}
+                            >
+                                Generation History
+                            </button>
+                        </div>
+                        {subTab === 'saved' && (
+                            <>
+                                <div className="h-6 w-px bg-white/10 mx-1 md:mx-2 shrink-0" />
+                                <div className="flex items-center gap-1 text-[10px] md:text-sm text-white/40 overflow-x-auto no-scrollbar whitespace-nowrap scroll-smooth py-1">
+                                    <button
+                                        onClick={() => handleNavigate(null)}
+                                        onDragOver={(e) => handleDragEnterTarget(e, 'root')}
+                                        onDragLeave={handleDragLeaveTarget}
+                                        onDrop={(e) => handleDrop(e, null)}
+                                        className={`transition-all rounded px-2 py-0.5 uppercase ${dragOverTarget === 'root' ? 'bg-emerald-500/20 text-emerald-400 scale-105 font-bold' : 'hover:text-emerald-400'}`}
+                                    >
+                                        Root
+                                    </button>
+                                    {path.map((p, i) => (
+                                        <React.Fragment key={p.id}>
+                                            <ChevronRight className="w-3 h-3 shrink-0" />
+                                            <button
+                                                onClick={() => handleNavigate(p)}
+                                                onDragOver={(e) => handleDragEnterTarget(e, p.id)}
+                                                onDragLeave={handleDragLeaveTarget}
+                                                onDrop={(e) => handleDrop(e, p.id)}
+                                                className={`transition-all rounded px-2 py-0.5 uppercase ${dragOverTarget === p.id ? 'bg-emerald-500/20 text-emerald-400 scale-105 font-bold' : (i === path.length - 1 ? 'text-white/80 font-bold' : 'hover:text-emerald-400')}`}
+                                            >
+                                                {p.name}
+                                            </button>
+                                        </React.Fragment>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                        {subTab === 'saved' && (
+                            <>
+                                <button
+                                    onClick={() => setShowNewFolderModal(true)}
+                                    className="flex items-center gap-2 p-2 md:px-4 md:py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white/80 transition-all"
+                                >
+                                    <FolderPlus className="w-4 h-4" />
+                                    <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">New</span>
+                                </button>
+                                <label className="flex items-center gap-2 p-2 md:px-4 md:py-2 bg-emerald-500 hover:bg-emerald-400 border border-emerald-400/50 rounded-lg text-black cursor-pointer transition-all shadow-lg shadow-emerald-500/20">
+                                    <Upload className="w-4 h-4" />
+                                    <span className="hidden md:inline text-xs font-bold uppercase tracking-widest">Upload</span>
+                                    <input type="file" multiple className="hidden" onChange={handleUploadAssets} />
+                                </label>
+                            </>
+                        )}
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="relative flex-1 group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-emerald-400 transition-colors" />
+                        <input
+                            type="text"
+                            placeholder="Search..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full bg-white/[0.03] border border-white/5 rounded-xl py-2.5 pl-11 pr-4 text-base md:text-sm text-white focus:outline-none focus:border-emerald-500/50 transition-all"
+                        />
+                    </div>
+                    <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 shrink-0">
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white/10 text-emerald-400' : 'text-white/40 hover:text-white'}`}
+                        >
+                            <LayoutGrid className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white/10 text-emerald-400' : 'text-white/40 hover:text-white'}`}
+                        >
+                            <List className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Sub-Search row for History Multi-Select */}
+                {subTab === 'history' && history.length > 0 && (
+                    <div className="flex items-center justify-between gap-2 mt-2">
+                        <button
+                            onClick={() => {
+                                setIsSelectionMode(!isSelectionMode);
+                                if (!isSelectionMode) setSelectedHistoryIds(new Set());
+                            }}
+                            className={`text-[10px] uppercase font-bold tracking-widest px-2.5 py-1.5 rounded-lg border transition-all flex items-center gap-2 ${isSelectionMode ? 'bg-emerald-500 text-black border-emerald-500' : 'bg-white/5 text-white/40 border-white/10 hover:text-white'}`}
+                        >
+                            <Check className="w-3 h-3" />
+                            {isSelectionMode ? 'Exit Select' : 'Multi-Select'}
+                        </button>
+                        {isSelectionMode && (
+                            <button
+                                onClick={() => handleSelectAll(filteredHistory)}
+                                className="text-[10px] uppercase font-bold tracking-widest px-2.5 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/40 hover:text-white transition-all overflow-hidden whitespace-nowrap"
+                            >
+                                {selectedHistoryIds.size === filteredHistory.length && filteredHistory.length > 0 ? 'Deselect All' : 'Select All'}
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {
+                subTab === 'saved' ? (
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                        {filteredFolders.length === 0 && filteredAssets.length === 0 ? (
+                            <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
+                                <ImageIcon className="w-12 h-12 mb-4 opacity-10" />
+                                <p className="font-serif italic text-white/40">
+                                    {searchQuery ? 'No assets match your search' : (currentFolderId ? 'This folder is empty' : 'Your library is empty')}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className={viewMode === 'grid' ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4" : "flex flex-col gap-1"}>
+                                {filteredFolders.map(folder => (
+                                    <div
+                                        key={folder.id}
+                                        onClick={() => handleNavigate(folder)}
+                                        onDragOver={(e) => handleDragEnterTarget(e, folder.id)}
+                                        onDragLeave={handleDragLeaveTarget}
+                                        onDrop={(e) => handleDrop(e, folder.id)}
+                                        className={viewMode === 'grid'
+                                            ? `group relative flex flex-col items-center justify-center aspect-square p-4 bg-white/[0.02] border rounded-2xl cursor-pointer transition-all ${dragOverTarget === folder.id ? 'border-emerald-500 bg-emerald-500/20' : 'border-white/5 hover:bg-white/5'}`
+                                            : `group flex items-center gap-4 p-3 bg-white/[0.02] border-b border-white/5 cursor-pointer transition-all ${dragOverTarget === folder.id ? 'border-emerald-500 bg-emerald-500/10' : 'hover:bg-white/5'}`
+                                        }
+                                    >
+                                        <div className="relative">
+                                            {(() => {
+                                                const IconComponent = {
+                                                    'folder': FolderIcon, 'star': Star, 'heart': Heart, 'camera': Camera,
+                                                    'video': FileVideo, 'music': Music, 'briefcase': Briefcase, 'home': Home
+                                                }[folder.icon || 'folder'] || FolderIcon;
+                                                return <IconComponent className={viewMode === 'grid' ? "w-12 h-12 mb-3 text-emerald-500/60 group-hover:scale-110 transition-all" : "w-5 h-5 text-emerald-500/60"} style={folder.color ? { color: folder.color } : {}} />;
+                                            })()}
+                                        </div>
+                                        <span className={viewMode === 'grid' ? "text-[10px] md:text-xs font-bold text-white/50 group-hover:text-white uppercase tracking-widest text-center truncate w-full mt-4" : "text-sm text-white/70 flex-1 truncate"}>
+                                            {folder.name}
+                                        </span>
+                                        <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity">
+                                            <button onClick={(e) => { e.stopPropagation(); openEditFolder(folder); }} className="p-1.5 bg-black/40 hover:bg-white/10 text-white/40 hover:text-white rounded-lg backdrop-blur-sm"><Edit3 className="w-3 h-3" /></button>
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id, folder.name); }} className="p-1.5 bg-black/40 hover:bg-red-500/10 text-white/40 hover:text-red-500 rounded-lg backdrop-blur-sm"><Trash2 className="w-3 h-3" /></button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {filteredAssets.map(asset => (
+                                    <div key={asset.id} draggable onDragStart={(e) => handleDragStart(e, asset.id)} className={viewMode === 'grid' ? "group relative aspect-square bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden hover:border-emerald-500/30 transition-all cursor-grab active:cursor-grabbing" : "group flex items-center gap-4 p-2 bg-white/[0.02] border-b border-white/5 hover:bg-white/5 transition-all cursor-grab"}>
+                                        {viewMode === 'grid' ? (
+                                            <>
+                                                {asset.type === 'video' ? <video src={asset.base64} className="w-full h-full object-cover opacity-60 group-hover:opacity-100" muted onClick={() => asset.base64 && onPreview(asset.base64 as string)} /> : asset.type === 'lora' ? <div className="w-full h-full flex flex-col items-center justify-center p-4" onClick={() => { asset.base64 && navigator.clipboard.writeText(asset.base64 as string); alert("Copied!"); }}><Layers className="w-12 h-12 mb-2 text-emerald-400 opacity-50" /><div className="text-[9px] uppercase tracking-widest text-emerald-400">Copy LoRA</div></div> : <img src={asset.base64} className="w-full h-full object-cover opacity-60 group-hover:opacity-100" onClick={() => asset.base64 && onPreview(asset.base64 as string)} />}
+                                                <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
+                                                    <p className="text-[9px] text-white/90 truncate font-mono">{asset.name}</p>
+                                                </div>
+                                                <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-100 transition-opacity">
+                                                    <button onClick={() => handleDeleteAsset(asset.id)} className="p-2 bg-black/40 text-red-400 hover:bg-red-500 hover:text-white rounded-xl backdrop-blur-sm"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                    <button onClick={() => asset.base64 && handleDownloadAsset(asset.base64, asset.name)} className="p-2 bg-black/40 text-white/60 hover:text-white rounded-xl backdrop-blur-sm"><Download className="w-3.5 h-3.5" /></button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="w-10 h-10 rounded-lg overflow-hidden bg-black shrink-0 border border-white/5">
+                                                    {asset.type === 'video' ? <video src={asset.base64 || ""} className="w-full h-full object-cover" /> : asset.type === 'lora' ? <div className="w-full h-10 flex items-center justify-center bg-emerald-900/20 text-emerald-400"><Layers className="w-5 h-5" /></div> : <img src={asset.base64 || ""} className="w-full h-full object-cover" />}
+                                                </div>
+                                                <span className="text-sm text-white/60 flex-1 truncate">{asset.name}</span>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => asset.base64 && handleDownloadAsset(asset.base64, asset.name)} className="p-2 text-white/40 hover:text-white"><Download className="w-4 h-4" /></button>
+                                                    <button onClick={() => handleDeleteAsset(asset.id)} className="p-2 text-white/40 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div ref={assetObserverTarget} className="h-20 flex items-center justify-center">
+                            {isLoadingMore && (
+                                <div className="flex items-center gap-2 text-white/20">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span className="text-[10px] uppercase tracking-widest font-mono">Loading...</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                        <div className="grid grid-cols-1 gap-6">
+                            {filteredHistory.length === 0 ? (
+                                <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
+                                    <History className="w-12 h-12 mb-4 opacity-10" />
+                                    <p className="font-serif italic text-white/40">{searchQuery ? 'No history matches your search' : 'No history yet'}</p>
+                                </div>
+                            ) : (
+                                filteredHistory.map(item => (
+                                    <div
+                                        key={item.id}
+                                        onClick={() => isSelectionMode && toggleSelection(item.id)}
+                                        className={`bg-white/[0.02] border rounded-2xl p-4 transition-all relative ${isSelectionMode ? 'cursor-pointer group/item' : ''} ${selectedHistoryIds.has(item.id) ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/5 hover:border-white/10'}`}
+                                    >
+                                        {isSelectionMode && (
+                                            <div className={`absolute top-4 left-4 z-10 w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedHistoryIds.has(item.id) ? 'bg-emerald-500 border-emerald-500 scale-110 shadow-lg shadow-emerald-500/20' : 'bg-black/40 border-white/20 group-hover/item:border-white/40'}`}>
+                                                {selectedHistoryIds.has(item.id) && <Check className="w-3 h-3 md:w-4 md:h-4 text-black stroke-[3px]" />}
+                                            </div>
+                                        )}
+                                        <div className={`flex items-start justify-between gap-4 mb-4 ${isSelectionMode ? 'pl-8 md:pl-10' : ''}`}>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className={`text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded ${item.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500 animate-pulse flex items-center gap-1' : 'bg-red-500/20 text-red-400'}`}>
+                                                        {item.status === 'pending' && <Loader2 className="w-3 h-3 animate-spin" />}
+                                                        {item.status === 'pending' ? 'Generating...' : item.status}
+                                                    </span>
+                                                    <span className="text-xs text-white/40">{new Date(item.timestamp).toLocaleString()}</span>
+                                                </div>
+                                                <div className="mb-3">
+                                                    <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-400/60 px-2 py-0.5 bg-emerald-500/5 rounded border border-emerald-500/10">
+                                                        {item.service} / {item.model}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-white/90 line-clamp-2 mb-1">{item.prompt}</p>
+                                            </div>
+                                            {!isSelectionMode && (
+                                                <div className="flex gap-1 opacity-100 transition-opacity">
+                                                    <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item.prompt); alert("Copied!"); }} className="p-1.5 text-white/40 hover:text-white bg-white/5 rounded-lg" title="Copy Prompt"><Copy className="w-3.5 h-3.5" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteHistory(item.id); }} className="p-1.5 text-white/40 hover:text-red-500 bg-white/5 rounded-lg" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); onRecall && onRecall(item); }} className="p-1.5 text-white/40 hover:text-emerald-500 bg-white/5 rounded-lg" title="Recall"><RotateCcw className="w-3.5 h-3.5" /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDownloadHistoryItem(item); }} className="p-1.5 text-white/40 hover:text-white bg-white/5 rounded-lg" title="Download Zip"><Download className="w-3.5 h-3.5" /></button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {(item.mediaUrls || item.thumbnailUrls) && (
+                                            <div className={`grid gap-2 ${(item.mediaUrls?.length || item.thumbnailUrls?.length || 0) > 1 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'} ${isSelectionMode ? 'pl-8 md:pl-10' : ''}`}>
+                                                {(item.thumbnailUrls || item.mediaUrls || []).map((_, idx) => {
+                                                    const thumbUrl = item.thumbnailUrls?.[idx];
+                                                    const fullUrlArr = item.mediaUrls;
+
+                                                    const handleImageClick = async (e: React.MouseEvent) => {
+                                                        if (isSelectionMode) return;
+                                                        e.stopPropagation();
+                                                        let urlToPreview: string | undefined = fullUrlArr?.[idx];
+                                                        if (!urlToPreview) {
+                                                            const full = await dbService.getGenerationHistoryItem(item.id);
+                                                            urlToPreview = (full?.mediaUrls || [])[idx];
+                                                        }
+                                                        if (urlToPreview) {
+                                                            onPreview(urlToPreview);
+                                                        }
+                                                    };
+
+                                                    const handleImageDownload = async (e: React.MouseEvent) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        let urlToDownload: string | undefined = fullUrlArr?.[idx];
+                                                        if (!urlToDownload) {
+                                                            const full = await dbService.getGenerationHistoryItem(item.id);
+                                                            urlToDownload = (full?.mediaUrls || [])[idx];
+                                                        }
+                                                        if (urlToDownload) {
+                                                            if (onDownload) onDownload(urlToDownload, `history_${idx}`);
+                                                            else handleDownloadAsset(urlToDownload, `history-${idx}`);
+                                                        }
+                                                    };
+
+                                                    return (
+                                                        <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-black/50 border border-white/5 group">
+                                                            {item.type === 'video' ? (
+                                                                <video
+                                                                    src={thumbUrl}
+                                                                    poster={thumbUrl}
+                                                                    className={`w-full h-full object-cover ${isSelectionMode ? 'cursor-default' : 'cursor-pointer'}`}
+                                                                    onClick={handleImageClick}
+                                                                />
+                                                            ) : (
+                                                                <ImageWithLoader
+                                                                    src={thumbUrl || (fullUrlArr?.[idx]) || ""}
+                                                                    className={`w-full h-full object-cover ${isSelectionMode ? 'cursor-default' : 'cursor-pointer'}`}
+                                                                    onClick={handleImageClick}
+                                                                    alt={`History ${idx}`}
+                                                                />
+                                                            )}
+                                                            {!isSelectionMode && (
+                                                                <button
+                                                                    onClick={handleImageDownload}
+                                                                    className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-100 transition-opacity"
+                                                                >
+                                                                    <Download className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                            <div ref={historyObserverTarget} className="h-20 flex items-center justify-center">
+                                {isLoadingMore && (
+                                    <div className="flex items-center gap-2 text-white/20">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span className="text-[10px] uppercase tracking-widest font-mono">Loading...</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {
+                showNewFolderModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+                        <div className="w-full max-w-sm bg-[#0a0a0a] border border-white/10 rounded-3xl p-8 shadow-2xl">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-bold font-serif text-white/90">{editingFolder ? 'Edit Folder' : 'New Folder'}</h2>
+                                <button onClick={() => setShowNewFolderModal(false)} className="text-white/40 hover:text-white"><X className="w-5 h-5" /></button>
+                            </div>
+                            <input
+                                type="text" autoFocus placeholder="Folder name..." value={newFolderName}
+                                onChange={(e) => setNewFolderName(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+                                className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 px-6 text-base text-white focus:border-emerald-500 transition-all mb-6"
+                            />
+
+                            <div className="space-y-4 mb-6">
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold block mb-2">Color</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {FOLDER_COLORS.map(c => (
+                                            <button key={c} onClick={() => setNewFolderColor(c)} className={`w-6 h-6 rounded-full border-2 ${newFolderColor === c ? 'border-white' : 'border-transparent'}`} style={{ backgroundColor: c }} />
+                                        ))}
+                                        <button onClick={() => setNewFolderColor("")} className={`w-6 h-6 rounded-full border-2 bg-emerald-500/20 flex items-center justify-center ${!newFolderColor ? 'border-white' : 'border-transparent'}`}><div className="w-3 h-3 rounded-full bg-emerald-500" /></button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase tracking-widest text-white/40 font-bold block mb-2">Icon</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {FOLDER_ICONS.map(icon => {
+                                            const IC = { 'folder': FolderIcon, 'star': Star, 'heart': Heart, 'camera': Camera, 'video': FileVideo, 'music': Music, 'briefcase': Briefcase, 'home': Home }[icon] || FolderIcon;
+                                            return <button key={icon} onClick={() => setNewFolderIcon(icon)} className={`p-2 rounded-lg border ${newFolderIcon === icon ? 'bg-white/10 border-white' : 'bg-white/5 border-transparent'}`}><IC className="w-4 h-4 text-white" /></button>
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4">
+                                <button onClick={() => setShowNewFolderModal(false)} className="flex-1 py-4 text-xs font-bold uppercase text-white/40">Cancel</button>
+                                <button onClick={handleCreateFolder} className="flex-1 py-4 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold uppercase rounded-2xl transition-all">{editingFolder ? 'Update' : 'Create'}</button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+            {/* Bulk Actions Modal/Bar for History */}
+            {selectedHistoryIds.size > 0 && (
+                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-bottom-4 duration-300 w-[calc(100%-2rem)] max-w-lg">
+                    <div className="bg-black/80 backdrop-blur-2xl border border-emerald-500/20 rounded-2xl shadow-2xl p-2 px-4 flex items-center justify-between gap-4">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-400">
+                                {selectedHistoryIds.size} Selected
+                            </span>
+                            <span className="text-[9px] text-white/40 uppercase tracking-tighter">History Items</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => handleBulkDownloadHistory(filteredHistory)}
+                                disabled={isProcessingBulk}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-black rounded-xl text-[10px] uppercase font-bold tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
+                            >
+                                {isProcessingBulk ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                                Download Sequential
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (confirm(`Delete ${selectedHistoryIds.size} history items?`)) {
+                                        setIsProcessingBulk(true);
+                                        try {
+                                            const ids = Array.from(selectedHistoryIds);
+                                            await dbService.deleteGenerationHistoryBatch(ids);
+                                            // history automatically updates via listener
+                                            setSelectedHistoryIds(new Set());
+                                            setIsSelectionMode(false);
+                                        } catch (err) {
+                                            console.error("Bulk delete failed:", err);
+                                            alert("Bulk delete failed.");
+                                        } finally {
+                                            setIsProcessingBulk(false);
+                                        }
+                                    }
+                                }}
+                                disabled={isProcessingBulk}
+                                className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all disabled:opacity-50"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div >
+    );
+}
