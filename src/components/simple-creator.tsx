@@ -1019,7 +1019,11 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
         setActiveTab('create');
     };
 
-    const handleRecall = (item: DBGenerationHistory) => {
+    const handleRecall = async (slimItem: DBGenerationHistory) => {
+        // Fetch full item because slim loading strips inputImageUrl and mediaUrls which are required here
+        const item = await dbService.getGenerationHistoryItem(slimItem.id);
+        if (!item) return;
+
         const isEditModel = item.model.includes('edit') || item.model.includes('replace') || item.model.includes('move');
         const targetTab = item.tab || (item.inputImageUrl ? (item.type === 'video' ? (isEditModel ? 'edit' : 'animate') : 'edit') : 'create');
 

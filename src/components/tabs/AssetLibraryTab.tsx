@@ -195,7 +195,6 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
                 }
             } else if (store === 'generation_history') {
                 // If a specific history item was updated (e.g. status changed from pending to success)
-                // we should update it in the local state immediately
                 if (type === 'update' && data && data.id) {
                     setHistory(prev => prev.map(h => h.id === data.id ? { ...h, ...data } : h));
                 } else if (type === 'insert') {
@@ -205,6 +204,14 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
                         if (prev.some(h => h.id === data.id)) return prev;
                         return [data, ...prev];
                     });
+                } else if (type === 'delete' && data) {
+                    if (data.id === 'ALL') {
+                        setHistory([]);
+                    } else if (data.id === 'BATCH' && data.ids) {
+                        setHistory(prev => prev.filter(h => !data.ids.includes(h.id)));
+                    } else if (data.id) {
+                        setHistory(prev => prev.filter(h => h.id !== data.id));
+                    }
                 } else {
                     if (subTab === 'history' || historyRef.current.length === 0) loadHistory(false);
                 }
@@ -501,7 +508,7 @@ Tab: ${fullItem.tab || 'N/A'}
     const handleDeleteHistory = async (id: string) => {
         if (!confirm("Delete this history entry?")) return;
         await dbService.deleteGenerationHistory(id);
-        loadHistory();
+        // deletion state is cleanly picked up by dbService.subscribe now
     };
 
     const handleDownloadAsset = (url: string, name: string) => {
@@ -909,13 +916,12 @@ Tab: ${fullItem.tab || 'N/A'}
                                         try {
                                             const ids = Array.from(selectedHistoryIds);
                                             await dbService.deleteGenerationHistoryBatch(ids);
-                                            loadHistory(false);
+                                            // history automatically updates via listener
                                             setSelectedHistoryIds(new Set());
                                             setIsSelectionMode(false);
                                         } catch (err) {
                                             console.error("Bulk delete failed:", err);
                                             alert("Bulk delete failed.");
-                                            loadHistory(false);
                                         } finally {
                                             setIsProcessingBulk(false);
                                         }

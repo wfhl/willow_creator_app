@@ -377,6 +377,7 @@ export const syncService = {
         if (data.requestId !== undefined) { mapped.request_id = data.requestId; delete mapped.requestId; }
         if (data.falEndpoint !== undefined) { mapped.fal_endpoint = data.falEndpoint; delete mapped.falEndpoint; }
         if (data.enhancePromptMode !== undefined) { mapped.enhance_prompt_mode = data.enhancePromptMode; delete mapped.enhancePromptMode; }
+        // Note: we just pass tab straight through assuming tab column is named 'tab' in Supabase.
         return mapped;
     },
 

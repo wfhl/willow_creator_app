@@ -8,3 +8,4 @@ ALTER TABLE public.generation_history ADD COLUMN IF NOT EXISTS base_prompt text;
 ALTER TABLE public.generation_history ADD COLUMN IF NOT EXISTS negative_prompt text;
 ALTER TABLE public.generation_history ADD COLUMN IF NOT EXISTS media_type text;
 ALTER TABLE public.generation_history ADD COLUMN IF NOT EXISTS caption_type text;
+ALTER TABLE public.generation_history ADD COLUMN IF NOT EXISTS tab text;
