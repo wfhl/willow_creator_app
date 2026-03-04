@@ -17,7 +17,7 @@ export const syncService = {
 
         // Subscribe to local changes
         this.unsubscribe = dbService.subscribe(async (store, type, data) => {
-            if (!this.user || this.isSyncing) return;
+            if (!this.user) return;
 
             try {
                 if (type === 'delete') {
@@ -91,12 +91,12 @@ export const syncService = {
 
                         if (store === 'assets') {
                             const dlAsset = await this.downloadAssetFromStorage(mapped);
-                            await dbService.saveAsset(dlAsset);
+                            await dbService.saveAsset(dlAsset, true);
                         }
-                        else if (store === 'posts') await dbService.savePost(mapped);
-                        else if (store === 'presets') await dbService.savePreset(mapped);
-                        else if (store === 'folders') await dbService.saveFolder(mapped);
-                        else if (store === 'generation_history') await dbService.saveGenerationHistory(mapped);
+                        else if (store === 'posts') await dbService.savePost(mapped, true);
+                        else if (store === 'presets') await dbService.savePreset(mapped, true);
+                        else if (store === 'folders') await dbService.saveFolder(mapped, true);
+                        else if (store === 'generation_history') await dbService.saveGenerationHistory(mapped, true);
                     }
                 })
                 .subscribe();
@@ -217,15 +217,15 @@ export const syncService = {
             if (store === 'assets') {
                 try {
                     const dlAsset = await this.downloadAssetFromStorage(mapped);
-                    await dbService.saveAsset(dlAsset);
+                    await dbService.saveAsset(dlAsset, true);
                 } catch (e) {
                     console.error(`[Sync] Failed to download asset ${cloud.id}`, e);
                 }
             }
-            else if (store === 'posts') await dbService.savePost(mapped);
-            else if (store === 'presets') await dbService.savePreset(mapped);
-            else if (store === 'folders') await dbService.saveFolder(mapped);
-            else if (store === 'generation_history') await dbService.saveGenerationHistory(mapped);
+            else if (store === 'posts') await dbService.savePost(mapped, true);
+            else if (store === 'presets') await dbService.savePreset(mapped, true);
+            else if (store === 'folders') await dbService.saveFolder(mapped, true);
+            else if (store === 'generation_history') await dbService.saveGenerationHistory(mapped, true);
         }
     },
 

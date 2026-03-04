@@ -328,14 +328,14 @@ export const dbService = {
         });
     },
 
-    async saveAsset(asset: DBAsset): Promise<void> {
+    async saveAsset(asset: DBAsset, skipNotify = false): Promise<void> {
         const db = await openDB();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('assets', 'readwrite');
             const store = transaction.objectStore('assets');
             const request = store.put(asset);
             request.onsuccess = () => {
-                this.notify('assets', 'insert', asset);
+                if (!skipNotify) this.notify('assets', 'insert', asset);
                 resolve();
             };
             request.onerror = () => reject(request.error);
@@ -367,14 +367,14 @@ export const dbService = {
         });
     },
 
-    async savePost(post: DBSavedPost): Promise<void> {
+    async savePost(post: DBSavedPost, skipNotify = false): Promise<void> {
         const db = await openDB();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('posts', 'readwrite');
             const store = transaction.objectStore('posts');
             const request = store.put(post);
             request.onsuccess = () => {
-                this.notify('posts', 'insert', post);
+                if (!skipNotify) this.notify('posts', 'insert', post);
                 resolve();
             };
             request.onerror = () => reject(request.error);
@@ -488,14 +488,14 @@ export const dbService = {
         });
     },
 
-    async savePreset(preset: DBPromptPreset): Promise<void> {
+    async savePreset(preset: DBPromptPreset, skipNotify = false): Promise<void> {
         const db = await openDB();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('presets', 'readwrite');
             const store = transaction.objectStore('presets');
             const request = store.put(preset);
             request.onsuccess = () => {
-                this.notify('presets', 'update', preset);
+                if (!skipNotify) this.notify('presets', 'update', preset);
                 resolve();
             };
             request.onerror = () => reject(request.error);
@@ -528,14 +528,14 @@ export const dbService = {
         });
     },
 
-    async saveFolder(folder: DBFolder): Promise<void> {
+    async saveFolder(folder: DBFolder, skipNotify = false): Promise<void> {
         const db = await openDB();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('folders', 'readwrite');
             const store = transaction.objectStore('folders');
             const request = store.put(folder);
             request.onsuccess = () => {
-                this.notify('folders', 'update', folder);
+                if (!skipNotify) this.notify('folders', 'update', folder);
                 resolve();
             };
             request.onerror = () => reject(request.error);
@@ -658,7 +658,7 @@ export const dbService = {
     },
 
     // --- GENERATION HISTORY ---
-    async saveGenerationHistory(entry: DBGenerationHistory): Promise<void> {
+    async saveGenerationHistory(entry: DBGenerationHistory, skipNotify = false): Promise<void> {
         const isDeleted = await this.isDeleted(entry.id);
         if (isDeleted) {
             console.log(`[DB] Ignoring save for deleted history item: ${entry.id}`);
@@ -671,7 +671,7 @@ export const dbService = {
             const store = transaction.objectStore('generation_history');
             const request = store.put(entry);
             request.onsuccess = () => {
-                this.notify('generation_history', 'insert', entry);
+                if (!skipNotify) this.notify('generation_history', 'insert', entry);
                 resolve();
             };
             request.onerror = () => reject(request.error);
