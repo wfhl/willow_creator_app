@@ -847,6 +847,20 @@ export const dbService = {
         });
     },
 
+    async trackDeletionBatch(ids: string[]): Promise<void> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            try {
+                const transaction = db.transaction('deleted_ids', 'readwrite');
+                const store = transaction.objectStore('deleted_ids');
+                const now = Date.now();
+                ids.forEach(id => store.put({ id, timestamp: now }));
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = () => reject(transaction.error);
+            } catch (e) { reject(e); }
+        });
+    },
+
     async isDeleted(id: string): Promise<boolean> {
         const db = await openDB();
         return new Promise((resolve, reject) => {

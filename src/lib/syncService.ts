@@ -29,9 +29,9 @@ export const syncService = {
                     if (data.id === 'BATCH' && data.ids && Array.isArray(data.ids)) {
                         for (const id of data.ids) {
                             this.recentlyDeleted.add(id);
-                            dbService.trackDeletion(id).catch(console.error);
-                            await this.removeFromCloud(store, id);
                         }
+                        dbService.trackDeletionBatch(data.ids).catch(console.error);
+                        await this.removeFromCloudBatch(store, data.ids);
                     } else {
                         this.recentlyDeleted.add(data.id);
                         dbService.trackDeletion(data.id).catch(console.error);
@@ -350,6 +350,22 @@ export const syncService = {
         const table = store === 'generation_history' ? 'generation_history' : store;
         const { error } = await supabase.from(table).delete().eq('id', id).eq('user_id', this.user.id);
         if (error) throw error;
+    },
+
+    async removeFromCloudBatch(store: DBStore, ids: string[]) {
+        if (!this.user || ids.length === 0) return;
+        const table = store === 'generation_history' ? 'generation_history' : store;
+
+        // Supabase limits .in() to somewhat small batches, but we handle chunks of 100 just to be safe
+        const chunkSize = 100;
+        for (let i = 0; i < ids.length; i += chunkSize) {
+            const chunk = ids.slice(i, i + chunkSize);
+            const { error } = await supabase.from(table).delete().in('id', chunk).eq('user_id', this.user.id);
+            if (error) {
+                console.error(`[Sync] Full batch delete failed for chunk`, error);
+                throw error;
+            }
+        }
     },
 
     mapToCloud(_store: DBStore, data: any): any {
