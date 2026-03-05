@@ -82,6 +82,11 @@ export interface DBGenerationHistory {
     status: 'pending' | 'success' | 'failed';
     errorMessage?: string;
     inputImageUrl?: string;
+    visualsImage?: string;
+    outfitImage?: string;
+    selectedAssetIds?: string[];
+    loras?: Array<{ path: string; scale: number }>;
+    additionalImages?: string[]; // base64 strings
     enhancePromptMode?: 'standard' | 'fast';
     tab?: string; // 'create' | 'edit' | 'animate'
     requestId?: string;

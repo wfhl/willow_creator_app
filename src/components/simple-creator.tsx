@@ -598,6 +598,10 @@ export default function SimpleCreator() {
             topic: topic || undefined,
             visuals: specificVisuals || undefined,
             outfit: specificOutfit || undefined,
+            visualsImage: visualsImage || undefined,
+            outfitImage: outfitImage || undefined,
+            selectedAssetIds: assets.filter(a => a.selected).map(a => a.id),
+            loras: loras,
             service: isFalModel ? 'fal' : 'gemini',
             status: 'pending',
             tab: activeTab
@@ -1023,6 +1027,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
         // Fetch full item because slim loading strips inputImageUrl and mediaUrls which are required here
         const item = await dbService.getGenerationHistoryItem(slimItem.id);
         if (!item) return;
+        setMediaType(item.type);
 
         const isEditModel = item.model.includes('edit') || item.model.includes('replace') || item.model.includes('move');
         const targetTab = item.tab || (item.inputImageUrl ? (item.type === 'video' ? (isEditModel ? 'edit' : 'animate') : 'edit') : 'create');
@@ -1036,6 +1041,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
             if (item.aspectRatio) setI2vAspectRatio(item.aspectRatio);
             if (item.withAudio !== undefined) setWithAudio(item.withAudio);
             if (item.cameraFixed !== undefined) setCameraFixed(item.cameraFixed);
+            if (item.loras) setLoras(item.loras);
 
             if (item.inputImageUrl) {
                 setI2VTarget({ url: item.inputImageUrl, index: -1 });
@@ -1046,9 +1052,22 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
             setEditSelectedModel(item.model);
             if (item.imageSize) setRefineImageSize(item.imageSize);
             if (item.numImages) setRefineNumImages(item.numImages);
+            if (item.loras) setLoras(item.loras);
             setRefineResultUrls(item.mediaUrls || []);
             if (item.inputImageUrl) {
                 setRefineTarget({ url: item.inputImageUrl, index: -1 });
+            }
+            if (item.additionalImages) {
+                setRefineAdditionalImages(item.additionalImages.map(b64 => ({
+                    id: generateUUID(),
+                    name: 'Recalled Reference',
+                    base64: b64,
+                    type: 'image',
+                    folderId: null,
+                    timestamp: Date.now()
+                })));
+            } else {
+                setRefineAdditionalImages([]);
             }
         } else {
             // Default to Create Tab
@@ -1059,14 +1078,29 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
             if (item.imageSize) setCreateImageSize(item.imageSize);
             if (item.numImages) setCreateNumImages(item.numImages);
             if (item.themeId) setSelectedThemeId(item.themeId);
+            if (item.loras) setLoras(item.loras);
 
             if (item.topic) setTopic(item.topic);
             if (item.visuals) setSpecificVisuals(item.visuals);
             if (item.outfit) setSpecificOutfit(item.outfit);
+            if (item.visualsImage) setVisualsImage(item.visualsImage);
+            if (item.outfitImage) setOutfitImage(item.outfitImage);
 
             if (item.prompt) {
                 ignoreNextPromptUpdate.current = true;
             }
+        }
+
+        // Common restoration: selected assets
+        if (item.selectedAssetIds && item.selectedAssetIds.length > 0) {
+            setAssets(prev => prev.map(a => ({
+                ...a,
+                selected: item.selectedAssetIds?.includes(a.id)
+            })));
+        } else {
+            // If no selected assets in history, we should probably clear selection
+            // unless we want to keep current selection. User said "recall related metadata".
+            setAssets(prev => prev.map(a => ({ ...a, selected: false })));
         }
     };
 
@@ -1535,6 +1569,9 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                 mediaUrls: [],
                                 service: (editSelectedModel.includes('grok') || editSelectedModel.includes('seedream') || isVideo) ? 'fal' : 'gemini',
                                 status: 'pending',
+                                loras: loras,
+                                selectedAssetIds: assets.filter(a => a.selected).map(a => a.id),
+                                additionalImages: refineAdditionalImages.map(a => a.base64),
                                 inputImageUrl: refineTarget?.url,
                                 imageSize: refineImageSize,
                                 numImages: refineNumImages,
@@ -1699,7 +1736,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                             />
                         }
                         onSaveToAssets={handleSaveToAssets}
-                        onPreview={(url) => handleOpenPreview(url)}
+                        onPreview={handleOpenPreview}
                         onDownload={handleDownload}
                     />
                 )}
@@ -1750,6 +1787,8 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                 mediaUrls: [],
                                 service: (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) ? 'fal' : 'gemini',
                                 status: 'pending',
+                                loras: loras,
+                                selectedAssetIds: assets.filter(a => a.selected).map(a => a.id),
                                 inputImageUrl: i2vTarget?.url,
                                 videoResolution: videoResolution,
                                 videoDuration: videoDuration,

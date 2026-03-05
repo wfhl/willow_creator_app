@@ -28,7 +28,7 @@ interface AnimateTabProps {
     onDiscardI2V: () => void;
     presetsDropdown: React.ReactNode;
     onSaveToAssets: (url: string, type: 'image' | 'video', name?: string) => void;
-    onPreview: (url: string) => void;
+    onPreview: (url: string, urls?: string[]) => void;
     onDownload: (url: string, prefix?: string) => void;
 
     // New Props for Seedance
@@ -245,7 +245,7 @@ export function AnimateTab({
                                 src={i2vTarget.url}
                                 alt="Target"
                                 className="w-full h-full object-cover cursor-zoom-in"
-                                onClick={() => onPreview(i2vTarget.url)}
+                                onClick={() => onPreview(i2vTarget.url, [i2vTarget.url])}
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-100 transition-opacity flex flex-col items-end justify-between p-4 pointer-events-none">
                                 <label className="pointer-events-auto cursor-pointer bg-white/10 hover:bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2 transition-all shadow-lg">
@@ -633,7 +633,7 @@ export function AnimateTab({
                                                 // But video tag clicks on controls might be tricky.
                                                 // Let's just make it clear.
                                                 if (e.target === e.currentTarget) {
-                                                    onPreview(generatedI2VUrl!);
+                                                    onPreview(generatedI2VUrl!, [generatedI2VUrl!]);
                                                 }
                                             }}
                                         />

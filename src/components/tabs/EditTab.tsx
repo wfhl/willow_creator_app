@@ -29,7 +29,7 @@ interface EditTabProps {
     onI2VEntry: (url: string) => void;
     presetsDropdown: React.ReactNode;
     onSaveToAssets: (url: string, type: 'image' | 'video', name?: string) => void;
-    onPreview: (url: string) => void;
+    onPreview: (url: string, urls?: string[]) => void;
     onDownload: (url: string, prefix?: string) => void;
 
     // New Props
@@ -217,7 +217,7 @@ export function EditTab({
                                     src={refineTarget.url}
                                     alt="Target"
                                     className="w-full h-full cursor-zoom-in"
-                                    onClick={() => onPreview(refineTarget.url)}
+                                    onClick={() => onPreview(refineTarget.url, [refineTarget.url])}
                                 />
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex flex-col items-end justify-between p-4 pointer-events-none">
@@ -517,7 +517,7 @@ export function EditTab({
                                                     src={url}
                                                     alt={`Refined Result ${idx + 1}`}
                                                     className="w-full h-full cursor-zoom-in"
-                                                    onClick={() => onPreview(url)}
+                                                    onClick={() => onPreview(url, refineResultUrls)}
                                                 />
                                                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1 z-10">
                                                     <button
