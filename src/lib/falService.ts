@@ -326,7 +326,7 @@ export const falService = {
         return await fal.storage.upload(file);
     },
 
-    async checkGenerationStatus(requestId: string, endpoint: string): Promise<{ status: 'pending' | 'success' | 'failed', mediaUrls?: string[], error?: string }> {
+    async checkGenerationStatus(requestId: string, endpoint: string, retries = 3): Promise<{ status: 'pending' | 'success' | 'failed', mediaUrls?: string[], error?: string }> {
         try {
             const statusResult: any = await fal.queue.status(endpoint, { requestId, logs: false });
             if (statusResult.status === 'COMPLETED') {
@@ -348,7 +348,13 @@ export const falService = {
                 return { status: 'failed', error: `Status: ${statusResult.status}` };
             }
         } catch (e: any) {
-            console.error('Failed to check generation status', e);
+            console.warn(`[FalService] Failed to check status. Retries left: ${retries}`, e);
+            // Treat network or 5xx errors as recoverable if we have retries
+            if (retries > 0) {
+                await new Promise(res => setTimeout(res, (4 - retries) * 1000));
+                return this.checkGenerationStatus(requestId, endpoint, retries - 1);
+            }
+            console.error('Failed to check generation status definitively', e);
             return { status: 'failed', error: e.message || 'Unknown error' };
         }
     }

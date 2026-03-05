@@ -1872,7 +1872,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                             />
                         }
                         onSaveToAssets={handleSaveToAssets}
-                        onPreview={(url) => handleOpenPreview(url)}
+                        onPreview={handleOpenPreview}
                         onDownload={handleDownload}
                         apiKeys={apiKeys}
                     />
@@ -1897,7 +1897,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                     CSS hides it when on another tab. This prevents spinner on every return visit. */}
                 <div className={activeTab === 'assets' ? 'block' : 'hidden'}>
                     <AssetLibraryTab
-                        onPreview={(url) => handleOpenPreview(url)}
+                        onPreview={handleOpenPreview}
                         onRecall={handleRecall}
                         onDownload={handleDownload}
                     />
@@ -1953,7 +1953,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                 >
                     {/* Close Button */}
                     <button
-                        className="absolute top-4 right-4 md:top-6 md:right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white/60 hover:text-white transition-all border border-white/10 z-[1001]"
+                        className="absolute top-10 right-6 md:top-6 md:right-6 p-4 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-full text-white/60 hover:text-white transition-all border border-white/10 z-[1001]"
                         onClick={() => setPreviewContext(null)}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
@@ -1963,7 +1963,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                     {previewContext.urls.length > 1 && (
                         <>
                             <button
-                                className="absolute left-4 md:left-8 p-4 bg-white/5 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-all border border-white/5 z-[1001]"
+                                className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-4 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full text-white/40 hover:text-white transition-all border border-white/5 z-[1001]"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setPreviewContext(prev => prev ? { ...prev, index: (prev.index - 1 + prev.urls.length) % prev.urls.length } : null);
@@ -1972,7 +1972,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
                             </button>
                             <button
-                                className="absolute right-4 md:right-8 p-4 bg-white/5 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-all border border-white/5 z-[1001]"
+                                className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-4 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full text-white/40 hover:text-white transition-all border border-white/5 z-[1001]"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setPreviewContext(prev => prev ? { ...prev, index: (prev.index + 1) % prev.urls.length } : null);

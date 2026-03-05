@@ -280,6 +280,27 @@ export const dbService = {
         });
     },
 
+    async getAllAssetsSlim(): Promise<Partial<DBAsset>[]> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('assets', 'readonly');
+            const store = transaction.objectStore('assets');
+            const items: Partial<DBAsset>[] = [];
+            const request = store.openCursor();
+            request.onsuccess = (event) => {
+                const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+                if (!cursor) {
+                    resolve(items);
+                    return;
+                }
+                const { base64, ...slim } = cursor.value;
+                items.push(slim);
+                cursor.continue();
+            };
+            request.onerror = () => reject(request.error);
+        });
+    },
+
     async getAssetsByType(type: string): Promise<DBAsset[]> {
         const db = await openDB();
         return new Promise((resolve, reject) => {
@@ -363,6 +384,27 @@ export const dbService = {
             const store = transaction.objectStore('posts');
             const request = store.getAll();
             request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async getAllPostsSlim(): Promise<Partial<DBSavedPost>[]> {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction('posts', 'readonly');
+            const store = transaction.objectStore('posts');
+            const items: Partial<DBSavedPost>[] = [];
+            const request = store.openCursor();
+            request.onsuccess = (event) => {
+                const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+                if (!cursor) {
+                    resolve(items);
+                    return;
+                }
+                const { mediaUrls, thumbnailUrls, ...slim } = cursor.value;
+                items.push(slim);
+                cursor.continue();
+            };
             request.onerror = () => reject(request.error);
         });
     },

@@ -141,8 +141,8 @@ export const syncService = {
         console.log(`[Sync] Syncing table: ${table}`);
 
         let localItems: any[] = [];
-        if (store === 'assets') localItems = await dbService.getAllAssets();
-        else if (store === 'posts') localItems = await dbService.getAllPosts();
+        if (store === 'assets') localItems = await dbService.getAllAssetsSlim();
+        else if (store === 'posts') localItems = await dbService.getAllPostsSlim();
         else if (store === 'presets') localItems = await dbService.getAllPresets();
         else if (store === 'folders') localItems = await dbService.getAllFolders();
         else if (store === 'generation_history') {
@@ -165,9 +165,12 @@ export const syncService = {
                 console.log(`[Sync] Pushing local-only ${store}: ${local.id}`);
                 let fullLocal = local;
                 try {
-                    // If it's a slim generation_history item, get the full data (with base64 media) for upload
+                    // Fetch full data with base64/media URLs for upload
                     if (store === 'generation_history') {
                         const fetchedFull = await dbService.getGenerationHistoryItem(local.id);
+                        if (fetchedFull) fullLocal = fetchedFull;
+                    } else if (store === 'assets' || store === 'posts') {
+                        const fetchedFull = await dbService.getById(store, local.id);
                         if (fetchedFull) fullLocal = fetchedFull;
                     }
                     await this.syncToCloud(store, fullLocal);

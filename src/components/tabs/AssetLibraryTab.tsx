@@ -33,7 +33,7 @@ import JSZip from 'jszip';
 import type { DBAsset, DBFolder, DBGenerationHistory } from '../../lib/dbService';
 
 interface AssetLibraryTabProps {
-    onPreview: (url: string) => void;
+    onPreview: (url: string, allUrls?: string[]) => void;
     onRecall?: (item: DBGenerationHistory) => void;
     onDownload?: (url: string, prefix?: string) => void;
 }
@@ -773,13 +773,15 @@ Tab: ${fullItem.tab || 'N/A'}
                                                     const handleImageClick = async (e: React.MouseEvent) => {
                                                         if (isSelectionMode) return;
                                                         e.stopPropagation();
-                                                        let urlToPreview: string | undefined = fullUrlArr?.[idx];
-                                                        if (!urlToPreview) {
+                                                        let fullUrls = fullUrlArr;
+                                                        let urlToPreview: string | undefined = fullUrls?.[idx];
+                                                        if (!urlToPreview || !fullUrls || fullUrls.length === 0) {
                                                             const full = await dbService.getGenerationHistoryItem(item.id);
-                                                            urlToPreview = (full?.mediaUrls || [])[idx];
+                                                            fullUrls = full?.mediaUrls || [];
+                                                            urlToPreview = fullUrls[idx];
                                                         }
                                                         if (urlToPreview) {
-                                                            onPreview(urlToPreview);
+                                                            onPreview(urlToPreview, fullUrls);
                                                         }
                                                     };
 
