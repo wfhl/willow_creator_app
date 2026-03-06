@@ -763,25 +763,41 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
 
             // --- Save to Generation History ---
             try {
-                // Ensure media items are converted to persistent base64 if they are images
-                // Process sequentially to avoid memory spikes (crashing on mobile)
-                const persistentMediaUrls: string[] = [];
-                if (generationSucceeded) {
-                    for (const url of resultUrls) {
-                        const b64 = await urlToBase64(url);
-                        persistentMediaUrls.push(b64);
-                    }
-                }
-
-                const thumbnailUrls = generationSucceeded ? await createThumbnails(persistentMediaUrls) : undefined;
-
-                await dbService.saveGenerationHistory({
+                // Instantly save to history with source URLs to make them appear immediately
+                // This prevents the UI from lagging behind the "edit" page.
+                const newHistoryEntry: DBGenerationHistory = {
                     ...baseHistoryEntry,
-                    mediaUrls: persistentMediaUrls,
-                    thumbnailUrls,
+                    mediaUrls: resultUrls,
                     status: generationSucceeded ? 'success' : 'failed',
                     errorMessage: generationError || undefined
-                });
+                };
+                await dbService.saveGenerationHistory(newHistoryEntry);
+
+                // Process heavy Base64 and thumbnail conversions in background
+                if (generationSucceeded && resultUrls.length > 0) {
+                    setTimeout(async () => {
+                        try {
+                            const persistentMediaUrls: string[] = [];
+                            for (const url of resultUrls) {
+                                const b64 = await urlToBase64(url);
+                                persistentMediaUrls.push(b64);
+                                // Pause to allow Garbage Collection and prevent OOM crash
+                                await new Promise(r => setTimeout(r, 500));
+                            }
+
+                            const thumbnailUrls = await createThumbnails(persistentMediaUrls);
+                            
+                            // Update the DB entry with the permanent base64 data
+                            await dbService.saveGenerationHistory({
+                                ...newHistoryEntry,
+                                mediaUrls: persistentMediaUrls,
+                                thumbnailUrls
+                            });
+                        } catch (bgErr) {
+                            console.error('[Background] Failed to persist media:', bgErr);
+                        }
+                    }, 100);
+                }
             } catch (histErr) {
                 console.error('Failed to save generation history:', histErr);
             }

@@ -73,6 +73,8 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
     // Separate in-flight guards so assets and history can't interfere with each other
     const isLoadingAssetsRef = useRef(false);
     const isLoadingHistoryRef = useRef(false);
+    const [hasAttemptedHistoryLoad, setHasAttemptedHistoryLoad] = useState(false);
+    const [hasAttemptedAssetsLoad, setHasAttemptedAssetsLoad] = useState(false);
 
     // Stable refs to latest state – used inside callbacks to avoid stale closures
     // that would otherwise force recreation of loadContent/loadHistory on every render
@@ -117,6 +119,7 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
         } finally {
             isLoadingAssetsRef.current = false;
             setIsLoadingMore(false);
+            setHasAttemptedAssetsLoad(true);
         }
         // Only recreate when folder changes – assetsRef gives us the latest assets without being a dep
     }, [currentFolderId]);
@@ -149,6 +152,7 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
         } finally {
             isLoadingHistoryRef.current = false;
             setIsLoadingMore(false);
+            setHasAttemptedHistoryLoad(true);
         }
         // Stable – no state deps needed since we use historyRef
     }, []);
@@ -641,7 +645,7 @@ Tab: ${fullItem.tab || 'N/A'}
                 subTab === 'saved' ? (
                     <div className="flex-1 overflow-y-auto min-h-0">
                         {filteredFolders.length === 0 && filteredAssets.length === 0 ? (
-                            isLoadingMore ? (
+                            (!hasAttemptedAssetsLoad || (isLoadingMore && assets.length === 0)) ? (
                                 <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
                                     <Loader2 className="w-8 h-8 mb-4 animate-spin text-emerald-500/50" />
                                     <p className="font-serif italic text-white/40">Loading assets...</p>
@@ -716,7 +720,7 @@ Tab: ${fullItem.tab || 'N/A'}
                             </div>
                         )}
                         <div ref={assetObserverTarget} className="h-20 flex items-center justify-center">
-                            {isLoadingMore && (
+                            {(isLoadingMore && assets.length > 0) && (
                                 <div className="flex items-center gap-2 text-white/20">
                                     <Loader2 className="w-4 h-4 animate-spin" />
                                     <span className="text-[10px] uppercase tracking-widest font-mono">Loading...</span>
@@ -728,7 +732,7 @@ Tab: ${fullItem.tab || 'N/A'}
                     <div className="flex-1 overflow-y-auto min-h-0">
                         <div className="grid grid-cols-1 gap-6">
                             {filteredHistory.length === 0 ? (
-                                isLoadingMore ? (
+                                (!hasAttemptedHistoryLoad || (isLoadingMore && history.length === 0)) ? (
                                     <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
                                         <Loader2 className="w-8 h-8 mb-4 animate-spin text-emerald-500/50" />
                                         <p className="font-serif italic text-white/40">Loading history...</p>
@@ -845,7 +849,7 @@ Tab: ${fullItem.tab || 'N/A'}
                                 ))
                             )}
                             <div ref={historyObserverTarget} className="h-20 flex items-center justify-center">
-                                {isLoadingMore && (
+                                {(isLoadingMore && history.length > 0) && (
                                     <div className="flex items-center gap-2 text-white/20">
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                         <span className="text-[10px] uppercase tracking-widest font-mono">Loading...</span>
