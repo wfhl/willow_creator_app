@@ -1045,6 +1045,9 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
 
             if (item.inputImageUrl) {
                 setI2VTarget({ url: item.inputImageUrl, index: -1 });
+            } else if (item.mediaUrls && item.mediaUrls.length > 0) {
+                // Fallback if inputImageUrl is missing (e.g. lost in sync or old data)
+                setI2VTarget({ url: item.mediaUrls[0], index: -1 });
             }
         } else if (targetTab === 'edit') {
             setActiveTab('edit');
@@ -1056,6 +1059,10 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
             setRefineResultUrls(item.mediaUrls || []);
             if (item.inputImageUrl) {
                 setRefineTarget({ url: item.inputImageUrl, index: -1 });
+            } else if (item.mediaUrls && item.mediaUrls.length > 0) {
+                // Fallback if inputImageUrl is missing (e.g. lost in sync or old data)
+                // If refineTarget is null, EditTab early returns the empty state.
+                setRefineTarget({ url: item.mediaUrls[0], index: -1 });
             }
             if (item.additionalImages) {
                 setRefineAdditionalImages(item.additionalImages.map(b64 => ({
