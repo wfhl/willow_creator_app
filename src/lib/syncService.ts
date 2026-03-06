@@ -97,6 +97,9 @@ export const syncService = {
                         else if (store === 'presets') await dbService.savePreset(mapped, true);
                         else if (store === 'folders') await dbService.saveFolder(mapped, true);
                         else if (store === 'generation_history') await dbService.saveGenerationHistory(mapped, true);
+                        
+                        // Notify the UI
+                        dbService.notify(store, payload.eventType === 'UPDATE' ? 'update' : 'insert', mapped);
                     }
                 })
                 .subscribe();
@@ -230,6 +233,9 @@ export const syncService = {
             else if (store === 'folders') await dbService.saveFolder(mapped, true);
             else if (store === 'generation_history') await dbService.saveGenerationHistory(mapped, true);
         }
+        
+        // Notify the UI that sync is complete for this store
+        dbService.notify(store, 'sync_complete', null);
     },
 
     async syncToCloud(store: DBStore, data: any) {

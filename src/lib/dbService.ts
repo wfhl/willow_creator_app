@@ -186,7 +186,7 @@ const openDB = (): Promise<IDBDatabase> => {
 
 // --- Change Listeners for Sync Engine ---
 export type DBStore = 'assets' | 'posts' | 'presets' | 'folders' | 'generation_history';
-export type ChangeType = 'insert' | 'update' | 'delete';
+export type ChangeType = 'insert' | 'update' | 'delete' | 'sync_complete';
 export type DBChangeListener = (store: DBStore, type: ChangeType, data: any) => void;
 
 let listeners: DBChangeListener[] = [];

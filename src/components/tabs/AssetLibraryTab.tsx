@@ -189,19 +189,17 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
     useEffect(() => {
         const unsubscribe = dbService.subscribe((store, type, data) => {
             if (store === 'assets' || store === 'folders') {
-                if (type === 'insert' || type === 'delete' || type === 'update') {
+                if (type === 'insert' || type === 'delete' || type === 'update' || type === 'sync_complete') {
                     // Use ref so we don't need assets/subTab as deps (avoids re-subscribing constantly)
                     if (subTab === 'saved' || assetsRef.current.length === 0) loadContent(false);
                 }
             } else if (store === 'generation_history') {
                 // If a specific history item was updated (e.g. status changed from pending to success)
-                if (type === 'update' && data && data.id) {
-                    setHistory(prev => prev.map(h => h.id === data.id ? { ...h, ...data } : h));
-                } else if (type === 'insert') {
-                    // Prepend new items to history for instant feedback
+                if ((type === 'update' || type === 'insert') && data && data.id) {
                     setHistory(prev => {
-                        // Avoid duplicate if the item is already present
-                        if (prev.some(h => h.id === data.id)) return prev;
+                        if (prev.some(h => h.id === data.id)) {
+                            return prev.map(h => h.id === data.id ? { ...h, ...data } : h);
+                        }
                         return [data, ...prev];
                     });
                 } else if (type === 'delete' && data) {
