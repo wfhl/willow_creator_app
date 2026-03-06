@@ -641,12 +641,19 @@ Tab: ${fullItem.tab || 'N/A'}
                 subTab === 'saved' ? (
                     <div className="flex-1 overflow-y-auto min-h-0">
                         {filteredFolders.length === 0 && filteredAssets.length === 0 ? (
-                            <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
-                                <ImageIcon className="w-12 h-12 mb-4 opacity-10" />
-                                <p className="font-serif italic text-white/40">
-                                    {searchQuery ? 'No assets match your search' : (currentFolderId ? 'This folder is empty' : 'Your library is empty')}
-                                </p>
-                            </div>
+                            isLoadingMore ? (
+                                <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
+                                    <Loader2 className="w-8 h-8 mb-4 animate-spin text-emerald-500/50" />
+                                    <p className="font-serif italic text-white/40">Loading assets...</p>
+                                </div>
+                            ) : (
+                                <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
+                                    <ImageIcon className="w-12 h-12 mb-4 opacity-10" />
+                                    <p className="font-serif italic text-white/40">
+                                        {searchQuery ? 'No assets match your search' : (currentFolderId ? 'This folder is empty' : 'Your library is empty')}
+                                    </p>
+                                </div>
+                            )
                         ) : (
                             <div className={viewMode === 'grid' ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4" : "flex flex-col gap-1"}>
                                 {filteredFolders.map(folder => (
@@ -721,10 +728,17 @@ Tab: ${fullItem.tab || 'N/A'}
                     <div className="flex-1 overflow-y-auto min-h-0">
                         <div className="grid grid-cols-1 gap-6">
                             {filteredHistory.length === 0 ? (
-                                <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
-                                    <History className="w-12 h-12 mb-4 opacity-10" />
-                                    <p className="font-serif italic text-white/40">{searchQuery ? 'No history matches your search' : 'No history yet'}</p>
-                                </div>
+                                isLoadingMore ? (
+                                    <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
+                                        <Loader2 className="w-8 h-8 mb-4 animate-spin text-emerald-500/50" />
+                                        <p className="font-serif italic text-white/40">Loading history...</p>
+                                    </div>
+                                ) : (
+                                    <div className="h-64 flex flex-col items-center justify-center text-white/20 border border-dashed border-white/5 rounded-3xl">
+                                        <History className="w-12 h-12 mb-4 opacity-10" />
+                                        <p className="font-serif italic text-white/40">{searchQuery ? 'No history matches your search' : 'No history yet'}</p>
+                                    </div>
+                                )
                             ) : (
                                 filteredHistory.map(item => (
                                     <div
