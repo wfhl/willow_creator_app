@@ -200,11 +200,19 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
             } else if (store === 'generation_history') {
                 // If a specific history item was updated (e.g. status changed from pending to success)
                 if ((type === 'update' || type === 'insert') && data && data.id) {
+                    // Strip the heavy payloads we don't need in the grid
+                    const { visualsImage, outfitImage, additionalImages, inputImageUrl, ...slimData } = data;
+                    
+                    // If thumbnails exist securely, we don't need the heavy mediaUrls in the UI list either
+                    if (slimData.thumbnailUrls && slimData.thumbnailUrls.length > 0) {
+                        delete slimData.mediaUrls;
+                    }
+
                     setHistory(prev => {
-                        if (prev.some(h => h.id === data.id)) {
-                            return prev.map(h => h.id === data.id ? { ...h, ...data } : h);
+                        if (prev.some(h => h.id === slimData.id)) {
+                            return prev.map(h => h.id === slimData.id ? { ...h, ...slimData } : h);
                         }
-                        return [data, ...prev];
+                        return [slimData as any, ...prev];
                     });
                 } else if (type === 'delete' && data) {
                     if (data.id === 'ALL') {

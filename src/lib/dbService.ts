@@ -755,7 +755,7 @@ export const dbService = {
 
                 if (slim) {
                     const val = cursor.value;
-                    const { mediaUrls, inputImageUrl, ...slimItem } = val;
+                    const { mediaUrls, inputImageUrl, visualsImage, outfitImage, additionalImages, ...slimItem } = val;
                     items.push(slimItem as DBGenerationHistory);
                 } else {
                     items.push(cursor.value);
