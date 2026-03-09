@@ -1603,7 +1603,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                             try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { console.error(e); }
 
                             try {
-                                const urlToBase64 = async (url: string) => {
+                                const localUrlToRawBase64 = async (url: string) => {
                                     if (url.startsWith('data:')) return url.split(',')[1];
                                     const res = await fetch(url);
                                     const blob = await res.blob();
@@ -1654,7 +1654,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                     urlUrls = results;
                                 } else {
                                     // IMAGE EDIT FLOW
-                                    const base64 = await urlToBase64(refineTarget.url);
+                                    const base64 = await localUrlToRawBase64(refineTarget.url);
                                     const baseMime = refineTarget.url.split(';')[0].split(':')[1] || "image/jpeg";
                                     const contentParts: any[] = [{ inlineData: { mimeType: baseMime, data: base64 } }];
                                     refineAdditionalImages.forEach(img => {
@@ -1703,8 +1703,13 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                     setRefineProgress(100);
                                     try {
                                         const thumbnailUrls = await createThumbnails(urlUrls);
+                                        const finalInputImageUrl = baseHistoryEntry.inputImageUrl ? await urlToBase64(baseHistoryEntry.inputImageUrl) : undefined;
+                                        const finalAdditionalImages = baseHistoryEntry.additionalImages ? await Promise.all(baseHistoryEntry.additionalImages.map(img => urlToBase64(img))) : undefined;
+
                                         await dbService.saveGenerationHistory({
                                             ...baseHistoryEntry,
+                                            inputImageUrl: finalInputImageUrl,
+                                            additionalImages: finalAdditionalImages,
                                             mediaUrls: urlUrls,
                                             thumbnailUrls,
                                             status: 'success'
@@ -1823,7 +1828,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                             try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { console.error(e); }
 
                             try {
-                                const urlToBase64 = async (url: string) => {
+                                const localUrlToRawBase64 = async (url: string) => {
                                     if (url.startsWith('data:')) return url.split(',')[1];
                                     const res = await fetch(url);
                                     const blob = await res.blob();
@@ -1833,7 +1838,7 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                         reader.readAsDataURL(blob);
                                     });
                                 };
-                                const base64 = await urlToBase64(i2vTarget.url);
+                                const base64 = await localUrlToRawBase64(i2vTarget.url);
                                 const sourceMime = i2vTarget.url.split(';')[0].split(':')[1] || "image/jpeg";
                                 const contentParts = [{ inlineData: { mimeType: sourceMime, data: base64 } }];
 
@@ -1885,9 +1890,13 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                     setI2VResultUrl(url);
                                     // Save to History
                                     try {
+                                        const finalInputImageUrl = baseHistoryEntry.inputImageUrl ? await urlToBase64(baseHistoryEntry.inputImageUrl) : undefined;
+                                        const thumbnailUrls = await createThumbnails([url]);
                                         await dbService.saveGenerationHistory({
                                             ...baseHistoryEntry,
+                                            inputImageUrl: finalInputImageUrl,
                                             mediaUrls: [url],
+                                            thumbnailUrls,
                                             status: 'success'
                                         });
                                     } catch (err) { console.error("Failed to save history:", err); }

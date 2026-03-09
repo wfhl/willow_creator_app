@@ -107,13 +107,8 @@ export function EditTab({
     // Helper to process a file to a data URL
     const processFile = (file: File) => {
         if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) return;
-        const reader = new FileReader();
-        reader.onload = (re) => {
-            if (re.target?.result) {
-                setRefineTarget({ url: re.target.result as string, index: -1 });
-            }
-        };
-        reader.readAsDataURL(file);
+        const url = URL.createObjectURL(file);
+        setRefineTarget({ url, index: -1 });
     };
 
     // Internal handler for uploading the main refine target if none exists
@@ -268,11 +263,7 @@ export function EditTab({
                                                     const newAssets: Asset[] = [];
                                                     for (let i = 0; i < e.target.files.length; i++) {
                                                         const file = e.target.files[i];
-                                                        const reader = new FileReader();
-                                                        const base64 = await new Promise<string>((resolve) => {
-                                                            reader.onload = () => resolve(reader.result as string);
-                                                            reader.readAsDataURL(file);
-                                                        });
+                                                        const base64 = URL.createObjectURL(file);
                                                         newAssets.push({
                                                             id: generateUUID(),
                                                             name: file.name,
@@ -323,11 +314,7 @@ export function EditTab({
                                                 onChange={async (e) => {
                                                     if (e.target.files?.[0]) {
                                                         const file = e.target.files[0];
-                                                        const reader = new FileReader();
-                                                        const base64 = await new Promise<string>((resolve) => {
-                                                            reader.onload = () => resolve(reader.result as string);
-                                                            reader.readAsDataURL(file);
-                                                        });
+                                                        const base64 = URL.createObjectURL(file);
                                                         setRefineAdditionalImages([{
                                                             id: generateUUID(), name: file.name, base64, type: 'image', folderId: null, timestamp: Date.now()
                                                         }]);
@@ -519,7 +506,7 @@ export function EditTab({
                                                     className="w-full h-full cursor-zoom-in"
                                                     onClick={() => onPreview(url, refineResultUrls)}
                                                 />
-                                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1 z-10">
+                                                <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity bg-black/60 rounded-lg p-1 z-10">
                                                     <button
                                                         onClick={() => setRefineTarget({ url: url, index: -1 })}
                                                         className="p-1 hover:bg-white/20 rounded"

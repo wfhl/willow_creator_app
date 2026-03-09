@@ -5,37 +5,43 @@ interface ImageWithLoaderProps extends React.ImgHTMLAttributes<HTMLImageElement>
     fallbackIcon?: React.ReactNode;
 }
 
-// Global session cache for already loaded URLs to prevent flickering during tab navigation
+// Global session cache for already loaded HTTP URLs to prevent flickering during tab navigation
+// WE DO NOT CACHE base64 `data:` urls here, otherwise 4K images will leak gigabytes of memory and OOM crash
 const loadedImagesCache = new Set<string>();
 
+const canMapToCache = (src: string | undefined): boolean => {
+    if (!src) return false;
+    return !src.startsWith('data:');
+}
+
 export function ImageWithLoader({ className, fallbackIcon, ...props }: ImageWithLoaderProps) {
-    const [isLoaded, setIsLoaded] = useState(() => props.src ? loadedImagesCache.has(props.src) : false);
+    const [isLoaded, setIsLoaded] = useState(() => canMapToCache(props.src) ? loadedImagesCache.has(props.src!) : false);
     const [hasError, setHasError] = useState(false);
 
     const imgRef = React.useRef<HTMLImageElement>(null);
 
     // Initial check on mount
     React.useEffect(() => {
-        if (props.src && loadedImagesCache.has(props.src)) {
+        if (canMapToCache(props.src) && loadedImagesCache.has(props.src!)) {
             setIsLoaded(true);
             return;
         }
         if (imgRef.current?.complete) {
-            if (props.src) loadedImagesCache.add(props.src);
+            if (canMapToCache(props.src)) loadedImagesCache.add(props.src!);
             setIsLoaded(true);
         }
     }, [props.src]);
 
     // Reset state when src changes
     React.useEffect(() => {
-        if (props.src && loadedImagesCache.has(props.src)) {
+        if (canMapToCache(props.src) && loadedImagesCache.has(props.src!)) {
             setIsLoaded(true);
             setHasError(false);
             return;
         }
 
         if (imgRef.current?.complete) {
-            if (props.src) loadedImagesCache.add(props.src);
+            if (canMapToCache(props.src)) loadedImagesCache.add(props.src!);
             setIsLoaded(true);
             setHasError(false);
         } else {
@@ -67,12 +73,12 @@ export function ImageWithLoader({ className, fallbackIcon, ...props }: ImageWith
                 decoding="async"
                 loading="lazy" // Prioritize browser-native lazy loading for lists
                 onLoad={(e) => {
-                    if (props.src) loadedImagesCache.add(props.src);
+                    if (canMapToCache(props.src)) loadedImagesCache.add(props.src!);
                     setIsLoaded(true);
                     if (props.onLoad) props.onLoad(e);
                 }}
                 onError={(e) => {
-                    if (props.src) loadedImagesCache.delete(props.src);
+                    if (canMapToCache(props.src)) loadedImagesCache.delete(props.src!);
                     setHasError(true);
                     if (props.onError) props.onError(e);
                 }}
