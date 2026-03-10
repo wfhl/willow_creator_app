@@ -65,7 +65,7 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
 
     const assetObserverTarget = useRef<HTMLDivElement>(null);
     const historyObserverTarget = useRef<HTMLDivElement>(null);
-    const BATCH_SIZE = 24;
+    const BATCH_SIZE = 12;
 
     const FOLDER_COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1'];
     const FOLDER_ICONS = ['folder', 'star', 'heart', 'camera', 'video', 'music', 'briefcase', 'home'];
@@ -200,19 +200,47 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
             } else if (store === 'generation_history') {
                 // If a specific history item was updated (e.g. status changed from pending to success)
                 if ((type === 'update' || type === 'insert') && data && data.id) {
-                    // Strip the heavy payloads we don't need in the grid
-                    const { visualsImage, outfitImage, additionalImages, inputImageUrl, ...slimData } = data;
-                    
-                    // If thumbnails exist securely, we don't need the heavy mediaUrls in the UI list either
-                    if (slimData.thumbnailUrls && slimData.thumbnailUrls.length > 0) {
-                        delete slimData.mediaUrls;
+                    // Sever GC links strictly
+                    const slimItem: Partial<DBGenerationHistory> = {
+                        id: data.id,
+                        timestamp: data.timestamp,
+                        type: data.type,
+                        prompt: data.prompt,
+                        model: data.model,
+                        aspectRatio: data.aspectRatio,
+                        imageSize: data.imageSize,
+                        numImages: data.numImages,
+                        videoResolution: data.videoResolution,
+                        videoDuration: data.videoDuration,
+                        withAudio: data.withAudio,
+                        cameraFixed: data.cameraFixed,
+                        themeId: data.themeId,
+                        themeName: data.themeName,
+                        topic: data.topic,
+                        visuals: data.visuals,
+                        outfit: data.outfit,
+                        selectedAssetIds: data.selectedAssetIds,
+                        loras: data.loras,
+                        status: data.status,
+                        errorMessage: data.errorMessage,
+                        requestId: data.requestId,
+                        falEndpoint: data.falEndpoint,
+                        thumbnailUrls: data.thumbnailUrls,
+                        tab: data.tab,
+                        service: data.service,
+                        mediaUrls: data.mediaUrls // Temporarily copy it
+                    };
+
+                    // Only preserve mediaUrls IF thumbnails don't exist yet, to prevent 50MB Blobs from locking up memory
+                    if (slimItem.thumbnailUrls && slimItem.thumbnailUrls.length > 0) {
+                        slimItem.mediaUrls = undefined; // Forcefully overwrite the old bloated property to undefined in the updater
                     }
 
                     setHistory(prev => {
-                        if (prev.some(h => h.id === slimData.id)) {
-                            return prev.map(h => h.id === slimData.id ? { ...h, ...slimData } : h);
+                        if (prev.some(h => h.id === slimItem.id)) {
+                            return prev.map(h => h.id === slimItem.id ? { ...h, ...slimItem } : h);
                         }
-                        return [slimData as any, ...prev];
+                        return [slimItem as any, ...prev];
                     });
                 } else if (type === 'delete' && data) {
                     if (data.id === 'ALL') {

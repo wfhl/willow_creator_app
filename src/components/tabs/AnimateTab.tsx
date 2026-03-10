@@ -111,16 +111,11 @@ export function AnimateTab({
         }
     }, [selectedModel, videoDuration, videoResolution, setSelectedModel, setVideoDuration, setVideoResolution]);
 
-    // Helper to process a file to a data URL
+    // Helper to process a file to a blob URL
     const processFile = (file: File) => {
         if (!file.type.startsWith('image/')) return;
-        const reader = new FileReader();
-        reader.onload = (re) => {
-            if (re.target?.result) {
-                setI2VTarget({ url: re.target.result as string, index: -1 });
-            }
-        };
-        reader.readAsDataURL(file);
+        const url = URL.createObjectURL(file);
+        setI2VTarget({ url, index: -1 });
     };
 
     const handleI2VImageUpload = (e: ChangeEvent<HTMLInputElement>) => {

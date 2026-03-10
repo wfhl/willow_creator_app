@@ -11,7 +11,7 @@ const loadedImagesCache = new Set<string>();
 
 const canMapToCache = (src: string | undefined): boolean => {
     if (!src) return false;
-    return !src.startsWith('data:');
+    return !src.startsWith('data:') && !src.startsWith('blob:');
 }
 
 export function ImageWithLoader({ className, fallbackIcon, ...props }: ImageWithLoaderProps) {

@@ -956,7 +956,10 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
         if (preset.themeId) setSelectedThemeId(preset.themeId);
         if (preset.visuals) setSpecificVisuals(preset.visuals);
         if (preset.outfit) setSpecificOutfit(preset.outfit);
-        if (preset.model) setSelectedModel(preset.model);
+        if (preset.model) {
+            if (activeTab === 'edit') setEditSelectedModel(preset.model);
+            else setSelectedModel(preset.model);
+        }
         if (preset.videoDuration) setVideoDuration(preset.videoDuration);
         if (preset.videoResolution) setVideoResolution(preset.videoResolution);
 
@@ -1590,12 +1593,12 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                 prompt: refinePrompt,
                                 model: editSelectedModel,
                                 mediaUrls: [],
-                                service: (editSelectedModel.includes('grok') || editSelectedModel.includes('seedream') || isVideo) ? 'fal' : 'gemini',
+                                service: (editSelectedModel.includes('grok') || editSelectedModel.includes('seedream') || editSelectedModel.includes('wan') || isVideo) ? 'fal' : 'gemini',
                                 status: 'pending',
                                 loras: loras,
                                 selectedAssetIds: assets.filter(a => a.selected).map(a => a.id),
-                                additionalImages: refineAdditionalImages.map(a => a.base64),
-                                inputImageUrl: refineTarget?.url,
+                                additionalImages: await Promise.all(refineAdditionalImages.map(a => urlToBase64(a.base64))),
+                                inputImageUrl: await urlToBase64(refineTarget?.url || ''),
                                 imageSize: refineImageSize,
                                 numImages: refineNumImages,
                                 tab: 'edit'
@@ -1605,13 +1608,24 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                             try {
                                 const localUrlToRawBase64 = async (url: string) => {
                                     if (url.startsWith('data:')) return url.split(',')[1];
-                                    const res = await fetch(url);
-                                    const blob = await res.blob();
-                                    return new Promise<string>(r => {
-                                        const reader = new FileReader();
-                                        reader.onloadend = () => r((reader.result as string).split(',')[1]);
-                                        reader.readAsDataURL(blob);
-                                    });
+                                    try {
+                                        const res = await fetch(url);
+                                        const blob = await res.blob();
+                                        return new Promise<string>((r, reject) => {
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                                if (reader.result) {
+                                                    r((reader.result as string).split(',')[1]);
+                                                } else {
+                                                    reject(new Error("Failed to read image data"));
+                                                }
+                                            };
+                                            reader.onerror = reject;
+                                            reader.readAsDataURL(blob);
+                                        });
+                                    } catch (e) {
+                                        throw new Error("Failed fetching url to raw base64");
+                                    }
                                 };
 
                                 let urlUrls: string[] = [];
@@ -1639,11 +1653,9 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
 
                                     if (editSelectedModel.includes('move') || editSelectedModel.includes('replace')) {
                                         if (refineAdditionalImages.length > 0) {
-                                            let imgUrl = refineAdditionalImages[0].base64;
-                                            if (imgUrl.startsWith('data:')) {
-                                                imgUrl = await falService.uploadBase64ToFal(imgUrl.split(',')[1]);
-                                            }
-                                            req.image_url = imgUrl;
+                                            const imgUrl = refineAdditionalImages[0].base64;
+                                            const rawB64 = await localUrlToRawBase64(imgUrl);
+                                            req.image_url = await falService.uploadBase64ToFal(rawB64);
                                         } else {
                                             alert("Subject image required for this model.");
                                             setActiveRefinements(prev => Math.max(0, prev - 1));
@@ -1657,10 +1669,11 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                     const base64 = await localUrlToRawBase64(refineTarget.url);
                                     const baseMime = refineTarget.url.split(';')[0].split(':')[1] || "image/jpeg";
                                     const contentParts: any[] = [{ inlineData: { mimeType: baseMime, data: base64 } }];
-                                    refineAdditionalImages.forEach(img => {
+                                    for (const img of refineAdditionalImages) {
                                         const refMime = img.base64.split(';')[0].split(':')[1] || "image/jpeg";
-                                        contentParts.push({ inlineData: { mimeType: refMime, data: img.base64.split(',')[1] } });
-                                    });
+                                        const fileB64 = await localUrlToRawBase64(img.base64);
+                                        contentParts.push({ inlineData: { mimeType: refMime, data: fileB64 } });
+                                    }
                                     setRefineProgress(40);
 
                                     if (editSelectedModel.includes('grok') || editSelectedModel.includes('seedream') || editSelectedModel.includes('wan') || editSelectedModel.includes('fal')) {
@@ -1703,13 +1716,8 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                     setRefineProgress(100);
                                     try {
                                         const thumbnailUrls = await createThumbnails(urlUrls);
-                                        const finalInputImageUrl = baseHistoryEntry.inputImageUrl ? await urlToBase64(baseHistoryEntry.inputImageUrl) : undefined;
-                                        const finalAdditionalImages = baseHistoryEntry.additionalImages ? await Promise.all(baseHistoryEntry.additionalImages.map(img => urlToBase64(img))) : undefined;
-
                                         await dbService.saveGenerationHistory({
                                             ...baseHistoryEntry,
-                                            inputImageUrl: finalInputImageUrl,
-                                            additionalImages: finalAdditionalImages,
                                             mediaUrls: urlUrls,
                                             thumbnailUrls,
                                             status: 'success'
@@ -1805,42 +1813,55 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                             if (!i2vTarget || !i2vPrompt) return;
                             setActiveAnimations(prev => prev + 1);
 
-                            const historyId = generateUUID();
-                            const baseHistoryEntry: DBGenerationHistory = {
-                                id: historyId,
-                                timestamp: Date.now(),
-                                type: 'video',
-                                prompt: i2vPrompt,
-                                model: selectedModel,
-                                mediaUrls: [],
-                                service: (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) ? 'fal' : 'gemini',
-                                status: 'pending',
-                                loras: loras,
-                                selectedAssetIds: assets.filter(a => a.selected).map(a => a.id),
-                                inputImageUrl: i2vTarget?.url,
-                                videoResolution: videoResolution,
-                                videoDuration: videoDuration,
-                                aspectRatio: i2vAspectRatio,
-                                withAudio: withAudio,
-                                cameraFixed: cameraFixed,
-                                tab: 'animate'
-                            };
-                            try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { console.error(e); }
-
+                            let baseHistoryEntry: DBGenerationHistory | null = null;
                             try {
                                 const localUrlToRawBase64 = async (url: string) => {
                                     if (url.startsWith('data:')) return url.split(',')[1];
-                                    const res = await fetch(url);
-                                    const blob = await res.blob();
-                                    return new Promise<string>(r => {
-                                        const reader = new FileReader();
-                                        reader.onloadend = () => r((reader.result as string).split(',')[1]);
-                                        reader.readAsDataURL(blob);
-                                    });
+                                    try {
+                                        const res = await fetch(url);
+                                        const blob = await res.blob();
+                                        return new Promise<string>((r, reject) => {
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                                if (reader.result) {
+                                                    r((reader.result as string).split(',')[1]);
+                                                } else {
+                                                    reject(new Error("Failed reading video image data"));
+                                                }
+                                            };
+                                            reader.onerror = reject;
+                                            reader.readAsDataURL(blob);
+                                        });
+                                    } catch (e) { throw new Error("Failed fetching animation source"); }
                                 };
-                                const base64 = await localUrlToRawBase64(i2vTarget.url);
+
+                                const historyId = generateUUID();
+                                const base64Data = await localUrlToRawBase64(i2vTarget.url);
                                 const sourceMime = i2vTarget.url.split(';')[0].split(':')[1] || "image/jpeg";
-                                const contentParts = [{ inlineData: { mimeType: sourceMime, data: base64 } }];
+                                const persistentUrl = `data:${sourceMime};base64,${base64Data}`;
+
+                                baseHistoryEntry = {
+                                    id: historyId,
+                                    timestamp: Date.now(),
+                                    type: 'video',
+                                    prompt: i2vPrompt,
+                                    model: selectedModel,
+                                    mediaUrls: [],
+                                    service: (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) ? 'fal' : 'gemini',
+                                    status: 'pending',
+                                    loras: loras,
+                                    selectedAssetIds: assets.filter(a => a.selected).map(a => a.id),
+                                    inputImageUrl: persistentUrl,
+                                    videoResolution: videoResolution,
+                                    videoDuration: videoDuration,
+                                    aspectRatio: i2vAspectRatio,
+                                    withAudio: withAudio,
+                                    cameraFixed: cameraFixed,
+                                    tab: 'animate'
+                                };
+                                try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { console.error(e); }
+
+                                const contentParts = [{ inlineData: { mimeType: sourceMime, data: base64Data } }];
 
                                 let url = "";
                                 if (selectedModel.includes('grok') || selectedModel.includes('seedance') || selectedModel.includes('wan')) {
@@ -1861,9 +1882,11 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                             enableSafety: false
                                         },
                                         onEnqueue: async (requestId, endpoint) => {
-                                            baseHistoryEntry.requestId = requestId;
-                                            baseHistoryEntry.falEndpoint = endpoint;
-                                            try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { }
+                                            if (baseHistoryEntry) {
+                                                baseHistoryEntry.requestId = requestId;
+                                                baseHistoryEntry.falEndpoint = endpoint;
+                                                try { await dbService.saveGenerationHistory(baseHistoryEntry); } catch (e) { }
+                                            }
                                         }
                                     };
                                     const results = await falService.generateMedia(req);
@@ -1890,11 +1913,9 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                                     setI2VResultUrl(url);
                                     // Save to History
                                     try {
-                                        const finalInputImageUrl = baseHistoryEntry.inputImageUrl ? await urlToBase64(baseHistoryEntry.inputImageUrl) : undefined;
                                         const thumbnailUrls = await createThumbnails([url]);
                                         await dbService.saveGenerationHistory({
-                                            ...baseHistoryEntry,
-                                            inputImageUrl: finalInputImageUrl,
+                                            ...baseHistoryEntry!,
                                             mediaUrls: [url],
                                             thumbnailUrls,
                                             status: 'success'
@@ -1904,13 +1925,15 @@ TECHNICAL PROMPT: ${finalPromptToUse}`;
                             } catch (e: any) {
                                 console.error(e);
                                 alert(`Video gen failed: ${e.message || e}`);
-                                try {
-                                    await dbService.saveGenerationHistory({
-                                        ...baseHistoryEntry,
-                                        status: 'failed',
-                                        errorMessage: e?.message || 'Unknown error'
-                                    });
-                                } catch (err) { }
+                                if (baseHistoryEntry) {
+                                    try {
+                                        await dbService.saveGenerationHistory({
+                                            ...baseHistoryEntry,
+                                            status: 'failed',
+                                            errorMessage: e?.message || 'Unknown error'
+                                        });
+                                    } catch (err) { }
+                                }
                             } finally { setActiveAnimations(prev => Math.max(0, prev - 1)); }
                         }}
                         generatedI2VUrl={i2vResultUrl}

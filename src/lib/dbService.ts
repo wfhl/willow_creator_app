@@ -755,7 +755,36 @@ export const dbService = {
 
                 if (slim) {
                     const val = cursor.value;
-                    const { mediaUrls, inputImageUrl, visualsImage, outfitImage, additionalImages, ...slimItem } = val;
+                    // Sever memory reference explicitly instead of rest destructuring
+                    // which forces V8 to maintain the hidden parent shape for gigabytes of image data
+                    const slimItem: Partial<DBGenerationHistory> = {
+                        id: val.id,
+                        timestamp: val.timestamp,
+                        type: val.type,
+                        prompt: val.prompt,
+                        model: val.model,
+                        aspectRatio: val.aspectRatio,
+                        imageSize: val.imageSize,
+                        numImages: val.numImages,
+                        videoResolution: val.videoResolution,
+                        videoDuration: val.videoDuration,
+                        withAudio: val.withAudio,
+                        cameraFixed: val.cameraFixed,
+                        themeId: val.themeId,
+                        themeName: val.themeName,
+                        topic: val.topic,
+                        visuals: val.visuals,
+                        outfit: val.outfit,
+                        selectedAssetIds: val.selectedAssetIds,
+                        loras: val.loras,
+                        status: val.status,
+                        errorMessage: val.errorMessage,
+                        requestId: val.requestId,
+                        falEndpoint: val.falEndpoint,
+                        thumbnailUrls: val.thumbnailUrls,
+                        tab: val.tab,
+                        service: val.service
+                    };
                     items.push(slimItem as DBGenerationHistory);
                 } else {
                     items.push(cursor.value);
