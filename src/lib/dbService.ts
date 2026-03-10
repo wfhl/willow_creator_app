@@ -706,13 +706,16 @@ export const dbService = {
 
     // --- GENERATION HISTORY ---
     async saveGenerationHistory(entry: DBGenerationHistory, skipNotify = false): Promise<void> {
-        const isDeleted = await this.isDeleted(entry.id);
-        if (isDeleted) {
+        // Run the deletion check and DB open in parallel to avoid two serial round-trips
+        const [isDeletedResult, db] = await Promise.all([
+            this.isDeleted(entry.id),
+            openDB()
+        ]);
+        if (isDeletedResult) {
             console.log(`[DB] Ignoring save for deleted history item: ${entry.id}`);
             return;
         }
 
-        const db = await openDB();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('generation_history', 'readwrite');
             const store = transaction.objectStore('generation_history');
@@ -733,11 +736,25 @@ export const dbService = {
             const index = store.index('timestamp');
 
             const items: DBGenerationHistory[] = [];
-            let skipped = 0;
-            let range = null;
-            if (beforeTimestamp) {
-                range = sortOrder === 'prev' ? IDBKeyRange.upperBound(beforeTimestamp, false) : IDBKeyRange.lowerBound(beforeTimestamp, false);
+
+            // Build a key range so the cursor starts right at the boundary and
+            // never scans records we don't need. On the very first page we open
+            // with IDBKeyRange.upperBound(Date.now()) so the cursor starts at
+            // the newest record and walks backwards - stopping after `limit` hits.
+            let range: IDBKeyRange;
+            if (beforeTimestamp !== undefined) {
+                // Load-more: fetch items strictly older than the last seen timestamp
+                range = sortOrder === 'prev'
+                    ? IDBKeyRange.upperBound(beforeTimestamp, true)   // exclusive upper bound
+                    : IDBKeyRange.lowerBound(beforeTimestamp, true);  // exclusive lower bound
+            } else {
+                // First page: open a range that includes everything up to now so
+                // the cursor can start at the very latest record immediately.
+                range = sortOrder === 'prev'
+                    ? IDBKeyRange.upperBound(Date.now())
+                    : IDBKeyRange.lowerBound(0);
             }
+
             const request = index.openCursor(range, sortOrder);
 
             request.onsuccess = (event) => {
@@ -747,9 +764,10 @@ export const dbService = {
                     return;
                 }
 
-                if (skipped < offset) {
-                    cursor.advance(offset - skipped);
-                    skipped = offset;
+                // Skip offset records (used for non-timestamp-keyed pagination)
+                if (offset > 0 && items.length === 0) {
+                    cursor.advance(offset);
+                    offset = 0; // only advance once
                     return;
                 }
 

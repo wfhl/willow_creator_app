@@ -62,6 +62,10 @@ export function AssetLibraryTab({ onPreview, onRecall, onDownload }: AssetLibrar
     const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [isProcessingBulk, setIsProcessingBulk] = useState(false);
+    // Tracks which image download is in-flight so we can show a spinner: `${itemId}-${idx}`
+    const [downloadingImageKey, setDownloadingImageKey] = useState<string | null>(null);
+    // Cache of already-fetched mediaUrls so repeat clicks are instant
+    const mediaUrlCacheRef = useRef<Map<string, string[]>>(new Map());
 
     const assetObserverTarget = useRef<HTMLDivElement>(null);
     const historyObserverTarget = useRef<HTMLDivElement>(null);
@@ -840,10 +844,23 @@ Tab: ${fullItem.tab || 'N/A'}
                                                     const handleImageDownload = async (e: React.MouseEvent) => {
                                                         e.preventDefault();
                                                         e.stopPropagation();
+                                                        const dlKey = `${item.id}-${idx}`;
+                                                        if (downloadingImageKey === dlKey) return; // prevent double-click
                                                         let urlToDownload: string | undefined = fullUrlArr?.[idx];
                                                         if (!urlToDownload) {
-                                                            const full = await dbService.getGenerationHistoryItem(item.id);
-                                                            urlToDownload = (full?.mediaUrls || [])[idx];
+                                                            // Check in-memory cache first to avoid re-reading the fat DB record
+                                                            let cachedUrls = mediaUrlCacheRef.current.get(item.id);
+                                                            if (!cachedUrls) {
+                                                                setDownloadingImageKey(dlKey);
+                                                                try {
+                                                                    const full = await dbService.getGenerationHistoryItem(item.id);
+                                                                    cachedUrls = full?.mediaUrls || [];
+                                                                    if (cachedUrls.length > 0) mediaUrlCacheRef.current.set(item.id, cachedUrls);
+                                                                } finally {
+                                                                    setDownloadingImageKey(null);
+                                                                }
+                                                            }
+                                                            urlToDownload = (cachedUrls || [])[idx];
                                                         }
                                                         if (urlToDownload) {
                                                             if (onDownload) onDownload(urlToDownload, `history_${idx}`);
@@ -871,9 +888,13 @@ Tab: ${fullItem.tab || 'N/A'}
                                                             {!isSelectionMode && (
                                                                 <button
                                                                     onClick={handleImageDownload}
-                                                                    className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-100 transition-opacity"
+                                                                    disabled={downloadingImageKey === `${item.id}-${idx}`}
+                                                                    className="absolute top-2 right-2 p-1.5 bg-black/60 text-white/60 hover:text-white rounded-lg opacity-100 transition-opacity disabled:opacity-50"
+                                                                    title="Download image"
                                                                 >
-                                                                    <Download className="w-3.5 h-3.5" />
+                                                                    {downloadingImageKey === `${item.id}-${idx}`
+                                                                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                        : <Download className="w-3.5 h-3.5" />}
                                                                 </button>
                                                             )}
                                                         </div>
